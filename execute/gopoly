@@ -1,0 +1,7 @@
+#!/bin/sh
+#$ -pe Parallel_32 8
+#$ -cwd -j y
+#$ -N GOPOLY
+
+/usr/lib64/mpi/gcc/openmpi/bin/mpirun -np $NSLOTS /home/ws37/dl_poly_classic/execute/DLPOLY.X
+

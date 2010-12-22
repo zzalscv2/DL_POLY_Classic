@@ -1,0 +1,3 @@
+javac *.java
+jar -cfm GUI.jar manifesto *.class About_DL_POLY Acknowledge CERAMICS MINIDREI MINIOPLS WATER.300K TestInfo Licence Disclaimer
+
