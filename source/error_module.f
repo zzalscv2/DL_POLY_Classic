@@ -1364,6 +1364,7 @@ c     close all i/o channels
           close (nrest)
           close (nfield)
           close (ntable)
+          close (nevnt)
         endif
         
         call gsync()
