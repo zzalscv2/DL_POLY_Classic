@@ -21,6 +21,8 @@ c
 c     authors: w.smith and t.r.forester 1995
 c     copyright daresbury laboratory 1995
 c     
+c                       DL_POLY CLASSIC VERSION 1.1
+c
 c***********************************************************************
       
 c     declare required modules
