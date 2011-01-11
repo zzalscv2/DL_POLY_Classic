@@ -509,8 +509,8 @@ c     integrate equations of motion stage 1 of velocity verlet
             if(lghost)call update_ghost(idnode,mxnode)
             
             if(lfree.or.lghost)
-     x        call lrcorrect_fre(lfree,volm,elrc,virlrc)
-            if(lsolva)call lrcorrect_sol(lghost,volm)
+     x        call lrcorrect_fre(lfree,imcon,volm,elrc,virlrc)
+            if(lsolva)call lrcorrect_sol(lghost,imcon,volm)
             
           endif
 
@@ -616,11 +616,11 @@ c     update the atomic positions for the ghost molecule
         
 c     long range correction adjustment for free energy and solvation
         
-        if(lsolva)call lrcorrect_sol(lghost,volm)
+        if(lsolva)call lrcorrect_sol(lghost,imcon,volm)
         
         if(lfree.or.lghost)
-     x    call lrcorrect_fre(lfree,volm,elrc,virlrc)
-        if(lsolva)call lrcorrect_sol(lghost,volm)
+     x    call lrcorrect_fre(lfree,imcon,volm,elrc,virlrc)
+        if(lsolva)call lrcorrect_sol(lghost,imcon,volm)
         
 c     application of transition analysis procedures
         

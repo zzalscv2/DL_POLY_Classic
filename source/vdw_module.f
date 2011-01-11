@@ -1167,6 +1167,7 @@ c     long range corrections to energy and pressure
       virlrc=0.d0
       virlrc2=0.d0
       denprdf=0.d0
+      volm_sav=0.d0
       elrc_fre=0.d0
       vlrc_fre=0.d0
       

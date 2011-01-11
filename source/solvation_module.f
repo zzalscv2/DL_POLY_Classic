@@ -249,7 +249,7 @@ c***********************************************************************
       
       end subroutine alloc_free_arrays
       
-      subroutine lrcorrect_fre(lfree,volm,elrc,virlrc)
+      subroutine lrcorrect_fre(lfree,imcon,volm,elrc,virlrc)
       
 c***********************************************************************
 c     
@@ -261,17 +261,23 @@ c
 c***********************************************************************
       
       logical lfree
+      integer imcon
       real(8) volm,elrc,virlrc
       
-      elrc=elrc_sav*(volm_sav/volm)
-      elrc2=elrc2_sav*(volm_sav/volm)
-      virlrc=virlrc_sav*(volm_sav/volm)
-      virlrc2=virlrc2_sav*(volm_sav/volm)
-      if(lfree)then
-        elrc_fre=elrc_fre_sav*(volm_sav/volm)
-        vlrc_fre=vlrc_fre_sav*(volm_sav/volm)
+      if(imcon.ne.0.and.imcon.ne.6)then
+        
+        elrc=elrc_sav*(volm_sav/volm)
+        elrc2=elrc2_sav*(volm_sav/volm)
+        virlrc=virlrc_sav*(volm_sav/volm)
+        virlrc2=virlrc2_sav*(volm_sav/volm)
+        if(lfree)then
+          elrc_fre=elrc_fre_sav*(volm_sav/volm)
+          vlrc_fre=vlrc_fre_sav*(volm_sav/volm)
+        endif
+        
       endif
       
+      return
       end subroutine lrcorrect_fre
       
       subroutine free_kinetic(lfrmas,idnode,mxnode,keyver)
@@ -735,7 +741,7 @@ c***********************************************************************
       
       end subroutine switch
       
-      subroutine lrcorrect_sol(lghost,volm)
+      subroutine lrcorrect_sol(lghost,imcon,volm)
       
 c***********************************************************************
 c     
@@ -746,11 +752,16 @@ c     adapted   - w. smith     aug 2008
 c     
 c***********************************************************************
       
-      logical :: lghost
-      real(8) :: volm 
+      logical lghost
+      integer imcon
+      real(8) volm 
       
-      elrc_sol(:)=elrc_sol_sav(:)*(volm_sav/volm)
-      if(lghost)elrc_exc(:)=elrc_exc_sav(:)*(volm_sav/volm)
+      if(imcon.ne.0.and.imcon.ne.6)then
+        
+        elrc_sol(:)=elrc_sol_sav(:)*(volm_sav/volm)
+        if(lghost)elrc_exc(:)=elrc_exc_sav(:)*(volm_sav/volm)
+        
+      endif
       
       return
       end subroutine lrcorrect_sol
