@@ -546,7 +546,7 @@ c***********************************************************************
       logical safe
       character*8 atom1,atom2
       integer idnode,ntpvdw,ntpatm,idum,ngrid
-      integer ivdw,katom1,katom2,jtpatm,l,i,k,keyvdw
+      integer ivdw,katom1,katom2,jtpatm,l,i,j,k,keyvdw
       real(8) dlrpot,rcut,engunit,delpot,cutpot,rdr,rrr,ppp
       real(8) vk0,vk1,vk2,t1,t2
 
@@ -564,27 +564,25 @@ c     read mesh resolution
       delpot=dblstr(record,lenrec,idum)
       cutpot=dblstr(record,lenrec,idum)
       ngrid=intstr(record,lenrec,idum)
+
       dlrpot=rcut/dble(mxgrid-4)
-      if(abs(delpot-dlrpot)/dlrpot.le.1.d-4)delpot=dlrpot
-      if((delpot.gt.dlrpot).or.(ngrid-4.ne.nint(cutpot/delpot)))then
 
-        if(idnode.eq.0) then
-          write(nrite,"('expected radial increment : ',1p,e15.7,/,
-     x                '   TABLE radial increment : ',1p,e15.7,/,/,    
-     x                'expected number of grid points : ',0p,i10,/,
-     x                'grid points in TABLE           : ',i10)")
-     x      dlrpot, delpot, mxgrid, ngrid
-        endif
-        
-        call error(idnode,22)
+      If (Abs(delpot-dlrpot) <= 1.0e-8) delpot=dlrpot
+      If ((delpot>dlrpot) .or. (ngrid-4 /= Nint(cutpot/delpot))) Then
+         If (idnode == 0) Write(nrite,"(                 
+     x    'expected radial increment : ',1p,e15.7,/,     
+     x    'TABLE    radial increment : ',1p,e15.7,/,/,   
+     x    'expected number of grid points : ',0p,i10,/,  
+     x    'grid points in TABLE           : ',i10)")     
+     x    dlrpot, delpot, mxgrid, ngrid
 
-      endif
+         Call error(idnode,22)
+      End If
 
       if(cutpot.lt.rcut) call error(idnode,504)
-      if(idnode.eq.0) then
-        if(abs(1.d0-(delpot/dlrpot)).gt.1d-7) write(nrite,
+      if(abs(1.d0-(delpot/dlrpot)).gt.1.0e-8) then
+        if(idnode.eq.0) write(nrite,
      x    "(/,' TABLE arrays resized for mxgrid=',i10)") mxgrid
-
       endif
 
 c     read potential arrays for all pairs
@@ -627,74 +625,76 @@ c     read pair potential labels and long range corrections
           
 c     read potential arrays
           
-          if(idnode.eq.0)then
-
-            if(mxbuff.lt.ngrid)  then
+          if(mxbuff.lt.ngrid)  then
               
-              write(nrite,*) 'mxbuff must be >=',ngrid,' in fortab'
-              call error(idnode,48)
+            if(idnode.eq.0)
+     x         write(nrite,*) 'mxbuff must be >=',ngrid,' in fortab'
+            call error(idnode,48)
               
-            endif
+          endif
 
-            read(ntable,'(4e15.8)',end=100)(buffer(i),i=1,ngrid)
+c     read in potential arrays
+
+          Do i=1,(ngrid+3)/4
+             l=Min(4,ngrid-(i-1)*4)
+             If (idnode == 0) Then
+                Read(Unit=ntable, Fmt=*, End=100)
+     x              (buffer((i-1)*4+j),j=1,l)
+             Else
+                buffer((i-1)*4+1:(i-1)*4+l)=0.0d0
+             End If
+          End Do
+          Call gdsum(buffer(1:ngrid),ngrid,buffer(ngrid+1:2*ngrid))
 
 c     reconstruct arrays using 3pt interpolation
 
-            rdr=1.d0/delpot
-            vvv(1,ivdw)=1.d0
-            ggg(1,ivdw)=0.d0
-            do i=2,mxgrid
-              rrr=dble(i)*dlrpot
-              l=int(rrr*rdr)
-              ppp=rrr*rdr-dble(l)
-              vk0=buffer(l)
-              vk1=buffer(l+1)
-              vk2=buffer(l+2)
+          rdr=1.d0/delpot
+          vvv(1,ivdw)=1.d0
+          ggg(1,ivdw)=0.d0
+          do i=2,mxgrid
+            rrr=dble(i)*dlrpot
+            l=int(rrr*rdr)
+            ppp=rrr*rdr-dble(l)
+            vk0=buffer(l)
+            vk1=buffer(l+1)
+            vk2=buffer(l+2)
             
-              t1=vk0+(vk1-vk0)*ppp
-              t2=vk1+(vk2-vk1)*(ppp-1.0d0)
-              vvv(i,ivdw)=t1+(t2-t1)*ppp*0.5d0
+            t1=vk0+(vk1-vk0)*ppp
+            t2=vk1+(vk2-vk1)*(ppp-1.0d0)
+            vvv(i,ivdw)=t1+(t2-t1)*ppp*0.5d0
 
-            enddo
+          enddo
 
-            read(ntable,'(4e15.8)',end=100)(buffer(i),i=1,ngrid)
+c     read in force arrays
+
+          Do i=1,(ngrid+3)/4
+             l=Min(4,ngrid-(i-1)*4)
+             If (idnode == 0) Then
+                Read(Unit=ntable, Fmt=*, End=100)
+     x              (buffer((i-1)*4+j),j=1,l)
+             Else
+                buffer((i-1)*4+1:(i-1)*4+l)=0.0d0
+             End If
+          End Do
+          Call gdsum(buffer(1:ngrid),ngrid,buffer(ngrid+1:2*ngrid))
 
 c     reconstruct ggg arrays using 3pt interpolation
 
-            do i=2,mxgrid
+          do i=2,mxgrid
 
-              rrr=dble(i)*dlrpot
-              l=int(rrr*rdr)
-              ppp=rrr*rdr-dble(l)
-              vk0=buffer(l)
-              vk1=buffer(l+1)
-              vk2=buffer(l+2)
+            rrr=dble(i)*dlrpot
+            l=int(rrr*rdr)
+            ppp=rrr*rdr-dble(l)
+            vk0=buffer(l)
+            vk1=buffer(l+1)
+            vk2=buffer(l+2)
             
-              t1=vk0+(vk1-vk0)*ppp
-              t2=vk1+(vk2-vk1)*(ppp-1.0d0)
+            t1=vk0+(vk1-vk0)*ppp
+            t2=vk1+(vk2-vk1)*(ppp-1.0d0)
             
-              ggg(i,ivdw)=t1+(t2-t1)*ppp*0.5d0
+            ggg(i,ivdw)=t1+(t2-t1)*ppp*0.5d0
 
-            enddo
-
-            call gdsum(vvv(1,ivdw),mxgrid,buffer)
-            call gdsum(ggg(1,ivdw),mxgrid,buffer)
-
-          else
-            
-            if(mxbuff.lt.mxgrid) call error(idnode,48)
-
-            do i=1,mxgrid
-
-              vvv(i,ivdw)=0.d0
-              ggg(i,ivdw)=0.d0
-
-            enddo
-
-            call gdsum(vvv(1,ivdw),mxgrid,buffer)
-            call gdsum(ggg(1,ivdw),mxgrid,buffer)
-
-          endif
+          enddo
 
         endif
         
