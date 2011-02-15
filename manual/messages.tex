@@ -1,3 +1,5 @@
+
+
 \label{A2} 
 \subsection*{Introduction}
 In this appendix we document the error messages\index{error
@@ -4340,4 +4342,333 @@ other! \\
 \noindent
 {\em Action:}\\ Remove either the TAD or BPD option from the CONTROL file.
 
+\subsubsection*{Message 2500: error in number of collective variables -
+ncolvar too small?}
 
+The number of order parameters in a metadynamics simulation  has not been
+properly specified.
+
+\noindent
+{\em Action:}\\ Check input data in CONTROL file and correct accordingly.
+
+\subsubsection*{Message 2501: Wang-Landau style recursion not yet 
+implemented for ncolvar $> 1$}
+
+The Wang-Landau recursion option in metadynamics is currently limted to one
+order parameter only.
+
+\noindent
+{\em Action:}\\ Select another Gaussian convergence option in the CONTROL file.
+
+\subsubsection*{Message 2502: Unrecognised Gaussian height scheme}
+
+An invalid option has been selected for the metadynamics Gaussian convergence
+scheme, which is rstricted to values 0,1 and 2,
+
+\noindent
+{\em Action:}\\ Reset the {\bf hkey} option to an acceptable value in the CONTROL
+file. 
+      
+\subsubsection*{Message 2503: Error maxhis exceeded in metadynamics}
+
+The internal storage of Gaussian data in metadynamics has been exceeded.
+
+\noindent
+{\em Action:}\\ This can be recovered if a greater number of processing nodes
+is used at restart, but ideally, a less ambitious Gaussian deposition rate
+should be considered.
+
+\subsubsection*{Message 2504: Error allocating comms buffer in 
+compute\_bias\_potential}
+
+Unlikely array allocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ The user is probably making excessive demands of
+memory. Reconsider the problem size in relation to compute resource.
+          
+\subsubsection*{Message 2505: Error allocating driven array}
+          
+Unlikely array allocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ The user is probably making excessive demands of
+memory. Reconsider the problem size in relation to compute resource.
+          
+\subsubsection*{Message 2508: Comms error in metadynamics setup}
+
+This is probably a programming error and should not occur.
+
+\noindent
+{\em Action:}\\ Identify and fix the bug if you can. Otherwise locate
+the authors and ask for a fix.
+          
+\subsubsection*{Message 2509: Cannot bias local and global PE in same run}
+
+The metadynamics option does not allow the use of both global and local
+potential energy order parameters at the same time.
+
+\noindent
+{\em Action:}\\ Decide which of these options you really need and reset the
+directives in the CONTROL file.
+
+\subsubsection*{Message 2510: Error allocating local force arrays}
+          
+Unlikely array allocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ The user is probably making excessive demands of
+memory. Reconsider the problem size in relation to compute resource.
+          
+\subsubsection*{Message 2511: Error allocating collective variables arrays}
+
+Unlikely array allocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ The user is probably making excessive demands of
+memory. Reconsider the problem size in relation to compute resource.
+          
+\subsubsection*{Message 2512: Error allocating Wang-Landau bins}
+
+Unlikely array allocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ The user is probably making excessive demands of
+memory. Reconsider the problem size in relation to compute resource.
+          
+\subsubsection*{Message 2515: Error allocating Steinhardt parameter arrays}
+
+Unlikely array allocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ The user is probably making excessive demands of
+memory. Reconsider the problem size in relation to compute resource.
+          
+\subsubsection*{Message 2516: Could not open STEINHARDT}
+
+The STEINHARDT data (input) file cannot be opened.
+
+\noindent
+{\em Action:}\\ The file is probably not available, or is unreadable. Restore
+the file as required and rerun.
+          
+\subsubsection*{Message 2517: Error allocating q4site}
+
+Unlikely array allocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ The user is probably making excessive demands of
+memory. Reconsider the problem size in relation to compute resource.
+          
+\subsubsection*{Message 2518: Error allocating q6site}
+
+Unlikely array allocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ The user is probably making excessive demands of
+memory. Reconsider the problem size in relation to compute resource.
+          
+\subsubsection*{Message 2519: Error deallocating buff}
+
+Unlikely array deallocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ Possible system error. Raise issue with system manager.
+          
+\subsubsection*{Message 2521: Error reading line \_ of STEINHARDT}
+
+The nominated line of the STEINHARDT file cannot be read.
+
+\noindent
+{\em Action:}\\ Probably missing or corrupted data line in file. Locate and correct.
+          
+\subsubsection*{Message 2522: Error allocating Steinhardt parameter arrays}
+
+Unlikely array allocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ The user is probably making excessive demands of
+memory. Reconsider the problem size in relation to compute resource.
+          
+\subsubsection*{Message 2523: Could not open ZETA}
+          
+The ZETA data (input) file cannot be opened.
+
+\noindent
+{\em Action:}\\ The file is probably not available, or is unreadable. Restore
+the file as required and rerun.
+          
+\subsubsection*{Message 2524: Error allocating zetasite}
+
+Unlikely array allocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ The user is probably making excessive demands of
+memory. Reconsider the problem size in relation to compute resource.
+          
+\subsubsection*{Message 2525: Error allocating full neighbour list}
+
+Unlikely array allocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ The user is probably making excessive demands of
+memory. Reconsider the problem size in relation to compute resource.
+          
+\subsubsection*{Message 2527: Number of collective variables incorrect
+for specified order parameters}
+
+The internal check of the requested number of order parameters in a
+metadynamics simulation has found an inconsistency.
+
+\noindent
+{\em Action:}\\ Check the total number of collective variables (ncolvar) 
+matches total number specified by nq4, nq6, ntet and potential energy
+parameters.
+
+\subsubsection*{Message 2529: Error reading line \_ of ZETA}
+
+There has been an error reading the nominated line of the ZETA file.
+
+\noindent
+{\em Action:}\\ Probably a missing or corrupted data line. Locate and fix.
+          
+\subsubsection*{Message 2531: Comms error on reading METADYNAMICS}
+          
+This is probably a programming error and should not occur.
+
+\noindent
+{\em Action:}\\ Identify and fix the bug if you can. Otherwise locate
+the authors and ask for a fix.
+
+\subsubsection*{Message 2532: Error in fc function - out of range}
+
+The switching function has been incorrectly defined in a hyperdynamics
+simulation. 
+
+\noindent
+{\em Action:}\\ Check the value reported and make the necessary correction in
+the STEINHARDT or ZETA file concerned.
+          
+\subsubsection*{Message 2533: Error allocating solvation arrays for 
+metadynamics}
+
+Unlikely array allocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ The user is probably making excessive demands of
+memory. Reconsider the problem size in relation to compute resource.
+          
+\subsubsection*{Message 2534: Error allocating comms buffer arrays}
+
+Unlikely array allocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ The user is probably making excessive demands of
+memory. Reconsider the problem size in relation to compute resource.
+          
+\subsubsection*{Message 2535: Solvation list overrun}
+
+The arrays tabulating the coordination list for either Steinhardt or
+tetrahedral order parameters have been exceeded.
+
+\noindent
+{\em Action:}\\ Locate the specification of the variable {\em maxneigh} in the
+metafreeze\_module.f file (there are 3 occurrences) and reset to a larger
+number.
+
+\subsubsection*{Message 2536: Error deallocating solvation arrays for 
+metadynamics}
+
+Unlikely array deallocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ Possible system error. Raise issue with system manager.
+          
+\subsubsection*{Message 2537: Error deallocating comms buffer arrays}
+
+Unlikely array deallocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ Possible system error. Raise issue with system manager.
+          
+\subsubsection*{Message 2538: Error allocating solvation arrays for 
+metadynamics}
+
+Unlikely array allocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ The user is probably making excessive demands of
+memory. Reconsider the problem size in relation to compute resource.
+          
+\subsubsection*{Message 2540: Error allocating force prefactor arrays}
+
+Unlikely array allocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ The user is probably making excessive demands of
+memory. Reconsider the problem size in relation to compute resource.
+          
+\subsubsection*{Message 2541: Memory allocation error in compute\_tet\_nlist}
+
+Unlikely array allocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ The user is probably making excessive demands of
+memory. Reconsider the problem size in relation to compute resource.
+          
+\subsubsection*{Message 2542: Error in metafreeze\_module.f90 mxninc too small}
+          
+The internal estimate of the array allocation variable {\em mxninc} is too
+small for the purpose.
+
+\noindent
+{\em Action:}\\ Locate where variable is defined in metafreeze\_module.f and
+reset to a larger number.
+
+\subsubsection*{Message 2543: nnn too small in compute\_tet\_nlist}
+          
+The internal estimate of the array allocation variable {\em nnn} is too
+small for the purpose.
+
+\noindent
+{\em Action:}\\ Locate where variable is defined in metafreeze\_module.f and
+reset to a larger number.
+
+\subsubsection*{Message 2544: mxflist too small in metafreeze\_module}
+
+The internal estimate of the array allocation variable {\em mxflist} is too
+small for the purpose.
+
+\noindent
+{\em Action:}\\ Locate where variable is defined in metafreeze\_module.f and
+reset to a larger number.
+
+\subsubsection*{Message 2545: Memory deallocation error in compute\_tet\_nlist}
+
+Unlikely array deallocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ Probable system error. Raise issue with system manager.
+          
+\subsubsection*{Message 2546: Memory allocation error in compute\_tet\_nlist}
+
+Unlikely array allocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ The user is probably making excessive demands of
+memory. Reconsider the problem size in relation to compute resource.
+          
+\subsubsection*{Message 2547: Memory deallocation error in compute\_tet\_nlist}
+
+Unlikely array deallocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ Probable system error. Raise issue with system manager.
+          
+\subsubsection*{Message 2548: Memory allocation error in compute\_tet\_nlist}
+
+Unlikely array allocation error, which should not occur under normal use.
+
+\noindent
+{\em Action:}\\ The user is probably making excessive demands of
+memory. Reconsider the problem size in relation to compute resource.

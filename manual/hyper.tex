@@ -1,4 +1,3 @@
-
 \section{Overview of Hyperdynamics}
 \index{hyperdynamics!TAD}
 \index{hyperdynamics!BPD}
@@ -245,28 +244,52 @@ technique known as ``puddle skimming'' \cite{rahman-02a}, which is a viable
 method for Monte Carlo simulation, but has a disadvantage for molecular
 dynamics in that whenever $E_{bias}=V(\vek{R}^{N})$ the atomic forces become
 discontinuous. For dynamics a nonzero value of $\alpha$ is therefore always to
-be preferred. Hamelberg {\em et al} \cite{hamelberg-04a} give the following
-prescription for obtaining $\alpha$.
+be preferred. Hamelberg {\em et al} provides a workable prescription for
+obtaining $\alpha$ in reference \cite{hamelberg-04a}. However for \D{} a
+different approach is taken, which is outlined below.
 
-Firstly the system is simulated under normal conditions at the
-required state point and the mean value for the system configuration
-energy is determined. This average value is referred to as $V_{min}$
-and is used to represent the minimum configuration energy. Then a
-value of $E_{bias}$ is chosen that is able to to provide a suitable
-boost factor (as in equation \ref{boost}). $\alpha$ is then defined to
-be
+The scheme employed in \D{} makes use of the fact that the local potential
+energy minimum is known at any given instant by virtue of the minimisation
+operations that occur periodically in the course of the simulations. (These
+are necessary to check for any changes in structure.) This minimum (called
+hereafter $V_{0}$) is used to define the effective zero point of the
+configurational energy scale, which allows $E_{bias}$ to be conveniently
+defined in terms of a temperature $T_{bias}$, such that
 \begin{equation}
-\alpha=E_{bias}-V_{min.}
-\end{equation} 
-This prescription gives a system bias potential (\ref{sbias}) which is
-everywhere differentiable (with continuous forces) and usefully
-retains some semblance of the shape of the original potential energy
-surface. The user is at liberty to chose any value
-$E_{bias}>V_{min}$, which is useful for configurational
-sampling, but for hyperdynamics satisfying the Voter condition
-(\ref{votcon}) $E_{bias}$ must not exceed the system configuration
-energy at any saddle point representing an escape route from a
-potential basin.
+(E_{bias}-V_{0})=\frac{3}{2}Nk_{B}T_{bias}
+\end{equation}
+This representation has the advantage that it can be intuitively related to
+the energetics of the system without prior knowledge of where the system
+resides on the absolute energy scale. One can, for example, experiment with
+gradual increases in $T_{bias}$ until transitions occur at a reasonable rate.
+
+In a similar way an energy $V_{min}$, with an associated temperature
+$T_{min}$, can also be defined with respect to $V_{0}$, such that $V_{min}$
+represents the actual minimum of the biased potential $V_{bias}(\vek{R}^{N})$
+(equation \ref{vbias}). It can easily be shown that the minima of both
+$V_{bias}(\vek{R}^{N})$ and $V(\vek{R}^{N})$ occur at the same position
+$\vek{R}^{N}$ and this gives rise to the following expression for the
+constant $\alpha$
+\begin{equation}
+\alpha=\frac{(E_{bias}-V_{0})(E_{bias}-V_{min})}{(V_{min}-V_{0})}
+=\frac{3Nk_{B}T_{bias}(T_{bias}-T_{min})}{2T_{min}}.
+\end{equation}
+Under this scheme the user has easy control of the depth of the biased
+potential $V_{bias}(\vek{R}^{N})$, to any depth between $E_{bias}$ and
+$V_{0}$. Note that it does not matter if the system moves to a different
+potential basin (and hence adopts a different value of $V_{0}$), $T_{bias}$ and
+$T_{min}$ will be at the same heights above the minimum of the new basin.
+In this sense the the scheme outlined is adaptive with respect to the true
+energy surface.
+
+As with the original scheme of Hamelberg {\em et al} \cite{hamelberg-04a} this
+prescription gives a system bias potential (\ref{sbias}) which is everywhere
+differentiable (with continuous forces) and usefully retains some semblance of
+the topology of the original potential energy surface. The user is at liberty
+to chose any value $E_{bias}>V_{0}$, which is useful for configurational
+sampling, but for hyperdynamics satisfying the Voter condition (\ref{votcon})
+$E_{bias}$ must not exceed the system configuration energy at any saddle point
+representing an escape route from a potential basin.
 
 Finally it should be noted that simulations performed under the
 influence of a bias potential naturally do not return system averages
@@ -279,16 +302,22 @@ $<A>$ of a property $A$ is thus given by
 <A>=\frac{<Ae^{\beta W_{bias}(\vek{R}^{N})}>_{bias}}
 {<e^{\beta W_{bias}(\vek{R}^{N})}>_{bias}} \label{cbias}
 \end{equation}
-Where the ensemble averages are obtained in the biased system.  When
-running the BPD options \D{} calculates all system averages in this way.
+Where the ensemble averages are obtained in the biased system.
+In practice, if the system visits many basins in the course of the simulation
+(i.e. passes through many states), it is not always sensible to compute such
+averages over the run. \D{} only does this when using BPD to explore
+configuration space (see below, section \ref{cfgdyn}), in which case $V_{0}$
+is defined to be the {\em first} minimum visted in the simulation.
 
 \subsection{Running a BPD Simulation}
 
 Two ways of running bias potential dynamics are available in \D{}. The
 first is referred to as ``Full Path Kinetics'' since it attempts to
 reproduce a full description of the diffusion path with the associated
-activation energies. This is described in section \ref{FPK}. The
-second is ``configurational sampling'', which exploits BPD to explore
+activation energies. This is described in section \ref{FPK}. (A variation of
+Full Path Kinetics allows the user to bypass the Nudged Elatic Band
+calculations, which is useful in circumstances where the NEB has problems.)
+The second is ``configurational sampling'', which exploits BPD to explore
 the range of structural states available to a system, which need not
 necessarily be in the solid state. It may also be used to improve
 thermodynamic averaging of a system at a given temperature, where
@@ -297,15 +326,15 @@ described in section \ref{cfgdyn}.
 
 \subsection{Full Path Kinetics}
 \label{FPK}
-\index{hyperdynamics!BPD!full path kinetics}
-This option is intended to determine the true diffusional path that a
-solid state system follows at a given temperature, but at an
-accelerated rate.  Each time the system transforms from one structure
-to another (i.e. from one state to another) the program records the
-states it encounters and calculates both the activation energy $E^{*}$
-associated with the transition and extrpolates the time at which the
-transition would have occured in the unbiased system.  This information may
-subsequently be used to determine the full kinetics of the system.
+\index{hyperdynamics!BPD!full path kinetics} This option is intended to
+determine the true diffusional path that a solid state system follows at a
+given temperature, but at an accelerated rate.  Each time the system
+transforms from one structure to another (i.e. from one state to another) the
+program records the states it encounters and (optionally) calculates the
+activation energy $E^{*}$ associated with the transition and extrapolates to
+the time at which the transition would have occured in the unbiased system.
+This information may subsequently be used to determine the full kinetics of
+the system.
 
 The method in outline is as follows. 
 \begin{enumerate}
@@ -320,8 +349,11 @@ reference structure, which is compared with the original reference
 state to determine if a transition has occurred. A transition is
 deemed to have occured if one or more atoms are displaced by more than
 a preset distance (the `catch radius').  If a transition is
-detected, a NEB calculation is initiated, using the two reference
-structures, to find the activation energy ($E^{*}$). 
+detected, the program optionally performs a NEB calculation, using the 
+two reference structures, to find the activation energy ($E^{*}$). 
+Note that it is not essential calculate an activation energy if one is
+confident that the bias chosen does not exceed the safe limit described by
+Voter (equation \ref{votcon}).
 \item A determination of the time of the transition is made.
 In \D{} the occurrence time of the transition ($t_{occ}$) is determined
 by checking back from the detection of the transition through past
@@ -352,24 +384,32 @@ The recommended procedure for running BPD with \D{} is as follows.
 \item Run a normal (unbiased) simulation of the system at the required
 state point (temperature and volume). Make sure the system does not
 undergo any structural changes that nullify the validity of the BPD
-approach (e.g. melting). Record the average configuration energy
-($V_{min}$) of the system. Keep the REVCON file to use as the starting
+approach (e.g. melting). Keep the REVCON file to use as the starting
 CONFIG structure for the BPD simulation.
 \item Set up the BPD option in the CONTROL file as follows:
 \begin{enumerate}
 \item Set the {\bf bpd path} directive.
-\item Define the energy units for the BPD parameters e.g. \newline
+\item Define the energy units for the BPD calculations e.g. \newline
       {\bf units} {\em s}\newline where {\em s} is one of {\em eV,
-      kcal, kJ or K}, signifying electron volts, kilo cals per mole,
+      kcal, kJ or K}, signifying electron volts, kilo calories per mole,
       kilo joules per mole or Kelvin, respectively. No {\bf units}
       directive means DL\_POLY internal units apply. Forces are given 
-      in chosen energy units per Angstrom.
-\item Set the value of the average potential ($V_{min}$) e.g.\newline
-      {\bf vmin} {\em f} \newline
-      where {\em f} is the known average potential.
+      in the chosen energy units per Angstrom.
 \item Set the value of the potential bias ($E_{bias}$) e.g. \newline
       {\bf ebias} {\em f} \newline
-      where {\em f} is the bias energy level.
+      where {\em f} is the bias energy level in Kelvin.
+\item Set the value of the bias potential minimum ($V_{min}$) e.g. \newline
+      {\bf vmin} {\em f} \newline
+      where {\em f} is the energy minimum in Kelvin.
+\item If a BPD simulation {\em without} NEB calculations is required, set the
+      `no NEB' flag i.e. \newline
+      {\bf noneb} \newline
+\item Select which atom type is to be tracked when determining transitions.
+      \newline
+      {\bf target} {\em atom\_name} \newline
+      where {\em atom\_name} is the name of the target atom type. The default,
+      which is selected when this directive does not appear, is that all atom
+      types are chosen.
 \item Set the size of the simulation BPD block i.e. the number of time steps
       between structure optimisations (for transition
       detection). e.g. \newline {\bf num\_block} 500.
@@ -383,6 +423,7 @@ CONFIG structure for the BPD simulation.
       {\bf catch\_radius} 3.0.
 \item Set the NEB spring constant (in specified energy units per $\AA^2$). 
        e.g. \newline {\bf neb\_spring} 1000.0 (for DL\_POLY units).
+       This parameter is not required if the {\bf noneb} flag has been set.
 \item Select a minimisation option.  e.g. 
       \newline {\bf force} {\em key tol}.\newline 
       Where {\em key} is one of {\em force, energy, position} and {\em
@@ -399,7 +440,9 @@ CONFIG structure for the BPD simulation.
       altogether.
 \item Set the length of the simulation required ({\bf steps}) and the 
       equilibration period ({\bf equil}) (both in time steps). The
-      equilibration can be short if the system was pre-equilibrated.
+      equilibration can be short or absent if the system was pre-equilibrated.
+      In which case a useful alternative is to choose one of the NVT
+      algorithms. 
 \item In setting the job {\bf close time}, it is
       recommended to set the number to at least 500 times the clock
       time it takes to do one normal MD time step. This is to prevent
@@ -423,13 +466,12 @@ CONFIG structure for the BPD simulation.
    is continuing (restarting) and a full history of the kinetics is
    required. More about these directories and the files they contain
    can be found in section \ref{hypfiles}
-\item Run the BPD simulation. This will perform a simulation at the
-   state point requested, checking for structural transitions at the
-   BPD block intervals specified. Each time it finds a structural
-   transition, it will record the new state, determine the activation
-   energy by the NEB method and the (unbiased) transition time using
-   the boost factor in equation (\ref{boost}), and then continue the
-   simulation.
+ \item Run the BPD simulation. This will perform a simulation at the state
+   point requested, checking for structural transitions at the BPD block
+   intervals specified. Each time it finds a structural transition, it will
+   record the new state, determine the activation energy by the NEB method (if
+   requested) and the (unbiased) transition time using the boost factor in
+   equation (\ref{boost}), and then continue the simulation.
 \item When the simulation ends, proceed as follows.
 \begin{enumerate}
 \item Check the EVENTS file to see if any structural
@@ -441,7 +483,7 @@ CONFIG structure for the BPD simulation.
   considered.
 \item {\bf Important.} If any of the reported transitions has a system
   activation energy that is below $E_{bias}$
-  (i.e. $N*E^{*}<E_{bias}-V_{min}$, where $N$ is the number of atoms in the
+  (i.e. $N*E^{*}<E_{bias}$, where $N$ is the number of atoms in the
   system\footnote{Assuming just one atom undergoes the transition!}) this
   represents a violation of the condition in equation (\ref{votcon}), which
   means the observed diffusion path is not a valid representation of the
@@ -467,7 +509,7 @@ CONFIG structure for the BPD simulation.
 \item Check that the profiles for all the reported transitions have been
   written in the {\em PROFILES} directory. These record the change in
   configuration energy as a function of reaction coordinate (or
-  diffusion path). 
+  diffusion path). Do not do this if the option {\bf noneb} was taken!
   Plot these using the DL\_POLY Java GUI. Use the GUI `spline' option
   to get a better idea of what the profiles look like. Take special
   note of any double (or multiple) maxima. The transition is
@@ -491,7 +533,7 @@ CONFIG structure for the BPD simulation.
   consequence of using too large a catch radius is that transitions
   that require a short hop in atom positions may be missed during a
   run. Such misses make it difficult to reconstruct the reaction path
-  and, in particular, cause the NEB calculation to crash, since there
+  and, in particular, cause any NEB calculation to crash, since there
   is no simple path between the reference structures.
 \item Note that in a BPD simulation the reference state is replaced
   whenever a new state is found. In this respect the reference state
@@ -499,7 +541,7 @@ CONFIG structure for the BPD simulation.
 \item We repeat again the important message that if any of the 
   transitions reported by PBD has an activation energy that is below
   the value of the bias term $E_{bias}$
-  (i.e. $N*E^{*}<E_{bias}-V_{min}$,) this represents a violation of the
+  (i.e. $N*E^{*}<E_{bias}$,) this represents a violation of the
   condition in equation (\ref{votcon}), which means the observed
   diffusion path is not a valid representation of the original
   system. The simulation should be repeated with a lower value of
@@ -527,16 +569,19 @@ configurational space. This has a number of uses:
 \noindent This option is activated in the CONTROL file by using the 
 single-line directive:
 
-{\bf bpd dyn} $f_1$ $f_2$ $s$ 
+{\bf bpd dyn} $f_1$ $f_2$
 
 \noindent where $f_1$ is the value of the required bias ($E_{bias}$), 
 $f_2$ is the required value of the operating potential minimum
-($V_{min}$) and {\em s} is one of {\em eV, kcal, kJ or K}, signifying
-the energy unit of the values entered.
+($<V_{min}>$) both expressed in Kelvin.
 
 This option runs like a normal \D{} simulation, except that the
 system potential is now the biased potential. Consequently average
-system properties are calculated using equation (\ref{cbias}). 
+system properties are calculated using equation (\ref{cbias}). (The user
+should note that the zero point of potential energy ($V_{0}$) in this case
+corresponds to the first energy minimum found in the simulation. It does not
+change when further minima are found. This is different from full path
+dynamics - see above.)
 
 It is recommended that the simulation be run with the {\bf traject}
 option activated in the CONTROL file so that a HISTORY file is

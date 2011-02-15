@@ -1,4 +1,3 @@
-
 \section{DL\_POLY Examples}
 
 \subsection{Test Cases}
@@ -279,7 +278,24 @@ After another interval, the reverse switch is enacted and the DMSO* molecules
 are replaced by DMSO, to determine the relaxation after quenching.
 The electrostatic interactions are handled by the reaction field method.
 
+\subsubsection{Test Case 38. Freezing of TIP4P Water}
+This is a metadynamics simulation of the freezing of water at 180K and 1
+atmosphere pressure using a 4-centre TIP4P rigid model of the water molecule.
+The system consists of 512 water molecules and the ensemble is Hoover NPT. Two
+order parameters are used to define the structures: global potential energy
+and the Steinhardt $Q_{6}$ parameter. Control of the Gaussian convergence is
+by well-tempered dynamics.
+
+\subsubsection{Test Case 39: Calcite Nanoparticle Metadynamics}
+In this case 75 molecules of calcium carbonate in the calcite structure form a
+nanoparticle which is suspended in 863 water molecules represented by a
+flexible 3-centre TIP3P model. The temperature is 310K and pressure 1
+atmosphere maintained in a Hoover NPT ensemble. The metadynamics is controlled
+by 6 order parameters: the global potential energy and 5 Steinhardt $Q_{4}$
+parameters. Gaussian convergence is controlled by well-tempered dynamics.
+
 \subsection{Benchmark Cases}
+
 
 These represent rather larger test cases for \D{} that are also suitable
 for benchmarking the code on large scale computers. They have been
