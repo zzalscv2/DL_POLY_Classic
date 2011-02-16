@@ -1328,6 +1328,9 @@ c     dummy entry
             write(nrite,'(/,/,1x,a)')
      x        'error - TAD diffs arrays exceeded '//
      x        '- increase mxdiffs'
+          elseif(kode.eq.2341)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - HYPOLD file not TAD compatible'
           endif
           
         elseif(kode.lt.2400)then

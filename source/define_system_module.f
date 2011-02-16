@@ -43,16 +43,16 @@ c***********************************************************************
       contains
       
       subroutine simdef
-     x  (lfcap,lgofr,lnsq,loptim,lzero,lminim,lpgr,ltraj,ltscal,lzeql,
-     x  lzden,nolink,newgau,lhit,lbpd,ltad,lneb,prechk,tadall,lsolva,
-     x  lfree,lfrmas,lexcite,lswitch,lghost,lnfic,idnode,minstp,intsta,
-     x  istraj,keybpd,keyens,keyfce,keyres,keyver,keytrj,kmax1,kmax2,
-     x  kmax3,multt,nstack,nstbgr,nsbzdn,nstbpo,nhko,nlatt,nstbts,
-     x  nsteql,nstraj,nstrun,nospl,keytol,numgau,khit,nhit,nblock,
-     x  ntrack,blkout,numneb,mode,nsolva,isolva,nofic,alpha,delr,epsq,
-     x  fmax,press,quattol,rcut,rprim,rvdw,taup,taut,temp,timcls,
-     x  timjob,tolnce,tstep,rlxtol,opttol,zlen,ehit,xhit,yhit,zhit,
-     x  ebias,vmin,heinc,catchrad,sprneb,deltad,tlow,hyp_units)
+     x  (seek,lfcap,lgofr,lnsq,loptim,lzero,lminim,lpgr,ltraj,ltscal,
+     x  lzeql,lzden,nolink,newgau,lhit,lbpd,ltad,lneb,prechk,tadall,
+     x  lsolva,lfree,lfrmas,lexcite,lswitch,lghost,lnfic,nebgo,idnode,
+     x  minstp,intsta,istraj,keybpd,keyens,keyfce,keyres,keyver,keytrj,
+     x  kmax1,kmax2,kmax3,multt,nstack,nstbgr,nsbzdn,nstbpo,nhko,nlatt,
+     x  nstbts,nsteql,nstraj,nstrun,nospl,keytol,numgau,khit,nhit,
+     x  nblock,ntrack,blkout,numneb,mode,nsolva,isolva,nofic,alpha,
+     x  delr,epsq,fmax,press,quattol,rcut,rprim,rvdw,taup,taut,temp,
+     x  timcls,timjob,tolnce,tstep,rlxtol,opttol,zlen,ehit,xhit,yhit,
+     x  zhit,ebias,vmin,heinc,catchrad,sprneb,deltad,tlow,hyp_units)
 
 c***********************************************************************
 c     
@@ -73,14 +73,14 @@ c***********************************************************************
       
       implicit none
       
-      character*8 cunit
+      character*8 cunit,seek
       character*1 hms
       character*1 directive(lenrec)
       logical lsolva,lfree,lfrmas,lexcite,lswitch,lghost,lnfic
       logical ltscal,lzeql,loptim,ltraj,lfcap,lgofr,lpgr,lpres,safe
       logical lstep,ltemp,lcut,ldelr,lprim,lforc,lens,lvdw,lrvdw,kill
       logical lnsq,lzden,lewald,lspme,lhke,loop,lzero,nolink,newgau
-      logical lminim,lminopt,ltad,lneb,lhit,lbpd,prechk,tadall
+      logical lminim,lminopt,ltad,lneb,lhit,lbpd,prechk,tadall,nebgo
       integer idnode,intsta,istraj,keyens,keyfce,keyres,nstbpo,nsbzdn
       integer keytrj,kmax1,kmax2,kmax3,multt,nstack,nstbgr,khit,nhit
       integer nhko,nlatt,nstbts,nsteql,nstraj,nstrun,nospl,ntrack
@@ -223,6 +223,8 @@ c     temp scaling interval
       lexcite=.false.
       lswitch=.false.
       lghost=.false.
+      nebgo=.true.
+      seek='all     '
       
 c     open the simulation input file
       
@@ -474,9 +476,9 @@ c     convert impact energy from keV to internal units
           
 c     activate the BPD option
           
-          call bpd_option(directive,lbpd,ltad,lminopt,prechk,keybpd,
-     x      idnode,nblock,ntrack,keytol,ebias,vmin,catchrad,sprneb,
-     x      opttol,hyp_units)
+          call bpd_option(directive,seek,lbpd,ltad,lminopt,prechk,
+     x      nebgo,keybpd,idnode,nblock,ntrack,keytol,ebias,vmin,
+     x      catchrad,sprneb,opttol,hyp_units)
           
         elseif(findstring('tad',directive,idum))then
           
@@ -2102,7 +2104,7 @@ c     error exit for config file read
      x  (lgofr,lzden,lsolva,lfree,lghost,idnode,imcon,keyfce,
      x  keyres,mxnode,natms,ntshl,nstep,numacc,numrdf,ntpatm,
      x  ntpmet,ntpvdw,nzden,chip,chit,conint,elrc,engunit,virlrc,
-     x  rvdw,volm,virtot,vircom,tboost)
+     x  rvdw,volm,virtot,vircom)
       
 c***********************************************************************
 c     
@@ -2121,7 +2123,7 @@ c***********************************************************************
       integer idnode,imcon,keyfce,keyres,mxnode,natms,nstep,numacc
       integer numrdf,ntpatm,nzden,i,j,k,ntpmet,ntshl,ntpvdw
       real(8) chip,chit,conint,elrc,engunit,virlrc,rvdw,volm
-      real(8) dnumrd,dnstep,dnumac,dnzden,virtot,vircom,tboost
+      real(8) dnumrd,dnstep,dnumac,dnzden,virtot,vircom
       
 c     read or initialise accumulator arrays
       
@@ -2131,7 +2133,7 @@ c     read accumulator data from dump file
         
         open(nrest,file='REVOLD',form='unformatted')
         
-        read(nrest) dnstep,dnumac,dnumrd,chit,chip,conint,dnzden,tboost
+        read(nrest) dnstep,dnumac,dnumrd,chit,chip,conint,dnzden
         read(nrest) virtot,vircom,eta,strcns,strbod
         read(nrest) stpval
         read(nrest) sumval
@@ -2175,10 +2177,6 @@ c     and integral for conserved quantity
           strbod(i)=0.d0
           
         enddo
-        
-c     initialise bias potential boost factor
-        
-        tboost=0.d0
         
 c     initialise accumulator arrays
         
@@ -2260,10 +2258,9 @@ c     if restart then broadcast stored variables via a global sum
         buffer(5)=dble(numacc)
         buffer(6)=dble(numrdf)
         buffer(7)=dble(nzden)
-        buffer(8)=tboost
-        buffer(9)=virtot
-        buffer(10)=vircom
-        call gdsum(buffer(1),10,buffer(11))
+        buffer(8)=virtot
+        buffer(9)=vircom
+        call gdsum(buffer(1),9,buffer(10))
         chit=buffer(1)
         chip=buffer(2)
         conint=buffer(3)
@@ -2271,9 +2268,8 @@ c     if restart then broadcast stored variables via a global sum
         numacc=nint(buffer(5))
         numrdf=nint(buffer(6))
         nzden=nint(buffer(7))
-        tboost=buffer(8)
-        virtot=buffer(9)
-        vircom=buffer(10)
+        virtot=buffer(8)
+        vircom=buffer(9)
         call gdsum(eta,9,buffer)
         call gdsum(strcns,9,buffer)
         call gdsum(strbod,9,buffer)
@@ -4972,8 +4968,9 @@ c     units conversion
       end subroutine  neb_option
       
       subroutine bpd_option
-     x  (directive,lbpd,ltad,lminopt,prechk,keybpd,idnode,nblock,
-     x  ntrack,keytol,ebias,vmin,catchrad,sprneb,opttol,hyp_units)
+     x  (directive,seek,lbpd,ltad,lminopt,prechk,nebgo,keybpd,idnode,
+     x  nblock,ntrack,keytol,ebias,vmin,catchrad,sprneb,opttol,
+     x  hyp_units)
       
 c***********************************************************************
 c     
@@ -4986,9 +4983,9 @@ c***********************************************************************
       
       implicit none
       
-      character*8 cunit
+      character*8 cunit,seek
       character*1 directive(lenrec)
-      logical lbpd,ltad,lminopt,prechk,endbpd,safe
+      logical lbpd,ltad,lminopt,prechk,endbpd,safe,nebgo
       integer keybpd,idnode,nblock,ntrack,keytol,idum
       real(8) ebias,vmin,catchrad,sprneb,opttol,hyp_units
       
@@ -4997,6 +4994,7 @@ c***********************************************************************
       lminopt=.true.
       lbpd=.true.
       endbpd=.false.
+      cunit=" dl_poly"
       if(idnode.eq.0)
      x  write(nrite,"(/,1x,'bias potential dynamics controls')")
       
@@ -5009,17 +5007,15 @@ c***********************************************************************
         call getword(cunit,directive,8,lenrec)
         if(idnode.eq.0)write(nrite,"(
      x    1x,'dynamics option selected       ',
-     x    /,1x,'potential bias                 ',1p,e12.4,
-     x    /,1x,'average unbiased potential     ',1p,e12.4,
+     x    /,1x,'bias potential E_bias  (kelvin)',f10.4,
+     x    /,1x,'bias potential V_min   (kelvin)',f10.4
      x    /,1x,'energy units                   ',2x,a8)")
      x    ebias,vmin,cunit
-        ebias=ebias*hyp_units
-        vmin=vmin*hyp_units
         
       elseif(findstring('path',directive,idum))then
         
         keybpd=2
-        cunit="        "
+        nebgo=.true.
         hyp_units=1.d0
         do while(.not.endbpd)
           
@@ -5033,6 +5029,11 @@ c***********************************************************************
             endbpd=.true.
           elseif(findstring('pre',directive,idum))then
             prechk=.true.
+          elseif(findstring('noneb',directive,idum))then
+            nebgo=.false.
+          elseif(findstring('target',directive,idum))then
+            call getword(seek,directive,8,lenrec)
+            call getword(seek,directive,8,lenrec)
           elseif(findstring('units',directive,idum))then
             hyp_units=energy_unit()
             call getword(cunit,directive,8,lenrec)
@@ -5066,15 +5067,17 @@ c***********************************************************************
           
           write(nrite,"(
      x      1x,'dynamics with path analysis selected',
-     x      /,1x,'potential bias                 ',1p,e12.4,
-     x      /,1x,'average unbiased potential     ',1p,e12.4,
+     x      /,1x,'bias potential E_bias  (kelvin)',f10.4,
+     x      /,1x,'bias potential V_min   (kelvin)',f10.4,
      x      /,1x,'steps per time block           ',i10,
      x      /,1x,'steps per tracking block       ',i10,
-     x      /,1x,'configuration catch radius     ',1p,e12.4,
-     x      /,1x,'NEB spring constant            ',e12.4,
+     x      /,1x,'configuration catch radius  (A)',f10.4,
      x      /,1x,'minimisation tolerance         ',e12.4,
+     x      /,1x,'atom type to be tracked        ',2x,a8,
      x      /,1x,'energy units                   ',2x,a8)")
-     x      ebias,vmin,nblock,ntrack,catchrad,sprneb,opttol,cunit
+     x      ebias,vmin,nblock,ntrack,catchrad,opttol,seek,cunit
+          if(nebgo)write(nrite,
+     x      "(1x,'NEB spring constant            ',e12.4)")sprneb
           if(prechk)write(nrite,
      x      "(1x,'transition prechecking option selected')")
           call print_optim(keytol)
@@ -5083,8 +5086,6 @@ c***********************************************************************
         
 c     energy unit conversions
         
-        ebias=ebias*hyp_units
-        vmin=vmin*hyp_units
         sprneb=sprneb*hyp_units
         if(keytol.lt.2)opttol=opttol*hyp_units
         

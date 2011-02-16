@@ -56,9 +56,9 @@ c***********************************************************************
       end subroutine alloc_prp_arrays
 
       subroutine result
-     x  (lbpd,lgofr,lpgr,lzden,idnode,imcon,keyens,mxnode,natms,
-     x  levcfg,nzden,nstep,ntpatm,numacc,numrdf,chip,chit,conint,
-     x  rcut,tstep,engcfg,volm,virtot,vircom,zlen,tboost)
+     x  (ltad,lbpd,lgofr,lpgr,lzden,idnode,imcon,keyens,mxnode,natms,
+     x  levcfg,nzden,nstep,ntpatm,numacc,numrdf,keybpd,chip,chit,
+     x  conint,rcut,tstep,engcfg,volm,virtot,vircom,zlen,tboost)
 
 c***********************************************************************
 c     
@@ -73,145 +73,152 @@ c***********************************************************************
       implicit none
 
       character*1 hms,dec
-      logical lgofr,lpgr,lzden,check,lbpd
+      logical lgofr,lpgr,lzden,check,ltad,lbpd,goprint
       
       integer idnode,imcon,keyens,mxnode,natms,nzden,nstep,ntpatm
-      integer levcfg,numacc,numrdf,i,iadd,io,j
+      integer levcfg,numacc,numrdf,keybpd,i,iadd,io,j
       real(8) chip,chit,conint,rcut,tstep,volm,timelp,avvol,zlen,dc
-      real(8) engcfg,virtot,vircom,tboost,prntim,simtim
+      real(8) engcfg,virtot,vircom,prntim,simtim,tboost,boost
 
 c     save restart data
       
       call revive
      x  (lgofr,lzden,idnode,imcon,mxnode,natms,levcfg,nstep,nzden,
-     x  numacc,numrdf,chip,chit,conint,tstep,engcfg,virtot,vircom,
-     x  tboost)
+     x  numacc,numrdf,chip,chit,conint,tstep,engcfg,virtot,vircom)
 
-c     calculate final fluctuations
-
-      do i=1,mxnstk
-
-        ssqval(i)=sqrt(max(0.d0,ssqval(i)))
-
-      enddo
-
-c     final averages and fluctuations
+c     for TAD and BPD system averages not generally meaningful 
+c     useful only for BPD in configurational sampling mode
       
-      call timchk(0,timelp)
+      goprint=.not.(ltad.or.(lbpd.and.keybpd.gt.1))
       
-      if(idnode.eq.0)then
+      if(goprint)then
         
-        write(nrite,
-     x    "(/,/,1x,'run terminated after',i8,' steps.',
-     x    ' final averages calculated over',i8,' steps.',/,/)") 
-     x    nstep,numacc
-        write(nrite,"(1x,120('-'),
-     x    /,/,1x,'    step',5x,'eng_tot',4x,'temp_tot',5x,'eng_cfg',
-     x    5x,'eng_vdw',5x,'eng_cou',5x,'eng_bnd',5x,'eng_ang',5x,
-     x    'eng_dih',5x,'eng_tet',/,1x,'time    ',5x,' eng_pv',4x,
-     x    'temp_rot',5x,'vir_cfg',5x,'vir_vdw',5x,'vir_cou',5x,
-     x    'vir_bnd',5x,'vir_ang',5x,'vir_con',5x,'vir_tet',/,
-     x    1x,'cpu time',6x,'volume',4x,'temp_shl',5x,'eng_shl',
-     x    5x,'vir_shl',7x,'alpha',8x,'beta',7x,'gamma',5x,'vir_pmf',
-     x    7x,'press',/,/,
-     x    1x,120('-'))")          
-
-        call get_prntime(hms,timelp,prntim)
-        call get_simtime(dec,nstep,tstep,simtim)
-        write(nrite,'(1x,i8,1p,9e12.4,/,1x,0p,f7.3,a1,1p,9e12.4,
-     x    /,1x,0p,f7.3,a1,1p,9e12.4)') 
-     x    nstep,(sumval(i),i=1,9),
-     x    simtim,dec,(sumval(i),i=10,18),
-     x    prntim,hms,(sumval(i),i=19,27)
-        write(nrite,"(/,1x,' r.m.s. ',1p,9e12.4,/,1x,'fluctn. ',
-     x    1p,9e12.4,/,9x,9e12.4)") (ssqval(i),i=1,27)
-        write(nrite,"(1x,120('-'))")
-
+c     calculate final fluctuations
+        
+        do i=1,mxnstk
+          ssqval(i)=sqrt(max(0.d0,ssqval(i)))
+        enddo
+        
+c     final averages and fluctuations
+        
+        call timchk(0,timelp)
+        
+        if(idnode.eq.0)then
+          
+          write(nrite,
+     x      "(/,/,1x,'run terminated after',i8,' steps.',
+     x      ' final averages calculated over',i8,' steps.',/,/)") 
+     x      nstep,numacc
+          write(nrite,"(1x,120('-'),
+     x      /,/,1x,'    step',5x,'eng_tot',4x,'temp_tot',5x,'eng_cfg',
+     x      5x,'eng_vdw',5x,'eng_cou',5x,'eng_bnd',5x,'eng_ang',5x,
+     x      'eng_dih',5x,'eng_tet',/,1x,'time    ',5x,' eng_pv',4x,
+     x      'temp_rot',5x,'vir_cfg',5x,'vir_vdw',5x,'vir_cou',5x,
+     x      'vir_bnd',5x,'vir_ang',5x,'vir_con',5x,'vir_tet',/,
+     x      1x,'cpu time',6x,'volume',4x,'temp_shl',5x,'eng_shl',
+     x      5x,'vir_shl',7x,'alpha',8x,'beta',7x,'gamma',5x,'vir_pmf',
+     x      7x,'press',/,/,
+     x      1x,120('-'))")          
+          
+          call get_prntime(hms,timelp,prntim)
+          call get_simtime(dec,nstep,tstep,simtim)
+          write(nrite,'(1x,i8,1p,9e12.4,/,1x,0p,f7.3,a1,1p,9e12.4,
+     x      /,1x,0p,f7.3,a1,1p,9e12.4)') 
+     x      nstep,(sumval(i),i=1,9),
+     x      simtim,dec,(sumval(i),i=10,18),
+     x      prntim,hms,(sumval(i),i=19,27)
+          write(nrite,"(/,1x,' r.m.s. ',1p,9e12.4,/,1x,'fluctn. ',
+     x      1p,9e12.4,/,9x,9e12.4)") (ssqval(i),i=1,27)
+          write(nrite,"(1x,120('-'))")
+          
 c     write out bias potential boost factor
           
-        if(lbpd)write(nrite,"(/,/,1x,
-     x    'calculated bias potential boost factor',1p,e16.8)")tboost
-        
-        if(numacc.gt.0)then
-          iadd=27
+          if(lbpd)write(nrite,"(/,/,1x,
+     x      'calculated bias potential boost factor',1p,e16.8)")tboost
           
-c     write out estimated diffusion coefficients
-
           if(numacc.gt.0)then
+            iadd=27
             
-            write(nrite,"(/,/,12x,'Approximate 3D Diffusion',
-     x       '  coefficients (10^-9 m^2 / s)',/,/,12x,'atom',7x,' D ')")
-
-            do i=1,ntpatm
-              
-              iadd=iadd+1
-              dc=(ravval(iadd)-sumval(iadd))/
-     x          (3.d0*dble(numacc-min(mxnstk,numacc-1))*tstep)*10.d0
-              if(dc.lt.1d-10) dc=0.d0
-              if(lbpd)dc=dc/tboost
-              write(nrite,'(12x,a8,1p,e13.4)') unqatm(i),dc
-              
-            enddo
+c     write out estimated diffusion coefficients
             
-          endif
-
+            if(numacc.gt.0)then
+              
+              write(nrite,"(/,/,12x,'Approximate 3D Diffusion',
+     x          '  coefficients (10^-9 m^2 / s)',/,/,12x,'atom',7x,
+     x          ' D ')")
+              
+              do i=1,ntpatm
+                
+                iadd=iadd+1
+                dc=(ravval(iadd)-sumval(iadd))/
+     x            (3.d0*dble(numacc-min(mxnstk,numacc-1))*tstep)*10.d0
+                if(dc.lt.1d-10) dc=0.d0
+                if(lbpd)dc=dc/tboost
+                write(nrite,'(12x,a8,1p,e13.4)') unqatm(i),dc
+                
+              enddo
+              
+            endif
+            
 c     print out average pressure tensor
-
-          write(nrite,"(/,/,16x,'Average pressure tensor',
-     x      39x,'r.m.s. fluctuations ',/)")
-
-          do i=iadd,iadd+6,3
-            write(nrite,'(9x,1p,3e12.4,24x,3e12.4)')
-     x        (sumval(i+j),j=1,3),(ssqval(i+j),j=1,3)
-          enddo
-          iadd=iadd+9
-
-          write(nrite,'(/,12x,a,1p,e12.4)') 'trace/3. ',
-     x     (sumval(iadd)+sumval(iadd-4)+sumval(iadd-8))/3.d0
-
-c     write out mean cell vectors for npt 
-
-          if(keyens.gt.3.and.(keyens.le.7))then
-
-            write(nrite,"(/,/,17x,'Average cell vectors',
-     x        41x,'r.m.s. fluctuations ',/)")
-
+            
+            write(nrite,"(/,/,16x,'Average pressure tensor',
+     x        39x,'r.m.s. fluctuations ',/)")
+            
             do i=iadd,iadd+6,3
-              write(nrite,'(3f20.10,9x,1p,3e12.4)')
+              write(nrite,'(9x,1p,3e12.4,24x,3e12.4)')
      x          (sumval(i+j),j=1,3),(ssqval(i+j),j=1,3)
             enddo
             iadd=iadd+9
             
-          endif
-
+            write(nrite,'(/,12x,a,1p,e12.4)') 'trace/3. ',
+     x        (sumval(iadd)+sumval(iadd-4)+sumval(iadd-8))/3.d0
+            
+c     write out mean cell vectors for npt 
+            
+            if(keyens.gt.3.and.(keyens.le.7))then
+              
+              write(nrite,"(/,/,17x,'Average cell vectors',
+     x          41x,'r.m.s. fluctuations ',/)")
+              
+              do i=iadd,iadd+6,3
+                write(nrite,'(3f20.10,9x,1p,3e12.4)')
+     x            (sumval(i+j),j=1,3),(ssqval(i+j),j=1,3)
+              enddo
+              iadd=iadd+9
+              
+            endif
+            
 c     write out remaining registers
-
-          check=.false.
-          do i=iadd+1,mxnstk
-
-            if((abs(sumval(i)).gt.1.d-10).or.
-     x        (abs(ssqval(i)).gt.1.d-10)) check=.true.
-
-          enddo
-
-          if(check)then
-
-            write(nrite,"(/,/,12x,
-     x        'Remaining non-zero statistics registers ',
-     x        /,/,12x,'Register',7x,'Average value',8x,'r.m.s. fluc.')")
-
+            
+            check=.false.
             do i=iadd+1,mxnstk
-
-            if((abs(sumval(i)).gt.1.d-10).or.
-     x        (abs(ssqval(i)).gt.1.d-10))
-     x          write(nrite,'(10x,i10,2f20.10)') i,sumval(i),ssqval(i)
-
+              
+              if((abs(sumval(i)).gt.1.d-10).or.
+     x          (abs(ssqval(i)).gt.1.d-10)) check=.true.
+              
             enddo
-
+            
+            if(check)then
+              
+              write(nrite,"(/,/,12x,
+     x          'Remaining non-zero statistics registers ',/,/,12x,
+     x          'Register',7x,'Average value',8x,'r.m.s. fluc.')")
+              
+              do i=iadd+1,mxnstk
+                
+                if((abs(sumval(i)).gt.1.d-10).or.
+     x            (abs(ssqval(i)).gt.1.d-10))
+     x            write(nrite,'(10x,i10,2f20.10)') i,sumval(i),ssqval(i)
+                
+              enddo
+              
+            endif
+            
           endif
-
+          
         endif
-
+        
 c     print out sample of final configuration 
         
         write(nrite,"(/,/,1x,'sample of final configuration',/)")
@@ -229,40 +236,46 @@ c     print out sample of final configuration
         enddo
 
       endif
-
+          
+c     bypass printing averages for certain tad and bpd options
+      
+      if(goprint)then
+        
 c     average volume
-
-      avvol=sumval(19)
-      if(imcon.eq.0.or.imcon.eq.6)then
-        avvol=4.d0*pi/3.d0*rcut**3
-        volm=avvol
-      endif
-
+        
+        avvol=sumval(19)
+        if(imcon.eq.0.or.imcon.eq.6)then
+          avvol=4.d0*pi/3.d0*rcut**3
+          volm=avvol
+        endif
+        
 c     calculate and print radial distribution functions
-
-      if(lgofr.and.lpgr.and.(numrdf.gt.0))then 
-
+        
+        if(lgofr.and.lpgr.and.(numrdf.gt.0))then 
+          
 c     scale densities for average volume
-
-        do i=1,ntpatm
-          dens(i)=dens(i)*(volm/avvol)
-        enddo
-
-        call  rdf1
-     x    (lpgr,idnode,mxnode,ntpatm,numrdf,avvol,rcut)
-
+          
+          do i=1,ntpatm
+            dens(i)=dens(i)*(volm/avvol)
+          enddo
+          
+          call rdf1
+     x      (lpgr,idnode,mxnode,ntpatm,numrdf,avvol,rcut)
+          
+        endif
+        
+        if(lzden.and.lpgr.and.(nzden.gt.0))then 
+          call zden1(lpgr,idnode,mxnode,ntpatm,nzden,avvol,zlen)
+        endif
+        
+        if(imcon.eq.0)volm=0.d0
+        
       endif
-
-      if(lzden.and.lpgr.and.(nzden.gt.0))then 
-        call zden1(lpgr,idnode,mxnode,ntpatm,nzden,avvol,zlen)
-      endif
-
-      if (imcon.eq.0) volm=0.d0
-
+      
 c     print final time check
-      
+        
       call timchk(1,timelp)
-      
+        
       return
       end subroutine result
 
@@ -573,13 +586,13 @@ c     print out information
 
       subroutine static
      x  (lbpd,lzeql,idnode,intsta,imcon,keyens,natms,nstack,
-     x  nstep,nsteql,ntpatm,numacc,mxnode,nblock,consv,degfre,
-     x  degrot,engang,engbnd,engcpe,engdih,enginv,engke,engrot,
-     x  engsrp,engunit,engcfg,stpeng,stpeth,stpprs,stptmp,stpvir,
-     x  stpvol,tstep,virbnd,engfbp,vircom,vircon,vircpe,virsrp,
-     x  engfld,virfld,engtbp,virtbp,virpmf,virshl,engshl,engtet,
-     x  virtet,degshl,shlke,virang,width,engmet,virmet,engter,
-     x  virter,boost,tboost,ebias,heinc)
+     x  nstep,nsteql,ntpatm,numacc,mxnode,nblock,keybpd,numbpd,
+     x  consv,degfre,degrot,engang,engbnd,engcpe,engdih,enginv,
+     x  engke,engrot,engsrp,engunit,engcfg,stpeng,stpeth,stpprs,
+     x  stptmp,stpvir,stpvol,tstep,virbnd,engfbp,vircom,vircon,
+     x  vircpe,virsrp,engfld,virfld,engtbp,virtbp,virpmf,virshl,
+     x  engshl,engtet,virtet,degshl,shlke,virang,width,engmet,
+     x  virmet,engter,virter,heinc,boost,tboost)
 
 c***********************************************************************
 c     
@@ -597,7 +610,7 @@ c***********************************************************************
       logical lbpd,lzeql,newjob
       integer idnode,intsta,imcon,keyens,natms,nstack,nstep,j
       integer nsteql,ntpatm,numacc,mxnode,i,iadd,k,kstak
-      integer nblock
+      integer nblock,keybpd,numbpd
       real(8) consv,degfre,degrot,engang,engbnd,engcpe,engdih
       real(8) enginv,engke,engrot,engsrp,engunit,engcfg,stpeng
       real(8) stpeth,stpprs,stptmp,stpvir,stpvol,tstep,virbnd
@@ -605,7 +618,7 @@ c***********************************************************************
       real(8) engtbp,virtbp,virpmf,virshl,engshl,engtet,virtet
       real(8) degshl,shlke,virang,width,sclnv1,sclnv2,stprot
       real(8) stpcns,stpshl,zistk,engmet,virmet,engter,virter
-      real(8) boost,tboost,tbold,aterm,bterm,cterm,ebias,heinc
+      real(8) tbold,aterm,bterm,cterm,heinc,boost,tboost
 
       save newjob
       
@@ -801,12 +814,12 @@ c     accumulate totals over steps
       sclnv2=1.d0/dble(numacc)
       sclnv1=dble(numacc-1)/dble(numacc)
       
-      if(lbpd)then
+      if(lbpd.and.keybpd.eq.1)then
         
 c     calculate true thermodynamic averages in bias potential system
+c     note integers numacc and numbpd should be equal in this case
         
-        tbold=tboost
-        tboost=sclnv1*tboost+sclnv2*boost
+        tbold=tboost*dble(numbpd)/dble(numbpd-1)-boost/dble(numbpd-1)
         cterm=0.d0
         do i=1,mxnstk
           
@@ -928,8 +941,7 @@ c     close statistics file at regular intervals
 
       subroutine revive
      x  (lgofr,lzden,idnode,imcon,mxnode,natms,levcfg,nstep,nzden,
-     x   numacc,numrdf,chip,chit,conint,tstep,engcfg,virtot,vircom,
-     x   tboost)
+     x   numacc,numrdf,chip,chit,conint,tstep,engcfg,virtot,vircom)
 
 c***********************************************************************
 c     
@@ -947,7 +959,6 @@ c***********************************************************************
       integer idnode,imcon,mxnode,natms,nstep,nzden,numacc,numrdf
       integer levcfg,nsum,nbuff,i,j
       real(8) chip,chit,conint,tstep,engcfg,rmxnode,virtot,vircom
-      real(8) tboost
 
       if(mxnode.gt.1)then
 
@@ -1010,7 +1021,7 @@ c     write accumulator data to dump file
         open(nrest,file='REVIVE',form='unformatted')
         
         write(nrest) dble(nstep),dble(numacc),dble(numrdf),chit,chip,
-     x    conint,dble(nzden),tboost
+     x    conint,dble(nzden)
         write(nrest) virtot,vircom,eta,strcns,strbod
         write(nrest) stpval
         write(nrest) sumval

@@ -27,10 +27,10 @@ c***********************************************************************
       integer, parameter :: mxdiffs=300
       integer, parameter :: hyper_tag=35000      
       
-      integer numbsn,numpro,numtrk,ndiff,maxtrk,numdark,home_bsn
+      integer numbsn,numpro,numtrk,ndiff,maxtrk,numdark,home_bsn,numbpd
       integer nbsa(mxbsn),nbsb(mxbsn),ktrn(mxtrn)
       real(8) xtrn(mxtrn),ytrn(mxtrn)
-      real(8) tstop,tkeres,timhyp,timres
+      real(8) tstop,tkeres,timhyp,timres,tboost,boost,vbase
       
       integer, allocatable :: idabsn(:),keymin(:)
       real(8), allocatable :: xbas(:),ybas(:),zbas(:)
@@ -47,20 +47,21 @@ c***********************************************************************
       real(8), allocatable :: fxneb(:),fyneb(:),fzneb(:)
       real(8), allocatable :: hxneb(:),hyneb(:),hzneb(:)
       real(8), allocatable :: taux(:),tauy(:),tauz(:)
+      real(8), allocatable :: track(:)
 
       integer bsn_1(maxneb),bsn_2(maxneb)
       real(8) strhyp(9),strres(9),engbsn(2)
       real(8) celbas(9),celhyp(9),celchk(9),celres(9)
 
       save numbsn,numtrk,numpro,ndiff,numdark,timres
-      save xbas,ybas,zbas,xchk,ychk,zchk,timhyp
+      save xbas,ybas,zbas,xchk,ychk,zchk,timhyp,vbase
       save xres,yres,zres,vxrs,vyrs,vzrs,fxrs,fyrs,fzrs
       save xhyp,yhyp,zhyp,vxhp,vyhp,vzhp,fxhp,fyhp,fzhp
       save celbas,celhyp,celres,celchk,strhyp,strres
       save idabsn,nbsa,nbsb,xdiffs,ydiffs,zdiffs,tkeres
       save xneb,yneb,zneb,engneb,taux,tauy,tauz,keymin
       save fxneb,fyneb,fzneb,hxneb,hyneb,hzneb,path
-      save optk,tstop
+      save optk,tstop,tboost,boost,numbpd
       
       contains
       
@@ -87,6 +88,7 @@ c***********************************************************************
       
 c     initialise control variables
       
+      numbpd=0
       numtrk=0
       numbsn=0
       numpro=0
@@ -97,6 +99,9 @@ c     initialise control variables
       tstop=1.d30
       timhyp=0.d0
       timres=0.d0
+      boost=1.d0
+      tboost=0.d0
+      vbase=-huge(1.d0)
       do i=1,maxneb
         bsn_1(i)=0
         bsn_2(i)=0
@@ -137,14 +142,14 @@ c     allocate working arrays
       end subroutine alloc_hyper_arrays
       
       subroutine hyper_start
-     x  (lbpd,lfcap,lneut,lnsq,loglnk,lzeql,newlst,nblock,idnode,
+     x  (ltad,lbpd,lfcap,lneut,lnsq,loglnk,lzeql,newlst,nblock,idnode,
      x  imcon,keyfce,keyfld,keyshl,keytol,kmax1,kmax2,kmax3,multt,
      x  mxnode,natms,ngrp,nhko,nlatt,nneut,nospl,nscons,nstbgr,
      x  nstep,nsteql,ntangl,ntbond,ntdihd,ntfree,ntinv,ntpfbp,
-     x  ntpmet,ntptbp,ntpter,ntpvdw,ntshl,ntteth,ntcons,alpha,
+     x  ntpmet,ntptbp,ntpter,ntpvdw,ntshl,ntteth,ntcons,ntrack,alpha,
      x  delr,dlrpot,drewd,elrc,virlrc,epsq,fmax,opttol,rctter,
      x  rcut,rcutfb,rcuttb,rprim,rvdw,temp,tstep,volm,sigma,
-     x  tboost,hyp_units)
+     x  hyp_units)
       
 c***********************************************************************
 c     
@@ -156,16 +161,22 @@ c***********************************************************************
 
       implicit none
       
-      logical lbpd,lfcap,lneut,lnsq,loglnk,lzeql,newlst,savflg
+      logical ltad,lbpd,lfcap,lneut,lnsq,loglnk,lzeql,newlst,savflg
       integer nblock,idnode,imcon,keyfce,keyfld,keyshl,keytol
       integer kmax1,kmax2,kmax3,multt,mxnode,natms,ngrp,nhko,nlatt
       integer nneut,nospl,nscons,nstbgr,nstep,nsteql,ntangl,ntbond
       integer ntdihd,ntfree,ntinv,ntpfbp,ntpmet,ntptbp,ntpter,i,j
       integer ntpvdw,ntshl,ntteth,numblock,iatm0,iatm1,ntcons
-      integer ktol,pass
+      integer ktol,pass,fail,ntrack
       real(8) alpha,delr,dlrpot,drewd,elrc,epsq,fmax,opttol,rctter
       real(8) rcut,rcutfb,rcuttb,rprim,rvdw,temp,tstep,volm,engcfg
-      real(8) virlrc,cvgerr,dum,otol,cgerr,sigma,tboost,hyp_units
+      real(8) virlrc,cvgerr,dum,otol,cgerr,sigma,hyp_units
+      
+c     allocate track array for BPD
+
+      if(lbpd)then
+        allocate (track(0:nblock/ntrack),stat=fail)
+      endif
       
 c     block indices
       
@@ -187,6 +198,8 @@ c     set up hyperdynamics for simulation start
         
 c     initialise bias potential boost factor
       
+        numbpd=0
+        boost=1.d0
         tboost=0.d0
       
 c     set basin difference markers
@@ -216,6 +229,10 @@ c     minimise starting structure
      x    ntpvdw,ntshl,ntteth,alpha,delr,dlrpot,drewd,
      x    elrc,virlrc,epsq,fmax,opttol,rctter,rcut,rcutfb,
      x    rcuttb,rprim,rvdw,temp,tstep,volm,engcfg,cvgerr)
+        
+c     define zero energy for BPD dynamics mode
+        
+        vbase=engcfg
         
 c     write events entry for minimisation
         
@@ -266,7 +283,7 @@ c     restore the starting configuration
         
 c     restore previous data from hyperdynamics backup file
       
-        call hyper_open(idnode,mxnode,natms,nsteql)
+        call hyper_open(ltad,idnode,mxnode,natms,nsteql)
                 
 c     reset home basin for hyperdynamics (home basin is 0 for TAD)
         
@@ -315,16 +332,16 @@ c     restore the current configuration
       end subroutine hyper_start
       
       subroutine hyper_driver
-     x  (ltad,lbpd,cycle,lfcap,lneut,lnsq,loglnk,lzeql,newlst,
-     x  prechk,tadall,nblock,ntrack,idnode,imcon,keyfce,keyfld,
-     x  keyshl,keytol,kmax1,kmax2,kmax3,multt,mxnode,natms,ngrp,
-     x  ntcons,nhko,nlatt,nneut,nospl,nscons,nstbgr,nstep,
-     x  nsteql,ntangl,ntbond,ntdihd,ntfree,ntinv,ntpfbp,
-     x  ntpmet,ntptbp,ntpter,ntpvdw,ntshl,ntteth,blkout,
+     x  (seek,ltad,lbpd,recycle,lfcap,lneut,lnsq,loglnk,lzeql,
+     x  newlst,prechk,tadall,nebgo,nblock,ntrack,idnode,imcon,
+     x  keyfce,keyfld,keyshl,keytol,kmax1,kmax2,kmax3,multt,
+     x  mxnode,natms,ngrp,ntcons,nhko,nlatt,nneut,nospl,nscons,
+     x  nstbgr,nstep,nsteql,ntangl,ntbond,ntdihd,ntfree,ntinv,
+     x  ntpfbp,ntpmet,ntptbp,ntpter,ntpvdw,ntshl,ntteth,blkout,
      x  alpha,delr,dlrpot,drewd,elrc,virlrc,epsq,fmax,
      x  opttol,rctter,rcut,rcutfb,rcuttb,rprim,rvdw,temp,
      x  tstep,volm,engcfg,catchrad,sprneb,deltad,tlow,engtke,
-     x  tolnce,tboost,hyp_units)
+     x  tolnce,hyp_units,ebias,vmin)
       
 c***********************************************************************
 c     
@@ -336,22 +353,24 @@ c***********************************************************************
       
       implicit none
 
+      character*8 seek
       logical lbpd,ltad,lfcap,lneut,lnsq,loglnk,lzeql,newlst,lneb
-      logical lrefmin,same,savflg,cycle,scan,prechk,tadall
+      logical lrefmin,same,savflg,recycle,scan,prechk,tadall,nebgo
       integer nblock,idnode,imcon,keyfce,keyfld,keyshl,keytol,ntrack
       integer kmax1,kmax2,kmax3,multt,mxnode,natms,ngrp,nhko,nlatt
       integer nneut,nospl,nscons,nstbgr,nstep,nsteql,ntangl,ntbond
       integer ntdihd,ntfree,ntinv,ntpfbp,ntpmet,ntptbp,ntpter,ntpvdw
       integer ntshl,ntteth,blkout,numblock,bsn1,bsn2,itrack
-      integer nturn,ntcons,mdiff,newbsn,iatm0,iatm1,pass,i,j
+      integer nturn,ntcons,mdiff,newbsn,iatm0,iatm1,pass,i,j,itrk
       real(8) alpha,delr,dlrpot,drewd,elrc,epsq,fmax,opttol,rctter
       real(8) rcut,rcutfb,rcuttb,rprim,rvdw,temp,tstep,volm,catchrad
       real(8) cvgerr,estar,engcfg,cfgtmp,engcpe,engsrp,catch
       real(8) vircpe,engmet,virmet,virlrc,engtbp,virtbp,dum
       real(8) engfbp,virfbp,engter,virter,engbnd,virbnd,engang
       real(8) virang,engdih,virdih,enginv,virinv,engtet,virtet
-      real(8) engshl,shlke,virshl,engfld,virfld,virsrp,sprneb,tboost
+      real(8) engshl,shlke,virshl,engfld,virfld,virsrp,sprneb
       real(8) deltad,deltal,tlow,timhop,timlow,engtke,tolnce,hyp_units
+      real(8) ebias,vmin
       
       data bsn1,bsn2/0,0/
       
@@ -372,6 +391,10 @@ c     BPD/TAD simulation time
       
       timhyp=timhyp+tstep
       
+c     track the tboost value
+      
+      if(mod(nstep,ntrack).eq.0)track(mod(numtrk,maxtrk))=tboost
+      
 c     provisional check for transition - compare current config with 
 c     the reference state (not in dark period)
       
@@ -382,7 +405,9 @@ c     the reference state (not in dark period)
         
         catch=0.65d0*catchrad
         call check_for_transition
-     x    (same,scan,idnode,mxnode,natms,imcon,mdiff,nblock,catch)
+     x    (seek,same,scan,idnode,mxnode,natms,imcon,mdiff,nblock,
+     x    catch)
+        
         if(.not.same.and.idnode.eq.0)then
           
           write(nevnt,'("PRE",i10)')nstep
@@ -426,12 +451,13 @@ c     write events entry for minimisation
           write(nrite,"(1x,120('-'))")
           
         endif
-      
+        
 c     confirm any transition
         
         if(ltad)scan=.true.
         call check_for_transition
-     x    (same,scan,idnode,mxnode,natms,imcon,mdiff,nblock,catchrad)
+     x    (seek,same,scan,idnode,mxnode,natms,imcon,mdiff,nblock,
+     x    catchrad)
         
 c     transition detected - proceed with transition analysis
         
@@ -498,8 +524,8 @@ c     save the basin file and store basin energy
      x          cfgtmp)
               
 c     determine minimum (reaction) path and activation energy
-            
-              call neb_driver
+              
+              if(nebgo)call neb_driver
      x          (lfcap,lneut,lnsq,loglnk,lzeql,newlst,lneb,bsn1,
      x          bsn2,idnode,mxnode,natms,imcon,nstep,nstbgr,nsteql,
      x          keytol,keyfce,kmax1,kmax2,kmax3,nhko,nlatt,ntpvdw,ngrp,
@@ -515,8 +541,8 @@ c     determine minimum (reaction) path and activation energy
               
 c     analyse the transition - determine e-star and destination state
               
-              call transition_properties
-     x          (ltad,lfcap,lneut,lnsq,loglnk,lzeql,newlst,nblock,
+              if(nebgo)call transition_properties
+     x          (seek,ltad,lfcap,lneut,lnsq,loglnk,lzeql,newlst,nblock,
      x          idnode,imcon,keyfce,keyfld,keyshl,keytol,ntcons,
      x          kmax1,kmax2,kmax3,multt,mxnode,natms,ngrp,nhko,nlatt,
      x          nneut,nospl,nscons,nstbgr,nstep,nsteql,ntangl,ntbond,
@@ -529,15 +555,15 @@ c     analyse the transition - determine e-star and destination state
 c     estimate time of transition from past trajectory
               
               call transition_time
-     x          (lfcap,lneut,lnsq,loglnk,lzeql,newlst,nblock,
+     x          (seek,lfcap,lneut,lnsq,loglnk,lzeql,newlst,nblock,
      x          idnode,imcon,keyfce,keyfld,keyshl,keytol,kmax1,
      x          kmax2,kmax3,multt,mxnode,natms,ngrp,nhko,nlatt,
      x          nneut,nospl,nscons,nstbgr,nstep,nsteql,ntangl,
      x          ntbond,ntdihd,ntfree,ntinv,ntpfbp,ntpmet,ntptbp,
-     x          ntpter,ntrack,ntpvdw,ntshl,ntteth,ntcons,alpha,
-     x          delr,dlrpot,drewd,elrc,virlrc,epsq,fmax,opttol,
-     x          rctter,rcut,rcutfb,rcuttb,rprim,rvdw,temp,tstep,
-     x          volm,cfgtmp,cvgerr,catchrad,timhop,hyp_units)
+     x          ntpter,ntrack,ntpvdw,ntshl,ntteth,ntcons,itrk,
+     x          alpha,delr,dlrpot,drewd,elrc,virlrc,epsq,fmax,
+     x          opttol,rctter,rcut,rcutfb,rcuttb,rprim,rvdw,temp,
+     x          tstep,volm,cfgtmp,cvgerr,catchrad,timhop,hyp_units)
               
 c     update TAD control variables
               
@@ -568,9 +594,9 @@ c     write transition data for TAD only
                   
                 endif
                 
-              elseif(idnode.eq.0)then
+              elseif(nebgo.and.idnode.eq.0)then
                 
-c     write transition data for bias potential dynamics only
+c     write transition data for bias potential dynamics with NEB
                 
                 write(nevnt,'("TRA",i10,3i6,1p,3e14.5)')
      x            nstep,home_bsn,numbsn-1,nturn,estar/hyp_units,
@@ -579,6 +605,24 @@ c     write transition data for bias potential dynamics only
      x            nstep,home_bsn,numbsn-1,nturn,estar/hyp_units,
      x            timhop,timhop*tboost
                 write(nrite,"(1x,120('-'))")
+                
+                numbpd=0
+                tboost=0.0
+                
+              elseif(idnode.eq.0)then
+                
+c     write transition data for bias potential dynamics without NEB
+                
+                write(nevnt,'("TRA",i10,2i6,1p,3e14.5)')
+     x            nstep,home_bsn,numbsn-1,ebias/hyp_units,
+     x            timhop,timhop*tboost
+                write(nrite,'(1x,"TRA",i10,2i6,1p,3e14.5)')
+     x            nstep,home_bsn,numbsn-1,ebias/hyp_units,
+     x            timhop,timhop*tboost
+                write(nrite,"(1x,120('-'))")
+                
+                numbpd=0
+                tboost=0.0
                 
               endif
               
@@ -682,6 +726,11 @@ c     restore current hyperdynamics configuration
             call store_config(savflg,idnode,mxnode,natms,strhyp,celhyp,
      x        xhyp,yhyp,zhyp,vxhp,vyhp,vzhp,fxhp,fyhp,fzhp)
             
+c     reset boost factor
+            
+            numbpd=0
+            tboost=0.d0
+            
           endif
           
 c     no transition detected so restore current trajectory
@@ -712,7 +761,7 @@ c     save the block configuration as reset state (TAD only)
       
 c     close down if TAD stopping time reached
       
-      if(ltad.and.tstop.lt.timhyp)cycle=.false.
+      if(ltad.and.tstop.lt.timhyp)recycle=.false.
             
 c     write a tracking file
       
@@ -721,7 +770,7 @@ c     write a tracking file
         itrack=mod(numtrk,maxtrk)
         call write_reference_config
      x    ('CFGTRK','TRACKS',ntrk,itrack,natms,imcon,idnode,engcfg)
-        
+
         numtrk=numtrk+1
         
       endif
@@ -1077,7 +1126,8 @@ c     replication of full configuration data
       end subroutine store_config
       
       subroutine check_for_transition
-     x  (same,scan,idnode,mxnode,natms,imcon,mdiff,nblock,catchrad)
+     x  (seek,same,scan,idnode,mxnode,natms,imcon,mdiff,nblock,
+     x  catchrad)
       
 c***********************************************************************
 c     
@@ -1091,10 +1141,13 @@ c**********************************************************************
       
       implicit none
 
-      logical same,safe,scan
+      character*8 seek
+      logical same,safe,scan,all
       integer idnode,mxnode,natms,imcon,nblock,mdiff
       integer iatm0,iatm1,i,j
       real(8) catchrad,catch2,rr2,dum,sxx,syy,szz,txx,tyy,tzz,pp2
+      
+      all=(seek.eq.'all     ')
       
 c     flag for comparing structures
       
@@ -1115,7 +1168,7 @@ c     construct coordinate check arrays
         celchk(i)=cell(i)
       enddo
 
-c     store structure in reduced coordinates
+c     store structure in reduced coordinates (target atoms only)
       
       call invert(cell,rcell,dum)
       
@@ -1123,9 +1176,14 @@ c     store structure in reduced coordinates
       do i=iatm0,iatm1
         
         j=j+1
-        xchk(j)=rcell(1)*xxx(i)+rcell(4)*yyy(i)+rcell(7)*zzz(i)
-        ychk(j)=rcell(2)*xxx(i)+rcell(5)*yyy(i)+rcell(8)*zzz(i)
-        zchk(j)=rcell(3)*xxx(i)+rcell(6)*yyy(i)+rcell(9)*zzz(i)
+        
+        if(all.or.atmnam(i).eq.seek)then
+          
+          xchk(j)=rcell(1)*xxx(i)+rcell(4)*yyy(i)+rcell(7)*zzz(i)
+          ychk(j)=rcell(2)*xxx(i)+rcell(5)*yyy(i)+rcell(8)*zzz(i)
+          zchk(j)=rcell(3)*xxx(i)+rcell(6)*yyy(i)+rcell(9)*zzz(i)
+          
+        endif
         
       enddo
       
@@ -1139,54 +1197,58 @@ c     compare current structure with reference basin
         
         j=j+1
         
+        if(all.or.atmnam(i).eq.seek)then
+          
 c     calculate separations in reduced units
-        
-        sxx=xchk(j)-xbas(j)
-        syy=ychk(j)-ybas(j)
-        szz=zchk(j)-zbas(j)
-        
+          
+          sxx=xchk(j)-xbas(j)
+          syy=ychk(j)-ybas(j)
+          szz=zchk(j)-zbas(j)
+          
 c     calculate minimum image separations
-        
-        sxx=sxx-nint(sxx)
-        syy=syy-nint(syy)
-        szz=szz-nint(szz)
-        
+          
+          sxx=sxx-nint(sxx)
+          syy=syy-nint(syy)
+          szz=szz-nint(szz)
+          
 c     set trial structure at minimum displacements from reference
-        
-        xchk(j)=xbas(j)+sxx
-        ychk(j)=ybas(j)+syy
-        zchk(j)=zbas(j)+szz
-        
+          
+          xchk(j)=xbas(j)+sxx
+          ychk(j)=ybas(j)+syy
+          zchk(j)=zbas(j)+szz
+          
 c     calculate atomic separations in real coordinates
-        
-        txx=(celchk(1)*xchk(j)+celchk(4)*ychk(j)+celchk(7)*zchk(j))
-     x    -(celbas(1)*xbas(j)+celbas(4)*ybas(j)+celbas(7)*zbas(j))
-        tyy=(celchk(2)*xchk(j)+celchk(5)*ychk(j)+celchk(8)*zchk(j))
-     x    -(celbas(2)*xbas(j)+celbas(5)*ybas(j)+celbas(8)*zbas(j))
-        tzz=(celchk(3)*xchk(j)+celchk(6)*ychk(j)+celchk(9)*zchk(j))
-     x    -(celbas(3)*xbas(j)+celbas(6)*ybas(j)+celbas(9)*zbas(j))
-        
+          
+          txx=(celchk(1)*xchk(j)+celchk(4)*ychk(j)+celchk(7)*zchk(j))
+     x      -(celbas(1)*xbas(j)+celbas(4)*ybas(j)+celbas(7)*zbas(j))
+          tyy=(celchk(2)*xchk(j)+celchk(5)*ychk(j)+celchk(8)*zchk(j))
+     x      -(celbas(2)*xbas(j)+celbas(5)*ybas(j)+celbas(8)*zbas(j))
+          tzz=(celchk(3)*xchk(j)+celchk(6)*ychk(j)+celchk(9)*zchk(j))
+     x      -(celbas(3)*xbas(j)+celbas(6)*ybas(j)+celbas(9)*zbas(j))
+          
 c     calculate total structural difference
-        
-        rr2=txx**2+tyy**2+tzz**2
-        pp2=max(pp2,rr2)
-        
+          
+          rr2=txx**2+tyy**2+tzz**2
+          pp2=max(pp2,rr2)
+          
 c     identify and store the displaced atoms
-        
-        if(scan.and.rr2.ge.catch2)then
           
-          mdiff=mdiff+1
-          
-          if(mdiff.le.mxdiffs)then
+          if(scan.and.rr2.ge.catch2)then
             
-            idabsn(mdiff)=i
-            xdiffs(mdiff)=txx
-            ydiffs(mdiff)=tyy
-            zdiffs(mdiff)=tzz
+            mdiff=mdiff+1
             
-          else
-            
-            safe=.false.
+            if(mdiff.le.mxdiffs)then
+              
+              idabsn(mdiff)=i
+              xdiffs(mdiff)=txx
+              ydiffs(mdiff)=tyy
+              zdiffs(mdiff)=tzz
+              
+            else
+              
+              safe=.false.
+              
+            endif
             
           endif
           
@@ -1901,9 +1963,9 @@ c     abort if kinks detected
       end subroutine neb_spring_forces
       
       subroutine transition_properties
-     x  (ltad,lfcap,lneut,lnsq,loglnk,lzeql,newlst,nblock,idnode,
-     x  imcon,keyfce,keyfld,keyshl,keytol,ntcons,kmax1,kmax2,
-     x  kmax3,multt,mxnode,natms,ngrp,nhko,nlatt,nneut,nospl,
+     x  (seek,ltad,lfcap,lneut,lnsq,loglnk,lzeql,newlst,nblock,
+     x  idnode,imcon,keyfce,keyfld,keyshl,keytol,ntcons,kmax1,
+     x  kmax2,kmax3,multt,mxnode,natms,ngrp,nhko,nlatt,nneut,nospl,
      x  nscons,nstbgr,nstep,nsteql,ntangl,ntbond,ntdihd,ntfree,
      x  ntinv,ntpfbp,ntpmet,ntptbp,ntpter,ntpvdw,ntshl,ntteth,
      x  nturn,numbsn,alpha,delr,dlrpot,drewd,elrc,virlrc,epsq,
@@ -1922,6 +1984,7 @@ c***********************************************************************
       
       implicit none
       
+      character*8 seek
       logical lfcap,lneut,lnsq,loglnk,lzeql,newlst,ltad,scan,same
       integer nblock,idnode,imcon,keyfce,keyfld,keyshl,keytol,ntcons
       integer kmax1,kmax2,kmax3,multt,mxnode,natms,ngrp,nhko,nlatt
@@ -2005,7 +2068,8 @@ c     determine differences for new state (TAD only)
         
           scan=.true.
           call check_for_transition
-     x      (same,scan,idnode,mxnode,natms,imcon,mdiff,nblock,catchrad)
+     x      (seek,same,scan,idnode,mxnode,natms,imcon,mdiff,nblock,
+     x      catchrad)
           
 c     set difference counters and pointers
           
@@ -2232,14 +2296,14 @@ c     deallocate working arrays
       end subroutine scan_profile
       
       subroutine transition_time
-     x  (lfcap,lneut,lnsq,loglnk,lzeql,newlst,nblock,idnode,
+     x  (seek,lfcap,lneut,lnsq,loglnk,lzeql,newlst,nblock,idnode,
      x  imcon,keyfce,keyfld,keyshl,keytol,kmax1,kmax2,kmax3,
      x  multt,mxnode,natms,ngrp,nhko,nlatt,nneut,nospl,nscons,
      x  nstbgr,nstep,nsteql,ntangl,ntbond,ntdihd,ntfree,ntinv,
      x  ntpfbp,ntpmet,ntptbp,ntpter,ntrack,ntpvdw,ntshl,ntteth,
-     x  ntcons,alpha,delr,dlrpot,drewd,elrc,virlrc,epsq,fmax,
-     x  opttol,rctter,rcut,rcutfb,rcuttb,rprim,rvdw,temp,tstep,
-     x  volm,cfgtmp,cvgerr,catchrad,timhop,hyp_units)
+     x  ntcons,itrk,alpha,delr,dlrpot,drewd,elrc,virlrc,epsq,
+     x  fmax,opttol,rctter,rcut,rcutfb,rcuttb,rprim,rvdw,temp,
+     x  tstep,volm,cfgtmp,cvgerr,catchrad,timhop,hyp_units)
 
 c*********************************************************************
 c     
@@ -2253,6 +2317,7 @@ c*********************************************************************
       
       implicit none
       
+      character*8 seek
       logical same,minflg,lfcap,lneut,lnsq,loglnk,scan
       logical lzeql,newlst
       integer nblock,idnode,imcon,keyfce,keyfld,keyshl,keytol
@@ -2311,11 +2376,13 @@ c     check if still in base state
         
         scan=.false.
         call check_for_transition
-     x    (same,scan,idnode,mxnode,natms,imcon,mdiff,nblock,catchrad)
+     x    (seek,same,scan,idnode,mxnode,natms,imcon,mdiff,nblock,
+     x    catchrad)
         
       enddo
       
       timhop=timhyp-tstep*dble(ntrack)*(dble(itrk)-0.5d0)
+      tboost=track(ntry)
       
       return
       end subroutine transition_time
@@ -2361,7 +2428,7 @@ c**********************************************************************
       return
       end subroutine scramble_velocities
       
-      subroutine hyper_close(idnode,mxnode,natms,nsteql)
+      subroutine hyper_close(ltad,idnode,mxnode,natms,nsteql)
       
 c***********************************************************************
 c     
@@ -2374,6 +2441,7 @@ c**********************************************************************
       
       implicit none
       
+      logical ltad
       integer idnode,mxnode,natms,nsteql
       integer iatm0,iatm1,i,j,k,n,last,ierr,netdif
       real(8) buff(2)
@@ -2397,13 +2465,13 @@ c     open hyperdynamics restart file
       
 c     write control variables
         
-        write(nhrs)dble(numbsn),dble(numtrk),dble(numpro),
-     x    dble(netdif),dble(numdark),dble(nsteql),timhyp,
-     x    timres,tstop,tkeres,strres,celres
-        
+        write(nhrs)ltad,dble(numbsn),dble(numtrk),dble(numpro),
+     x    dble(netdif),dble(numdark),dble(nsteql),dble(numbpd),
+     x    timhyp,timres,tstop,tkeres,tboost,vbase,strres,celres
+        write(nhrs)track
       endif
       
-      if(numbsn.gt.1)then
+      if(ltad.and.numbsn.gt.1)then
         
 c     load basin difference data
         
@@ -2500,7 +2568,7 @@ c     write reference block configuration data
       return
       end subroutine hyper_close
       
-      subroutine hyper_open(idnode,mxnode,natms,nsteql)
+      subroutine hyper_open(ltad,idnode,mxnode,natms,nsteql)
       
 c***********************************************************************
 c     
@@ -2513,6 +2581,7 @@ c**********************************************************************
       
       implicit none
       
+      logical ltad,mtad
       integer idnode,mxnode,natms,nsteql
       integer iatm0,iatm1,i,j,k,n,last,netdif,ierr
       real(8) buff(1)
@@ -2523,24 +2592,32 @@ c     block indices
       iatm1=((idnode+1)*natms)/mxnode
       
 c     restore control variables
-        
+      
+      mtad=.true.
       if(idnode.eq.0)then
         
 c     open hyperdynamics restart file
       
         open(nhrs,file="HYPOLD",form="unformatted")
       
-        read(nhrs)(buffer(i),i=1,28)
+        read(nhrs)mtad,(buffer(i),i=1,30)
+        read(nhrs)track
         
       else
         
-        do i=1,28
+        do i=1,30
           buffer(i)=0.d0
         enddo
+        track(:)=0.d0
         
       endif
       
-      call gdsum(buffer(1),28,buffer(29))
+c     check restart file is tad compatible
+      
+      call gstate(mtad)
+      if(ltad.and.(.not.mtad))call error(idnode,2431)
+
+      call gdsum(buffer(1),31,buffer(32))
       
       numbsn=nint(buffer(1))
       numtrk=nint(buffer(2))
@@ -2548,18 +2625,23 @@ c     open hyperdynamics restart file
       netdif=nint(buffer(4))
       numdark=nint(buffer(5))
       nsteql=nint(buffer(6))
-      timhyp=buffer(7)
-      timres=buffer(8)
-      tstop=buffer(9)
-      tkeres=buffer(10)
+      numbpd=nint(buffer(7))
+      timhyp=buffer(8)
+      timres=buffer(9)
+      tstop=buffer(10)
+      tkeres=buffer(11)
+      tboost=buffer(12)
+      vbase=buffer(13)
       do i=1,9
         
-        strres(i)=buffer(i+10)
-        celres(i)=buffer(i+19)
+        strres(i)=buffer(i+13)
+        celres(i)=buffer(i+22)
 
       enddo
-      
-      if(numbsn.gt.1)then
+      last=size(track)
+      call gdsum(track,last,buffer)
+
+      if(ltad.and.numbsn.gt.1)then
         
 c     restore basin difference data
         
@@ -2671,7 +2753,7 @@ c     unload reference block configuration data
       return
       end subroutine hyper_open
       
-      subroutine bpd_forces(natms,vmin,ebias,temp,engcfg,boost)
+      subroutine bpd_forces(natms,keybpd,vmin,ebias,temp,engcfg)
       
 c***********************************************************************
 c     
@@ -2684,22 +2766,33 @@ c     author    - w. smith    jan 2008
 c     
 c***********************************************************************
       
-      integer i,natms,mynode
-      real(8) alpha,vmin,ebias,beta,temp,engcfg,boost,eboost,hscale
+      integer i,natms,mynode,keybpd
+      real(8) alpha,vmin,ebias,beta,temp,engcfg,eboost,hscale
+      real(8) engtmp
       
       boost=1.d0
-      if(ebias.gt.engcfg)then
+      numbpd=numbpd+1
+      
+c     reset potential energy wrt base level
+      
+      if(keybpd.eq.1)then
+        engtmp=engcfg-vbase
+      else
+        engtmp=engcfg-engbsn(1)
+      endif
+
+      if(ebias.gt.engtmp)then
         
 c     bias potental boost
         
-        alpha=ebias-vmin
+        alpha=ebias*(ebias-vmin)/vmin
         beta=1.d0/(boltz*temp*dble(natms))
-        eboost=(ebias-engcfg)**2/(alpha+ebias-engcfg)
+        eboost=(ebias-engtmp)**2/(alpha+ebias-engtmp)
         boost=exp(beta*eboost)
         
 c     bias potential forces scaling factor
         
-        hscale=(alpha/(alpha+ebias-engcfg))**2
+        hscale=(alpha/(alpha+ebias-engtmp))**2
         
 c     scale forces
         
@@ -2711,9 +2804,11 @@ c     scale forces
           
         enddo
         
-c$$$        engcfg=engcfg+eboost
-        
       endif
+      
+c     accumulative average of boost factor
+      
+      tboost=boost/dble(numbpd)+dble(numbpd-1)*tboost/dble(numbpd)
       
       return
       end subroutine bpd_forces

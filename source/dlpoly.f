@@ -21,7 +21,7 @@ c
 c     authors: w.smith and t.r.forester 1995
 c     copyright daresbury laboratory 1995
 c     
-c                       DL_POLY CLASSIC VERSION 1.1
+c                       DL_POLY CLASSIC VERSION 1.2
 c
 c***********************************************************************
       
@@ -64,12 +64,13 @@ c     declare required modules
       implicit none
       
       character*1 hms,dec
-
+      character*8 seek
+      
       logical ltscal,lzeql,loptim,ltraj,lgofr,lpgr,lfcap,recycle
       logical newlst,lneut,loglnk,lnsq,lzden,lshmov,lcnb,ltad,lneb
       logical stropt,lzero,nolink,newgau,lminim,lminnow,lhit,lbpd
       logical prechk,tadall,lexcite,lsolva,lfree,lfrmas,lswitch
-      logical lghost,llswitch,lnfic
+      logical lghost,llswitch,lnfic,nebgo
       
       integer npage,lines,idnode,mxnode,memr,intsta,istraj,nsbzdn
       integer keyens,keyfce,keyres,keytrj,kmax1,kmax2,kmax3,multt
@@ -93,11 +94,11 @@ c     declare required modules
       real(8) stpeng,stpeth,stpprs,stptmp,stpvir,stpvol,width,zlen
       real(8) timelp,engmet,virmet,pass0,pass1,pass2,rlxtol,opttol
       real(8) catchrad,sprneb,deltad,tlow,engtke,ehit,xhit,yhit,zhit
-      real(8) ebias,vmin,boost,heinc,tboost,hyp_units,estar
+      real(8) ebias,vmin,heinc,hyp_units,estar
       real(8), allocatable :: tbuffer(:)
       
       data timelp/0.d0/,lminnow/.false./,ntrack/10/
-      data npage,lines/8,0/,recycle/.true./,boost/1.d0/
+      data npage,lines/8,0/,recycle/.true./
       data pass0/0.d0/,pass1/0.d0/,pass2/0.d0/
       data delr,epsq,press,quattol,rprim,rvdw/6*0.d0/
       data temp,timcls,timjob,tolnce,rlxtol/5*0.d0/
@@ -115,7 +116,7 @@ c     open main printing file
       
       if(idnode.eq.0)open(nrite,file='OUTPUT')
       if(idnode.eq.0) write (nrite,
-     x  "(/,20x,'DL_POLY Version 2.20',
+     x  "(/,20x,'DL_POLY Classic 1.2',
      x  /,/,30x,'Running on ',i4,' nodes',/,/)") mxnode
       
 c     activate for limited-life executable
@@ -163,16 +164,16 @@ c     start clock
 c     input the control parameters defining the simulation
       
       call simdef
-     x  (lfcap,lgofr,lnsq,loptim,lzero,lminim,lpgr,ltraj,ltscal,lzeql,
-     x  lzden,nolink,newgau,lhit,lbpd,ltad,lneb,prechk,tadall,lsolva,
-     x  lfree,lfrmas,lexcite,lswitch,lghost,lnfic,idnode,minstp,intsta,
-     x  istraj,keybpd,keyens,keyfce,keyres,keyver,keytrj,kmax1,kmax2,
-     x  kmax3,multt,nstack,nstbgr,nsbzdn,nstbpo,nhko,nlatt,nstbts,
-     x  nsteql,nstraj,nstrun,nospl,keytol,numgau,khit,nhit,nblock,
-     x  ntrack,blkout,numneb,mode,nsolva,isolva,nofic,alpha,delr,epsq,
-     x  fmax,press,quattol,rcut,rprim,rvdw,taup,taut,temp,timcls,
-     x  timjob,tolnce,tstep,rlxtol,opttol,zlen,ehit,xhit,yhit,zhit,
-     x  ebias,vmin,heinc,catchrad,sprneb,deltad,tlow,hyp_units)
+     x  (seek,lfcap,lgofr,lnsq,loptim,lzero,lminim,lpgr,ltraj,ltscal,
+     x  lzeql,lzden,nolink,newgau,lhit,lbpd,ltad,lneb,prechk,tadall,
+     x  lsolva,lfree,lfrmas,lexcite,lswitch,lghost,lnfic,nebgo,idnode,
+     x  minstp,intsta,istraj,keybpd,keyens,keyfce,keyres,keyver,keytrj,
+     x  kmax1,kmax2,kmax3,multt,nstack,nstbgr,nsbzdn,nstbpo,nhko,nlatt,
+     x  nstbts,nsteql,nstraj,nstrun,nospl,keytol,numgau,khit,nhit,
+     x  nblock,ntrack,blkout,numneb,mode,nsolva,isolva,nofic,alpha,
+     x  delr,epsq,fmax,press,quattol,rcut,rprim,rvdw,taup,taut,temp,
+     x  timcls,timjob,tolnce,tstep,rlxtol,opttol,zlen,ehit,xhit,yhit,
+     x  zhit,ebias,vmin,heinc,catchrad,sprneb,deltad,tlow,hyp_units)
       
 c     input the system force field
       
@@ -219,7 +220,7 @@ c     read thermodynamic and structural data from restart file
      x  (lgofr,lzden,lsolva,lfree,lghost,idnode,imcon,keyfce,
      x  keyres,mxnode,natms,ntshl,nstep,numacc,numrdf,ntpatm,
      x  ntpmet,ntpvdw,nzden,chip,chit,conint,elrc,engunit,virlrc,
-     x  rvdw,volm,virtot,vircom,tboost)
+     x  rvdw,volm,virtot,vircom)
       
 c     synchronise LRC, SIC and system charge terms for switching
       
@@ -261,6 +262,15 @@ c     zero contraint terms
 c     define target kinetic energy
       
       sigma=temp*boltz*degfre*0.5d0
+      
+c     convert BPD parameters to internal units
+      
+      if(lbpd)then
+        
+        ebias=0.5d0*boltz*degfre*ebias
+        vmin=0.5d0*boltz*degfre*vmin
+        
+      endif
       
 c     time check
 
@@ -323,8 +333,7 @@ c     calculate initial forces
         
 c     bias potential dynamics option - reset forces
         
-        if(lbpd)call bpd_forces
-     x    (natms,vmin,ebias,temp,engcfg,boost)
+        if(lbpd)call bpd_forces(natms,keybpd,vmin,ebias,temp,engcfg)
         
       endif
       
@@ -333,14 +342,14 @@ c     bias potential dynamics option - reset forces
 c     construct the first reference state
         
         call hyper_start
-     x    (lbpd,lfcap,lneut,lnsq,loglnk,lzeql,newlst,nblock,idnode,
+     x    (ltad,lbpd,lfcap,lneut,lnsq,loglnk,lzeql,newlst,nblock,idnode,
      x    imcon,keyfce,keyfld,keyshl,keytol,kmax1,kmax2,kmax3,multt,
      x    mxnode,natms,ngrp,nhko,nlatt,nneut,nospl,nscons,nstbgr,
      x    nstep,nsteql,ntangl,ntbond,ntdihd,ntfree,ntinv,ntpfbp,
-     x    ntpmet,ntptbp,ntpter,ntpvdw,ntshl,ntteth,ntcons,alpha,
+     x    ntpmet,ntptbp,ntpter,ntpvdw,ntshl,ntteth,ntcons,ntrack,alpha,
      x    delr,dlrpot,drewd,elrc,virlrc,epsq,fmax,opttol,rctter,
      x    rcut,rcutfb,rcuttb,rprim,rvdw,temp,tstep,volm,sigma,
-     x    tboost,hyp_units)
+     x    hyp_units)
         
       endif
       
@@ -409,7 +418,7 @@ c     store velocities for free energy or solvation simulation
             vxo_fre(:)=vxx(:)
             vyo_fre(:)=vyy(:)
             vzo_fre(:)=vzz(:)
-
+            
           endif
           
         endif
@@ -578,8 +587,7 @@ c     scale t=0 tether reference positions (constant pressure only)
         
 c     bias potential dynamics option - reset forces
         
-        if(lbpd)call bpd_forces
-     x    (natms,vmin,ebias,temp,engcfg,boost)
+        if(lbpd)call bpd_forces(natms,keybpd,vmin,ebias,temp,engcfg)
         
 c     switching option for excitation simulation
         
@@ -630,19 +638,32 @@ c     application of transition analysis procedures
           
           engtke=engke+engrot
           call hyper_driver
-     x      (ltad,lbpd,recycle,lfcap,lneut,lnsq,loglnk,lzeql,newlst,
-     x      prechk,tadall,nblock,ntrack,idnode,imcon,keyfce,keyfld,
-     x      keyshl,keytol,kmax1,kmax2,kmax3,multt,mxnode,natms,ngrp,
-     x      ntcons,nhko,nlatt,nneut,nospl,nscons,nstbgr,nstep,
-     x      nsteql,ntangl,ntbond,ntdihd,ntfree,ntinv,ntpfbp,
-     x      ntpmet,ntptbp,ntpter,ntpvdw,ntshl,ntteth,blkout,
+     x      (seek,ltad,lbpd,recycle,lfcap,lneut,lnsq,loglnk,lzeql,
+     x      newlst,prechk,tadall,nebgo,nblock,ntrack,idnode,imcon,
+     x      keyfce,keyfld,keyshl,keytol,kmax1,kmax2,kmax3,multt,
+     x      mxnode,natms,ngrp,ntcons,nhko,nlatt,nneut,nospl,nscons,
+     x      nstbgr,nstep,nsteql,ntangl,ntbond,ntdihd,ntfree,ntinv,
+     x      ntpfbp,ntpmet,ntptbp,ntpter,ntpvdw,ntshl,ntteth,blkout,
      x      alpha,delr,dlrpot,drewd,elrc,virlrc,epsq,fmax,
      x      opttol,rctter,rcut,rcutfb,rcuttb,rprim,rvdw,temp,
      x      tstep,volm,engcfg,catchrad,sprneb,deltad,tlow,engtke,
-     x      tolnce,tboost,hyp_units)
+     x      tolnce,hyp_units,ebias,vmin)
           
         endif
         
+c     reset average boost factor in BPD during equilibration
+      
+      if(lbpd.and.keybpd.eq.1)then
+      
+        if(lzeql.and.nstep.le.nsteql)then
+          
+          numbpd=0
+          tboost=0.d0
+          
+        endif
+        
+      endif
+      
 c     calculate shell kinetic energy
         
         if(keyshl.eq.1)then
@@ -701,13 +722,13 @@ c     calculate physical quantities
         
         if(nstep.gt.0)call static
      x    (lbpd,lzeql,idnode,intsta,imcon,keyens,natms,nstack,
-     x    nstep,nsteql,ntpatm,numacc,mxnode,nblock,consv,degfre,
-     x    degrot,engang,engbnd,engcpe,engdih,enginv,engke,engrot,
-     x    engsrp,engunit,engcfg,stpeng,stpeth,stpprs,stptmp,stpvir,
-     x    stpvol,tstep,virbnd,engfbp,vircom,vircon,vircpe,virsrp,
-     x    engfld,virfld,engtbp,virtbp,virpmf,virshl,engshl,engtet,
-     x    virtet,degshl,shlke,virang,width,engmet,virmet,engter,
-     x    virter,boost,tboost,ebias,heinc)
+     x    nstep,nsteql,ntpatm,numacc,mxnode,nblock,keybpd,numbpd,
+     x    consv,degfre,degrot,engang,engbnd,engcpe,engdih,enginv,
+     x    engke,engrot,engsrp,engunit,engcfg,stpeng,stpeth,stpprs,
+     x    stptmp,stpvir,stpvol,tstep,virbnd,engfbp,vircom,vircon,
+     x    vircpe,virsrp,engfld,virfld,engtbp,virtbp,virpmf,virshl,
+     x    engshl,engtet,virtet,degshl,shlke,virang,width,engmet,
+     x    virmet,engter,virter,heinc,boost,tboost)
         
 c     z density calculation
         
@@ -724,8 +745,7 @@ c     terminate program if boundary conditions violated
           levcfg=2
           call revive
      x      (lgofr,lzden,idnode,imcon,mxnode,natms,levcfg,nstep,nzden,
-     x      numacc,numrdf,chip,chit,conint,tstep,engcfg,virtot,vircom,
-     x      tboost)
+     x      numacc,numrdf,chip,chit,conint,tstep,engcfg,virtot,vircom)
           call error(idnode,95)
           
         endif
@@ -733,7 +753,7 @@ c     terminate program if boundary conditions violated
 c     line-printer output every nstbpo steps
         
         if(nstep.eq.1.or.(nstep.gt.1.and.mod(nstep,nstbpo).eq.0))then
-           
+          
           call timchk(0,timelp)
           if(idnode.eq.0)then
             
@@ -824,10 +844,10 @@ c     save restart data in event of system crash
           levcfg=2
           call revive
      x      (lgofr,lzden,idnode,imcon,mxnode,natms,levcfg,nstep,nzden,
-     x      numacc,numrdf,chip,chit,conint,tstep,engcfg,virtot,vircom,
-     x      tboost)
+     x      numacc,numrdf,chip,chit,conint,tstep,engcfg,virtot,vircom)
           
-          if(ltad.or.lbpd)call hyper_close(idnode,mxnode,natms,nsteql)
+          if(ltad.or.lbpd)
+     x      call hyper_close(ltad,idnode,mxnode,natms,nsteql)
           
         endif
         
@@ -866,13 +886,14 @@ c     produce summary of simulation
       levcfg=2
       if(loptim)levcfg=0
       if(.not.lneb)call result
-     x  (lbpd,lgofr,lpgr,lzden,idnode,imcon,keyens,mxnode,natms,
-     x  levcfg,nzden,nstep,ntpatm,numacc,numrdf,chip,chit,conint,
-     x  rcut,tstep,engcfg,volm,virtot,vircom,zlen,tboost)
+     x  (lbpd,lbpd,lgofr,lpgr,lzden,idnode,imcon,keyens,mxnode,natms,
+     x  levcfg,nzden,nstep,ntpatm,numacc,numrdf,keybpd,chip,chit,
+     x  conint,rcut,tstep,engcfg,volm,virtot,vircom,zlen,tboost)
       
 c     write hyperdynamics restart file
       
-      if(ltad.or.lbpd)call hyper_close(idnode,mxnode,natms,nsteql)
+      if(ltad.or.lbpd)
+     x  call hyper_close(ltad,idnode,mxnode,natms,nsteql)
       
 c     close output channels
       
