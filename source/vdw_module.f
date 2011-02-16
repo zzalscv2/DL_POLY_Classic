@@ -567,17 +567,19 @@ c     read mesh resolution
 
       dlrpot=rcut/dble(mxgrid-4)
 
-      If (Abs(delpot-dlrpot) <= 1.0e-8) delpot=dlrpot
-      If ((delpot>dlrpot) .or. (ngrid-4 /= Nint(cutpot/delpot))) Then
-         If (idnode == 0) Write(nrite,"(                 
+      if (abs(delpot-dlrpot) <= 1.0e-8) delpot=dlrpot
+      if ((delpot>dlrpot) .or. (ngrid-4 /= nint(cutpot/delpot))) then
+        
+         if (idnode == 0) write(nrite,"(                 
      x    'expected radial increment : ',1p,e15.7,/,     
      x    'TABLE    radial increment : ',1p,e15.7,/,/,   
      x    'expected number of grid points : ',0p,i10,/,  
      x    'grid points in TABLE           : ',i10)")     
      x    dlrpot, delpot, mxgrid, ngrid
-
-         Call error(idnode,22)
-      End If
+         
+         call error(idnode,22)
+         
+      endif
 
       if(cutpot.lt.rcut) call error(idnode,504)
       if(abs(1.d0-(delpot/dlrpot)).gt.1.0e-8) then
@@ -613,7 +615,7 @@ c     read pair potential labels and long range corrections
             
           enddo
           
-          if(katom1.eq.0.or.katom2.eq.0) then
+          if(katom1.eq.0.or.katom2.eq.0)then
             if(idnode.eq.0) 
      x        write(nrite,'(a)') '****',atom1,'***',atom2,'****'
             call  error(idnode,81)
@@ -635,16 +637,18 @@ c     read potential arrays
 
 c     read in potential arrays
 
-          Do i=1,(ngrid+3)/4
-             l=Min(4,ngrid-(i-1)*4)
-             If (idnode == 0) Then
-                Read(Unit=ntable, Fmt=*, End=100)
+          do i=1,(ngrid+3)/4
+            
+             l=min(4,ngrid-(i-1)*4)
+             if (idnode == 0) then
+                read(unit=ntable, fmt=*, end=100)
      x              (buffer((i-1)*4+j),j=1,l)
-             Else
+             else
                 buffer((i-1)*4+1:(i-1)*4+l)=0.0d0
-             End If
-          End Do
-          Call gdsum(buffer(1:ngrid),ngrid,buffer(ngrid+1:2*ngrid))
+             endif
+             
+          enddo
+          call gdsum(buffer(1:ngrid),ngrid,buffer(ngrid+1:2*ngrid))
 
 c     reconstruct arrays using 3pt interpolation
 
@@ -652,6 +656,7 @@ c     reconstruct arrays using 3pt interpolation
           vvv(1,ivdw)=1.d0
           ggg(1,ivdw)=0.d0
           do i=2,mxgrid
+            
             rrr=dble(i)*dlrpot
             l=int(rrr*rdr)
             ppp=rrr*rdr-dble(l)
@@ -667,16 +672,18 @@ c     reconstruct arrays using 3pt interpolation
 
 c     read in force arrays
 
-          Do i=1,(ngrid+3)/4
-             l=Min(4,ngrid-(i-1)*4)
-             If (idnode == 0) Then
-                Read(Unit=ntable, Fmt=*, End=100)
+          do i=1,(ngrid+3)/4
+            
+             l=min(4,ngrid-(i-1)*4)
+             if (idnode == 0) then
+                read(unit=ntable, fmt=*, end=100)
      x              (buffer((i-1)*4+j),j=1,l)
-             Else
+             else
                 buffer((i-1)*4+1:(i-1)*4+l)=0.0d0
-             End If
-          End Do
-          Call gdsum(buffer(1:ngrid),ngrid,buffer(ngrid+1:2*ngrid))
+             endif
+             
+          enddo
+          call gdsum(buffer(1:ngrid),ngrid,buffer(ngrid+1:2*ngrid))
 
 c     reconstruct ggg arrays using 3pt interpolation
 
