@@ -567,7 +567,7 @@ c     read mesh resolution
 
       dlrpot=rcut/dble(mxgrid-4)
 
-      if (abs(delpot-dlrpot) <= 1.0e-8) delpot=dlrpot
+      if (abs(delpot-dlrpot) <= 1.0d-8) delpot=dlrpot
       if ((delpot>dlrpot) .or. (ngrid-4 /= nint(cutpot/delpot))) then
         
          if (idnode == 0) write(nrite,"(                 
@@ -582,7 +582,7 @@ c     read mesh resolution
       endif
 
       if(cutpot.lt.rcut) call error(idnode,504)
-      if(abs(1.d0-(delpot/dlrpot)).gt.1.0e-8) then
+      if(abs(1.d0-(delpot/dlrpot)).gt.1.0d-8) then
         if(idnode.eq.0) write(nrite,
      x    "(/,' TABLE arrays resized for mxgrid=',i10)") mxgrid
       endif
