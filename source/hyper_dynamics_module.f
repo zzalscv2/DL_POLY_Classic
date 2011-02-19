@@ -2615,7 +2615,7 @@ c     open hyperdynamics restart file
 c     check restart file is tad compatible
       
       call gstate(mtad)
-      if(ltad.and.(.not.mtad))call error(idnode,2431)
+      if(ltad.and.(.not.mtad))call error(idnode,2341)
 
       call gdsum(buffer(1),31,buffer(32))
       
