@@ -52,7 +52,7 @@ c***********************************************************************
      x  nblock,ntrack,blkout,numneb,mode,nsolva,isolva,nofic,alpha,
      x  delr,epsq,fmax,press,quattol,rcut,rprim,rvdw,taup,taut,temp,
      x  timcls,timjob,tolnce,tstep,rlxtol,opttol,zlen,ehit,xhit,yhit,
-     x  zhit,ebias,vmin,heinc,catchrad,sprneb,deltad,tlow,hyp_units)
+     x  zhit,ebias,vmin,catchrad,sprneb,deltad,tlow,hyp_units)
 
 c***********************************************************************
 c     
@@ -90,7 +90,7 @@ c***********************************************************************
       real(8) taut,temp,timcls,timjob,tolnce,tstep,rlxtol,opttol
       real(8) eps,tol,fm,densvar,delrdf,delzdn,zlen,ehit,hyp_units
       real(8) catchrad,sprneb,deltad,tlow,xhit,yhit,zhit,ebias,vmin
-      real(8) heinc,prntim
+      real(8) prntim
       
 CSGIC      real(8) dummy
 CCRAY      real(8) dummy
@@ -177,7 +177,6 @@ c     temp scaling interval
       zhit=0.d0
       vmin=0.d0
       ebias=0.d0
-      heinc=0.d0
       catchrad=0.d0
       pfree=0.d0
       

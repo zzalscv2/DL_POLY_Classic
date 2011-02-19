@@ -94,7 +94,7 @@ c     declare required modules
       real(8) stpeng,stpeth,stpprs,stptmp,stpvir,stpvol,width,zlen
       real(8) timelp,engmet,virmet,pass0,pass1,pass2,rlxtol,opttol
       real(8) catchrad,sprneb,deltad,tlow,engtke,ehit,xhit,yhit,zhit
-      real(8) ebias,vmin,heinc,hyp_units,estar
+      real(8) ebias,vmin,hyp_units,estar
       real(8), allocatable :: tbuffer(:)
       
       data timelp/0.d0/,lminnow/.false./,ntrack/10/
@@ -173,7 +173,7 @@ c     input the control parameters defining the simulation
      x  nblock,ntrack,blkout,numneb,mode,nsolva,isolva,nofic,alpha,
      x  delr,epsq,fmax,press,quattol,rcut,rprim,rvdw,taup,taut,temp,
      x  timcls,timjob,tolnce,tstep,rlxtol,opttol,zlen,ehit,xhit,yhit,
-     x  zhit,ebias,vmin,heinc,catchrad,sprneb,deltad,tlow,hyp_units)
+     x  zhit,ebias,vmin,catchrad,sprneb,deltad,tlow,hyp_units)
       
 c     input the system force field
       
@@ -728,7 +728,7 @@ c     calculate physical quantities
      x    stptmp,stpvir,stpvol,tstep,virbnd,engfbp,vircom,vircon,
      x    vircpe,virsrp,engfld,virfld,engtbp,virtbp,virpmf,virshl,
      x    engshl,engtet,virtet,degshl,shlke,virang,width,engmet,
-     x    virmet,engter,virter,heinc,boost,tboost)
+     x    virmet,engter,virter,boost,tboost)
         
 c     z density calculation
         
@@ -886,7 +886,7 @@ c     produce summary of simulation
       levcfg=2
       if(loptim)levcfg=0
       if(.not.lneb)call result
-     x  (lbpd,lbpd,lgofr,lpgr,lzden,idnode,imcon,keyens,mxnode,natms,
+     x  (ltad,lbpd,lgofr,lpgr,lzden,idnode,imcon,keyens,mxnode,natms,
      x  levcfg,nzden,nstep,ntpatm,numacc,numrdf,keybpd,chip,chit,
      x  conint,rcut,tstep,engcfg,volm,virtot,vircom,zlen,tboost)
       

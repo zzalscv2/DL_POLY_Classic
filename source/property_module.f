@@ -78,7 +78,7 @@ c***********************************************************************
       integer idnode,imcon,keyens,mxnode,natms,nzden,nstep,ntpatm
       integer levcfg,numacc,numrdf,keybpd,i,iadd,io,j
       real(8) chip,chit,conint,rcut,tstep,volm,timelp,avvol,zlen,dc
-      real(8) engcfg,virtot,vircom,prntim,simtim,tboost,boost
+      real(8) engcfg,virtot,vircom,prntim,simtim,tboost
 
 c     save restart data
       
@@ -592,7 +592,7 @@ c     print out information
      x  stptmp,stpvir,stpvol,tstep,virbnd,engfbp,vircom,vircon,
      x  vircpe,virsrp,engfld,virfld,engtbp,virtbp,virpmf,virshl,
      x  engshl,engtet,virtet,degshl,shlke,virang,width,engmet,
-     x  virmet,engter,virter,heinc,boost,tboost)
+     x  virmet,engter,virter,boost,tboost)
 
 c***********************************************************************
 c     
@@ -618,7 +618,7 @@ c***********************************************************************
       real(8) engtbp,virtbp,virpmf,virshl,engshl,engtet,virtet
       real(8) degshl,shlke,virang,width,sclnv1,sclnv2,stprot
       real(8) stpcns,stpshl,zistk,engmet,virmet,engter,virter
-      real(8) tbold,aterm,bterm,cterm,heinc,boost,tboost
+      real(8) tbold,aterm,bterm,cterm,boost,tboost
 
       save newjob
       
