@@ -262,7 +262,7 @@ c***********************************************************************
       
       logical safe
       integer idnode,imcon,mxnode,natms,i,j,k,ii,k0,l
-      real(8) engmet,virden,rhosqr,rrr,ppp,fk0,fk1,fk2,t1,t2
+      real(8) engmet,engtmp,virden,rhosqr,rrr,ppp,fk0,fk1,fk2,t1,t2
       
       safe=.true.
       
@@ -359,11 +359,13 @@ c     calculate embedding energy using 3-point interpolation
               t1=fk1+(fk1-fk0)*ppp
               t2=fk1+(fk2-fk1)*ppp
               if(ppp.lt.0.d0)then
-                engmet=engmet-(t1+0.5d0*(t2-t1)*(ppp+1.d0))
+                engtmp=-(t1+0.5d0*(t2-t1)*(ppp+1.d0))
               else
-                engmet=engmet-(t2+0.5d0*(t2-t1)*(ppp-1.d0))
+                engtmp=-(t2+0.5d0*(t2-t1)*(ppp-1.d0))
               endif
-              
+
+              engmet=engmet+engtmp
+
 c     calculate derivative of embedding function wrt density using 3-point
 c     interpolation - store result in rho array
               
@@ -397,7 +399,7 @@ c     analytical square root of density dependence
             engmet=engmet+rhosqr
             rho(i)=0.5d0/rhosqr
             virden=virden+vlrcm(ltype(i))/rhosqr
-            
+
           endif
           
         enddo
@@ -648,7 +650,7 @@ c     calculate density using 3-point interpolation
 
 c***********************************************************************
 c     
-c     dl_poly subroutine for calculating metal forces atom
+c     dl_poly subroutine for calculating metal forces
 c     for EAM and FS potentials using a verlet neighbour list
 c     
 c     parallel replicated data version
@@ -663,17 +665,21 @@ c***********************************************************************
       
       logical safe
       integer iatm,jatm,ik,m,k0,l,ld,ktyp1,ktyp2
-      real(8) engmet,virmet
+      real(8) engmet,virmet,strs
       real(8) rdr,rsq,rrr,ppp,vk0,vk1,vk2,t1,t2,gk0,gk1,gk2
       real(8) gamma,gamma1,gamma2,gamma3,fx,fy,fz,fi
-      dimension fi(3)
+      dimension fi(3),strs(6)
 
 CDIR$ CACHE_ALIGN fi
-      
+
 c     initialise potential energy and virial
       
       engmet=0.d0
       virmet=0.d0
+
+c     initialise stress tensor accumulators
+      
+      strs(:)=0.d0
 
 c     store forces for iatm 
       
@@ -873,19 +879,19 @@ c     calculate forces
             
 c     calculate stress tensor
             
-            stress(1)=stress(1)+xdf(m)*fx
-            stress(2)=stress(2)+xdf(m)*fy
-            stress(3)=stress(3)+xdf(m)*fz
-            stress(5)=stress(5)+ydf(m)*fy
-            stress(6)=stress(6)+ydf(m)*fz
-            stress(9)=stress(9)+zdf(m)*fz
+            strs(1)=strs(1)+xdf(m)*fx
+            strs(2)=strs(2)+xdf(m)*fy
+            strs(3)=strs(3)+xdf(m)*fz
+            strs(4)=strs(4)+ydf(m)*fy
+            strs(5)=strs(5)+ydf(m)*fz
+            strs(6)=strs(6)+zdf(m)*fz
             
 c     calculate virial
             
             virmet=virmet-gamma*rsq
             
           endif
-            
+          
         endif
         
       enddo
@@ -898,9 +904,15 @@ c     load temps back to fxx(iatm) etc
 
 c     complete stress tensor
       
-      stress(4)=stress(2)
-      stress(7)=stress(3)
-      stress(8)=stress(6)
+      stress(1)=stress(1)+strs(1)
+      stress(2)=stress(2)+strs(2)
+      stress(3)=stress(3)+strs(3)
+      stress(4)=stress(4)+strs(2)
+      stress(5)=stress(5)+strs(4)
+      stress(6)=stress(6)+strs(5)
+      stress(7)=stress(7)+strs(3)
+      stress(8)=stress(8)+strs(5)
+      stress(9)=stress(9)+strs(6)
       
       return
       end subroutine metfrc
@@ -1405,7 +1417,8 @@ c     check array dimensions
         
         if(mxbuff.lt.numpts+4)then
           
-          write(nrite,*) 'mxbuff must be >=',numpts+4,' in mettab'
+          if(idnode.eq.0)
+     x      write(nrite,*) 'mxbuff must be >=',numpts+4,' in mettab'
           call error(idnode,28)
           
         endif
@@ -1416,7 +1429,8 @@ c     store working parameters (start shifted for DL_POLY interpolation)
         buffer(4)=(finish-start)/dble(numpts-1)
         buffer(2)=start-5.d0*buffer(4)
         buffer(3)=finish
-        write(nrite,"(16x,2a8,2x,a4,3x,1p,4e13.5)") 
+        if(idnode.eq.0)
+     x    write(nrite,"(16x,2a8,2x,a4,3x,1p,4e13.5)") 
      x    atom1,atom2,type,dble(numpts),start,finish,buffer(4)
 
 c     read potential arrays

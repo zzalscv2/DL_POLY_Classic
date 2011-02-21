@@ -4,14 +4,15 @@ c***********************************************************************
 c     
 c     dl_poly module for defining four-body potential arrays
 c     copyright - daresbury laboratory
-c     author    - w. smith    sep 2003
-c     adapted   - w. smith    aug 2008 solvation, free energy 
-c                 and excitation 
+c     author  - w. smith  sep 2003
+c     adapted - w. smith  aug 2008 : solvation, free energy, excitation 
+c     adapted - w. smith  jan 2011 : metadynamics
 c     
 c***********************************************************************
 
       use config_module
       use error_module
+      use metafreeze_module
       use parse_module
       use property_module
       use setup_module
@@ -239,12 +240,13 @@ c***********************************************************************
       implicit none
       
       logical safe,lsolva,lfree,lexcite,lselect,lskip
+      logical idrive,jdrive,kdrive,ldrive
       integer idnode,mxnode,natms,imcon,nix,niy,niz
       integer i,j,k,nbx,nby,nbz,ncells,ix,iy,iz,icell,jx,jy
       integer jz,jj,kk,ia,ib,ifbp,jfbp,kfbp,jklbd,kkfbp,ktyp,ii
       integer ic,ll,id,lfbp,l,limit,jcell,kkk
       real(8) rcutfb,engfbp,virfbp,vbn,vcn,pterm,xm,ym,zm
-      real(8) strs,cprp,det,xdc,ydc,zdc,sxx,syy,szz,sxab
+      real(8) strs,cprp,det,xdc,ydc,zdc,sxx,syy,szz,sxab,strs_loc
       real(8) syab,szab,xab,yab,zab,rab2,sxac,syac,szac,xac,yac
       real(8) zac,rac2,sxad,syad,szad,xad,yad,zad,rad2,rrab,rrac
       real(8) rrad,rbc,rcd,rdb,ubx,uby,ubz,ubn,rub,vbx,vby,vbz
@@ -253,7 +255,7 @@ c***********************************************************************
       real(8) cosc,cosd,thb,thc,thd,gamb,gamc,gamd,rubc,rubd
       real(8) rucd,rucb,rudb,rudc,rvbc,rvbd,rvcd,rvcb,rvdb,rvdc
       real(8) fax,fay,faz,fbx,fby,fbz,fcx,fcy,fcz,fdx,fdy,fdz
-      dimension cprp(10),strs(6),nix(27),niy(27),niz(27)
+      dimension cprp(10),strs(6),nix(27),niy(27),niz(27),strs_loc(6)
       
       data nix/ 0,-1,-1,-1, 0, 0,-1, 1,-1, 0, 1,-1, 0, 1,
      x  1, 1, 1, 0, 0, 1,-1, 1, 0,-1, 1, 0,-1/
@@ -274,10 +276,8 @@ c     initialise accumulators
       virfbp=0.d0
       fbp_fre=0.d0
       fbp_vir=0.d0
-      
-      do i=1,6
-        strs(i)=0.d0
-      enddo
+      strs(:)=0.d0
+      strs_loc(:)=0.d0
       
       if(lsolva)then
         
@@ -420,20 +420,24 @@ c     loop over central atoms of inversion
         do ii=1,lst(icell)
           
           ia=latfbp(ii)
+          if(lmetadyn)idrive=driven(ltype(ia))
           ifbp=mx3fbp*(ltype(ia)-1)
           if(mod(ia,mxnode).eq.idnode.and.lstfbp(ifbp+1).ge.0)then
             
           do jj=1,limit-2
           
           ib=latfbp(jj)
+          if(lmetadyn)jdrive=driven(ltype(ib))
           
           do kk=jj+1,limit-1
           
           ic=latfbp(kk)
+          if(lmetadyn)kdrive=driven(ltype(ic))
                 
           do ll=kk+1,limit
           
           id=latfbp(ll)
+          if(lmetadyn)ldrive=driven(ltype(id))
                   
           if(lskip)then
             
@@ -832,6 +836,43 @@ c     stress tensor calculation for inversion terms
           
           endif
           
+c     metadynamics local parameters
+          
+          if(lmetadyn.and.(idrive.or.jdrive.or.kdrive.or.ldrive))then
+            
+c     local energy (no virial)
+
+            eng_loc=eng_loc+pterm
+
+c     local forces
+            
+            fxx_loc(ia)=fxx_loc(ia)+fax
+            fyy_loc(ia)=fyy_loc(ia)+fay
+            fzz_loc(ia)=fzz_loc(ia)+faz
+            
+            fxx_loc(ib)=fxx_loc(ib)+fbx
+            fyy_loc(ib)=fyy_loc(ib)+fby
+            fzz_loc(ib)=fzz_loc(ib)+fbz
+            
+            fxx_loc(ic)=fxx_loc(ic)+fcx
+            fyy_loc(ic)=fyy_loc(ic)+fcy
+            fzz_loc(ic)=fzz_loc(ic)+fcz
+            
+            fxx_loc(id)=fxx_loc(id)+fdx
+            fyy_loc(id)=fyy_loc(id)+fdy
+            fzz_loc(id)=fzz_loc(id)+fdz
+            
+c     local stress tensor
+            
+            strs_loc(1)=strs_loc(1)+xab*fbx+xac*fcx+xad*fdx 
+            strs_loc(2)=strs_loc(2)+yab*fbx+yac*fcx+yad*fdx 
+            strs_loc(3)=strs_loc(3)+zab*fbx+zac*fcx+zad*fdx 
+            strs_loc(4)=strs_loc(4)+yab*fby+yac*fcy+yad*fdy 
+            strs_loc(5)=strs_loc(5)+yab*fbz+yac*fcz+yad*fdz 
+            strs_loc(6)=strs_loc(6)+zab*fbz+zac*fcz+zad*fdz 
+
+          endif
+          
           endif
           endif
           endif
@@ -917,6 +958,20 @@ c     complete stress tensor
       stress(7)=stress(7)+strs(3)
       stress(8)=stress(8)+strs(5)
       stress(9)=stress(9)+strs(6)
+      
+      if(lmetadyn)then
+        
+        stress_loc(1)=stress_loc(1)+strs_loc(1)
+        stress_loc(2)=stress_loc(2)+strs_loc(2)
+        stress_loc(3)=stress_loc(3)+strs_loc(3)
+        stress_loc(4)=stress_loc(4)+strs_loc(2)
+        stress_loc(5)=stress_loc(5)+strs_loc(4)
+        stress_loc(6)=stress_loc(6)+strs_loc(5)
+        stress_loc(7)=stress_loc(7)+strs_loc(3)
+        stress_loc(8)=stress_loc(8)+strs_loc(5)
+        stress_loc(9)=stress_loc(9)+strs_loc(6)
+        
+      endif
       
       return
       end subroutine fbpfrc

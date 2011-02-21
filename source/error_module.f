@@ -1343,8 +1343,16 @@ c     dummy entry
             write(nrite,'(/,/,1x,a)')
      x        'error - cannot run both TAD and BPD together'
             
+          elseif(kode.eq.2360)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - ensemble unavailable for metadynamics'
+            
           endif
           
+c     *****************important note********************
+c     error messages 2500 to 2550 reserved for metadynamics
+c     see subroutine mfrz_error in metafreeze_module
+
         else
           
           write(nrite,'(/,/,1x,a)')

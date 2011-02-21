@@ -4,14 +4,15 @@ c***********************************************************************
 c     
 c     dl_poly module for defining three-body potential arrays
 c     copyright - daresbury laboratory
-c     author    - w. smith    sep 2003
-c     adapted   - w. smith    aug 2008 solvation, free energy 
-c                 and excitation 
+c     author  - w. smith  sep 2003
+c     adapted - w. smith  aug 2008 : solvation, free energy excitation
+c     adapted - w. smith  jan 2011 : metadynamics
 c     
 c***********************************************************************
 
       use config_module     
       use error_module     
+      use metafreeze_module
       use parse_module
       use setup_module
       use site_module
@@ -234,6 +235,7 @@ c***********************************************************************
       implicit none
 
       logical safe,lsolva,lfree,lexcite,lselect,lskip
+      logical idrive,jdrive,kdrive
       integer idnode,mxnode,natms,imcon,nix,niy,niz
       integer i,nbx,nby,nbz,ncells,l,ix,iy,iz,k,icell,kk,jx,jy,jz
       integer j,jcell,ii,itbp,limit,last,ktbp,jtbp,jktbp,kktbp
@@ -243,8 +245,9 @@ c***********************************************************************
       real(8) rab,sxbc,sybc,szbc,xbc,ybc,zbc,rbc,xac,yac,zac,rac
       real(8) rrab,rrbc,rrac,cost,sint,theta,pterm,gamma,vterm
       real(8) gamsa,gamsb,gamsc,scrn,fxa,fya,fza,fxc,fyc,fzc,strs
-
-      dimension nix(27),niy(27),niz(27),cprp(10),strs(6)
+      real(8) strs_loc
+      
+      dimension nix(27),niy(27),niz(27),cprp(10),strs(6),strs_loc(9)
       
       data nix/ 0,-1,-1,-1, 0, 0,-1, 1,-1, 0, 1,-1, 0, 1,
      x  1, 1, 1, 0, 0, 1,-1, 1, 0,-1, 1, 0,-1/
@@ -265,10 +268,8 @@ c     initialise accumulators
       virtbp=0.d0
       tbp_fre=0.d0
       tbp_vir=0.d0
-      
-      do i=1,6
-        strs(i)=0
-      enddo
+      strs(:)=0.d0
+      strs_loc(:)=0.d0
       
       if(lsolva)then
         
@@ -445,6 +446,14 @@ c     make labels etc consistent with angfrc.f
           ia=j
           ib=i
           ic=k
+          
+          if(lmetadyn)then
+            
+            idrive=driven(ltype(ia))
+            jdrive=driven(ltype(ib))
+            kdrive=driven(ltype(ic))
+            
+          endif
           
           if(lskip)then
             
@@ -728,7 +737,41 @@ c     calculate stress tensor
             strs(6)=strs(6)+rab*zab*fza+rbc*zbc*fzc
             
           endif
-          
+
+c     metadynamics local parameters
+        
+          if(lmetadyn)then
+            
+c     local energy and virial
+            
+            eng_loc=eng_loc+pterm
+            vir_loc=vir_loc+vterm
+            
+c     local forces
+            
+            fxx_loc(ia)=fxx_loc(ia)+fxa
+            fyy_loc(ia)=fyy_loc(ia)+fya
+            fzz_loc(ia)=fzz_loc(ia)+fza
+            
+            fxx_loc(ib)=fxx_loc(ib)-fxa-fxc
+            fyy_loc(ib)=fyy_loc(ib)-fya-fyc
+            fzz_loc(ib)=fzz_loc(ib)-fza-fzc
+            
+            fxx_loc(ic)=fxx_loc(ic)+fxc
+            fyy_loc(ic)=fyy_loc(ic)+fyc
+            fzz_loc(ic)=fzz_loc(ic)+fzc
+            
+c     local stress tensor
+            
+            strs_loc(1)=strs_loc(1)+rab*xab*fxa+rbc*xbc*fxc
+            strs_loc(2)=strs_loc(2)+rab*xab*fya+rbc*xbc*fyc
+            strs_loc(3)=strs_loc(3)+rab*xab*fza+rbc*xbc*fzc
+            strs_loc(4)=strs_loc(4)+rab*yab*fya+rbc*ybc*fyc
+            strs_loc(5)=strs_loc(5)+rab*yab*fza+rbc*ybc*fzc
+            strs_loc(6)=strs_loc(6)+rab*zab*fza+rbc*zbc*fzc
+            
+          endif
+
           endif
           endif
           endif
@@ -761,6 +804,20 @@ c     complete stress tensor
       stress(7)=stress(7)+strs(3)
       stress(8)=stress(8)+strs(5)
       stress(9)=stress(9)+strs(6)
+      
+      if(lmetadyn)then
+        
+        stress_loc(1)=stress_loc(1)+strs_loc(1)
+        stress_loc(2)=stress_loc(2)+strs_loc(2)
+        stress_loc(3)=stress_loc(3)+strs_loc(3)
+        stress_loc(4)=stress_loc(4)+strs_loc(2)
+        stress_loc(5)=stress_loc(5)+strs_loc(4)
+        stress_loc(6)=stress_loc(6)+strs_loc(5)
+        stress_loc(7)=stress_loc(7)+strs_loc(3)
+        stress_loc(8)=stress_loc(8)+strs_loc(5)
+        stress_loc(9)=stress_loc(9)+strs_loc(6)
+        
+      endif
       
 c     check for undefined potentials
 

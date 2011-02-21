@@ -818,7 +818,7 @@ c***********************************************************************
       real(8) tstep,virang,virbnd,vircpe,virdih,virfbp
       real(8) virfld,virinv,virlrc,virmet,virshl,virsrp
       real(8) virtbp,virter,virtet,volm,engmet,cfgold,cvgerr
-      real(8) hnorm,grad0,grad1,ff1,sgn
+      real(8) hnorm,grad0,grad1,ff1,sgn,engord,virord
       
       data mxpass/1000/
       
@@ -839,6 +839,8 @@ c     dummy variables
       lexcite=.false.
       nsolva=0
       isolva=1
+      engord=0.d0
+      virord=0.d0
       
 c     relax the current structure
       
@@ -867,7 +869,7 @@ c     calculate atomic forces
      x    rcuttb,engtbp,virtbp,rcutfb,engfbp,virfbp,rctter,engter,
      x    virter,engbnd,virbnd,engang,virang,engdih,virdih,enginv,
      x    virinv,engtet,virtet,engshl,shlke,virshl,engfld,virfld,
-     x    engcfg,fmax,temp)
+     x    engcfg,fmax,temp,engord,virord)
         
 c     frozen atoms option
         
@@ -1681,6 +1683,7 @@ c***********************************************************************
       real(8) rctter,engter,virter,engbnd,virbnd,engang,virang
       real(8) engdih,virdih,enginv,virinv,engtet,virtet,engshl
       real(8) shlke,virshl,engfld,virfld,engcfg,fmax,temp,tstep
+      real(8) engord,virord
       
       numrdf=0
       ltad=.true.
@@ -1693,6 +1696,8 @@ c     dummy variables
       lexcite=.false.
       nsolva=0
       isolva=1
+      engord=0.d0
+      virord=0.d0
       
 c     block indices
       
@@ -1746,7 +1751,7 @@ c     calculate atomic forces for one bead
      x    rcuttb,engtbp,virtbp,rcutfb,engfbp,virfbp,rctter,engter,
      x    virter,engbnd,virbnd,engang,virang,engdih,virdih,enginv,
      x    virinv,engtet,virtet,engshl,shlke,virshl,engfld,virfld,
-     x    engcfg,fmax,temp)
+     x    engcfg,fmax,temp,engord,virord)
         
 c     store configuration energy of bead
         

@@ -1242,7 +1242,7 @@ c     author    - w. smith  june       1997
 c     
 c***********************************************************************
       
-      logical safe,lewald,lspme,lhke,peek,nolink,lcshft
+      logical safe,lewald,lspme,lhke,peek,nolink,lcshft,lmetad
       logical lsolva,lfree,lfrmas,lghost
       real(8) cell,celprp,rcut,rvdw,delr,eps,alpha,fac,tol,tol1
       real(8) densvar,drdf,dzdn,zlen
@@ -1275,6 +1275,7 @@ c***********************************************************************
       lfree=.false.
       lfrmas=.false.
       lsolva=.false.
+      lmetad=.false.
       
 c     open the simulation input file
       
@@ -1297,6 +1298,16 @@ c     open the simulation input file
           elseif(findstring('no link',record,idum))then
             
             nolink=.true.
+            
+          elseif(findstring('metafreeze',record,idum))then
+            
+            lmetad=.true.
+            do while(lmetad)
+              call getrec(safe,idnode,nread)
+              if(.not.safe)call abortscan(17,idnode)
+              call lowcase(record,lenrec)
+              lmetad=.not.findstring('endmet',record,idum)
+            enddo
             
           elseif(findstring('densvar',record,idum))then
             

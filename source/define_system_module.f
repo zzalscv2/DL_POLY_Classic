@@ -7,6 +7,7 @@ c     copyright - daresbury laboratory
 c     author    - w. smith     aug 2006
 c     adapted   - p.-a. cazade oct 2007, solvation, free energy
 c     and excitation
+c     adapted   - d. quigley nov 2010, metadynamics
 c     
 c***********************************************************************
       
@@ -24,6 +25,7 @@ c***********************************************************************
       use hkewald_module
       use hyper_dynamics_module
       use inversion_module
+      use metafreeze_module
       use metal_module
       use parse_module
       use pmf_module
@@ -45,15 +47,15 @@ c***********************************************************************
       subroutine simdef
      x  (seek,lfcap,lgofr,lnsq,loptim,lzero,lminim,lpgr,ltraj,ltscal,
      x  lzeql,lzden,nolink,newgau,lhit,lbpd,ltad,lneb,prechk,tadall,
-     x  lsolva,lfree,lfrmas,lexcite,lswitch,lghost,lnfic,nebgo,idnode,
-     x  minstp,intsta,istraj,keybpd,keyens,keyfce,keyres,keyver,keytrj,
-     x  kmax1,kmax2,kmax3,multt,nstack,nstbgr,nsbzdn,nstbpo,nhko,nlatt,
-     x  nstbts,nsteql,nstraj,nstrun,nospl,keytol,numgau,khit,nhit,
-     x  nblock,ntrack,blkout,numneb,mode,nsolva,isolva,nofic,alpha,
-     x  delr,epsq,fmax,press,quattol,rcut,rprim,rvdw,taup,taut,temp,
-     x  timcls,timjob,tolnce,tstep,rlxtol,opttol,zlen,ehit,xhit,yhit,
-     x  zhit,ebias,vmin,catchrad,sprneb,deltad,tlow,hyp_units)
-
+     x  lsolva,lfree,lfrmas,lexcite,lswitch,lghost,lnfic,nebgo,lpcos,
+     x  idnode,minstp,intsta,istraj,keybpd,keyens,keyfce,keyres,keyver,
+     x  keytrj,kmax1,kmax2,kmax3,multt,nstack,nstbgr,nsbzdn,nstbpo,
+     x  nhko,nlatt,nstbts,nsteql,nstraj,nstrun,nospl,keytol,numgau,
+     x  khit,nhit,nblock,ntrack,blkout,numneb,mode,nsolva,isolva,nofic,
+     x  alpha,delr,epsq,fmax,press,quattol,rcut,rprim,rvdw,taup,taut,
+     x  temp,timcls,timjob,tolnce,tstep,rlxtol,opttol,zlen,ehit,xhit,
+     x  yhit,zhit,ebias,vmin,catchrad,sprneb,deltad,tlow,hyp_units)
+      
 c***********************************************************************
 c     
 c     dl_poly subroutine for reading in the simulation control 
@@ -76,7 +78,7 @@ c***********************************************************************
       character*8 cunit,seek
       character*1 hms
       character*1 directive(lenrec)
-      logical lsolva,lfree,lfrmas,lexcite,lswitch,lghost,lnfic
+      logical lsolva,lfree,lfrmas,lexcite,lswitch,lghost,lnfic,lpcos
       logical ltscal,lzeql,loptim,ltraj,lfcap,lgofr,lpgr,lpres,safe
       logical lstep,ltemp,lcut,ldelr,lprim,lforc,lens,lvdw,lrvdw,kill
       logical lnsq,lzden,lewald,lspme,lhke,loop,lzero,nolink,newgau
@@ -129,7 +131,6 @@ c     temp scaling interval
       keyens=0
       keyver=0
       taut=0.d0
-      nofic=1000
       nstbts=0
       nstbgr=0
       nsbzdn=0
@@ -149,6 +150,7 @@ c     temp scaling interval
       nsolva=0
       niswitch=0
       nswitch=0
+      nofic=1000
       
       fmax=1000.d0
       keyfce=0
@@ -186,6 +188,7 @@ c     temp scaling interval
       lneb=.false.
       loop=.true.
       lnfic=.false.
+      lpcos=.false.
       lzero=.false.
       ltscal=.false.
       lewald=.false.
@@ -257,8 +260,9 @@ c     convert to lowercase and strip out leading blanks
         call copystring(record,directive,lenrec)
         
         if(record(1).eq.'#'.or.record(1).eq.' ')then
-
+          
 c     record is commented out
+          cycle
           
         elseif(findstring('steps',directive,idum))then
           
@@ -292,6 +296,14 @@ c     cancel possible "flying ice cube" in Berendsen thermostats
           
           lnfic=.true.
           nofic=intstr(directive,lenrec,idum)
+          
+        elseif(findstring('cores',directive,idum).and.
+     x      findstring('on',directive,idum).and.
+     x      findstring('shells',directive,idum))then
+          
+c     put cores on shells at start - shell model only (else null)
+          
+          lpcos=.true.
           
         elseif(findstring('densvar',directive,idum))then
           
@@ -574,6 +586,15 @@ c     activate temperature accelerated dynamics option
           
           call solvation_option
      x      (directive,lsolva,idnode,nsolva,isolva)
+          
+        elseif(findstring('metafreeze',directive,idum))then
+          
+c     activate metadynamics option - d. quigley
+          
+          call metadyn_option
+     x      (directive,lmetadyn,lstein,ltet,lglobpe,llocpe,idnode,
+     x      ncolvar,nq4,nq6,ntet,hkey,meta_step_int,globpe_scale,
+     x      locpe_scale,ref_W_aug,h_aug,wt_Dt)
           
         else if(findstring('free',directive,idum))then
           
@@ -1008,6 +1029,13 @@ c     if tad selected use only leap frog
       
 c     error checking 
       
+      if(lmetadyn.and.keyens.ne.3.and.keyens.ne.5.and.keyens.ne.7)then
+        
+        kill=.true.
+        call error(idnode,-2360)
+        
+      endif
+      
       if(lsolva.or.lfree.or.lexcite.or.lswitch)then
         
         if(lspme)then
@@ -1219,8 +1247,8 @@ c     close CONTROL file
       subroutine sysdef
      x  (lneut,lnsq,lsolva,lfree,lexcite,lswitch,lghost,idnode,keyfce,
      x  keyfld,natms,ngrp,ntpatm,ntpmls,ntpvdw,ntptbp,ntpmet,ntpfbp,
-     x  ntpter,nshels,keyshl,ntghost,dlrpot,engunit,rvdw,rcuttb,rctter,
-     x  rcutfb)
+     x  ntpter,nshels,keyshl,ntghost,keyver,dlrpot,engunit,rvdw,rcuttb,
+     x  rctter,rcutfb)
       
 c***********************************************************************
 c     
@@ -1249,7 +1277,7 @@ c***********************************************************************
       integer idnode,keyfce,keyfld,natms,ngrp,ntpatm,ntpmls
       integer ntpvdw,ntptbp,ntpmet,ntpfbp,nshels,ksite
       integer nsite,nconst,nangle,ndihed,ninver,nbonds
-      integer nteth,nspmf,itmols,i,idum
+      integer nteth,nspmf,itmols,i,idum,keyver
       integer ntpter,keyshl,iatm,natmsr,ntghost
       
       real(8) dlrpot,engunit,rvdw,rcuttb,rctter,rcutfb
@@ -1332,6 +1360,7 @@ c     convert to lowercase and remove leading blanks
         if(record(1).eq.'#'.or.record(1).eq.' ')then
           
 c     record is commented out
+          cycle
           
         elseif(findstring('units',record,idum))then
           
@@ -1653,6 +1682,16 @@ c     close force field file
       
       if(lshl.and.keyshl.eq.0)call error(idnode,1951)
       
+c     if metadynamics and shell selected use only velocity verlet
+      
+      if(lshl.and.lmetadyn.and.keyver.eq.0)then
+        
+        if(idnode.eq.0)write(nrite,
+     x    "(/,1x,'switching to velocity verlet for metadynamics')")
+        keyver=1
+        
+      endif
+
       return
       end subroutine sysdef
       
@@ -2100,10 +2139,10 @@ c     error exit for config file read
       end subroutine sysgen
       
       subroutine sysinit
-     x  (lgofr,lzden,lsolva,lfree,lghost,idnode,imcon,keyfce,
+     x  (lgofr,lzden,lsolva,lfree,lghost,lpcos,idnode,imcon,keyfce,
      x  keyres,mxnode,natms,ntshl,nstep,numacc,numrdf,ntpatm,
      x  ntpmet,ntpvdw,nzden,chip,chit,conint,elrc,engunit,virlrc,
-     x  rvdw,volm,virtot,vircom)
+     x  rvdw,volm,virtot,vircom,tboost,chit_shl)
       
 c***********************************************************************
 c     
@@ -2113,16 +2152,18 @@ c
 c     copyright - daresbury laboratory 1997
 c     author    - w. smith         july 1997
 c     adapted   - p.-a. cazade oct 2007, solvation etc
+c     adapted   - d. quigley nov 2010, metadynamics
 c     
 c***********************************************************************
       
       implicit none
       
-      logical lgofr,lzden,lfree,lsolva,lghost
+      logical lgofr,lzden,lfree,lsolva,lghost,lpcos
       integer idnode,imcon,keyfce,keyres,mxnode,natms,nstep,numacc
       integer numrdf,ntpatm,nzden,i,j,k,ntpmet,ntshl,ntpvdw
       real(8) chip,chit,conint,elrc,engunit,virlrc,rvdw,volm
-      real(8) dnumrd,dnstep,dnumac,dnzden,virtot,vircom
+      real(8) dnumrd,dnstep,dnumac,dnzden,virtot,vircom,tboost
+      real(8) chit_shl
       
 c     read or initialise accumulator arrays
       
@@ -2132,7 +2173,8 @@ c     read accumulator data from dump file
         
         open(nrest,file='REVOLD',form='unformatted')
         
-        read(nrest) dnstep,dnumac,dnumrd,chit,chip,conint,dnzden
+        read(nrest) dnstep,dnumac,dnumrd,chit,chip,conint,dnzden,
+     x    tboost,chit_shl
         read(nrest) virtot,vircom,eta,strcns,strbod
         read(nrest) stpval
         read(nrest) sumval
@@ -2169,6 +2211,7 @@ c     and integral for conserved quantity
         conint=0.d0
         virtot=0.d0
         vircom=0.d0
+        chit_shl=0.d0
         do i=1,9
           
           eta(i)=0.d0
@@ -2240,8 +2283,8 @@ c     initialise accumulator arrays
       
 c     put shells on cores at start
       
-      if(keyres.ne.1.and.ntshl.gt.0)call put_shells_on_cores
-     x  (idnode,mxnode,ntshl)
+      if(lpcos.and.keyres.ne.1.and.ntshl.gt.0)
+     x  call put_shells_on_cores(idnode,mxnode,ntshl)
       
 c     if restart then broadcast stored variables via a global sum
       
@@ -2257,9 +2300,11 @@ c     if restart then broadcast stored variables via a global sum
         buffer(5)=dble(numacc)
         buffer(6)=dble(numrdf)
         buffer(7)=dble(nzden)
-        buffer(8)=virtot
-        buffer(9)=vircom
-        call gdsum(buffer(1),9,buffer(10))
+        buffer(8)=tboost
+        buffer(9)=virtot
+        buffer(10)=vircom
+        buffer(11)=chit_shl
+        call gdsum(buffer(1),11,buffer(12))
         chit=buffer(1)
         chip=buffer(2)
         conint=buffer(3)
@@ -2267,8 +2312,11 @@ c     if restart then broadcast stored variables via a global sum
         numacc=nint(buffer(5))
         numrdf=nint(buffer(6))
         nzden=nint(buffer(7))
-        virtot=buffer(8)
-        vircom=buffer(9)
+        tboost=buffer(8)
+        virtot=buffer(9)
+        vircom=buffer(10)
+        chit_shl=buffer(11)
+        
         call gdsum(eta,9,buffer)
         call gdsum(strcns,9,buffer)
         call gdsum(strbod,9,buffer)
@@ -2658,7 +2706,7 @@ c     adaptations for solvation and excitation simulations
         degfre_sol(:)=dble(3*(natm_sol(:))-const_sol(:))+degfre_sol(:)
         
       endif
-
+      
       return
       end subroutine sysbook
       
@@ -4900,7 +4948,6 @@ c***********************************************************************
       if(numneb.eq.0)numneb=1
       numneb=min(maxneb,numneb)
       
-      cunit="        "
       hyp_units=1.d0
       do while(.not.endneb)
         
@@ -4910,7 +4957,10 @@ c***********************************************************************
         call strip(record,lenrec)
         call copystring(record,directive,lenrec)
         
-        if(findstring('endneb',directive,idum))then
+        if(record(1).eq.'#'.or.record(1).eq.'&')then
+c     information only - skip record
+          cycle
+        elseif(findstring('endneb',directive,idum))then
           endneb=.true.
         elseif(findstring('units',directive,idum))then
           hyp_units=energy_unit()
@@ -5024,10 +5074,14 @@ c***********************************************************************
           call strip(record,lenrec)
           call copystring(record,directive,lenrec)
           
-          if(findstring('endbpd',directive,idum))then
+          if(record(1).eq.'#'.or.record(1).eq.'&')then
+c     information only - skip record
+            cycle
+          elseif(findstring('endbpd',directive,idum))then
             endbpd=.true.
           elseif(findstring('pre',directive,idum))then
             prechk=.true.
+            if(findstring('false',directive,idum))prechk=.false.
           elseif(findstring('noneb',directive,idum))then
             nebgo=.false.
           elseif(findstring('target',directive,idum))then
@@ -5119,7 +5173,6 @@ c***********************************************************************
       lminopt=.true.
       ltad=.true.
       endtad=.false.
-      cunit="        "
       hyp_units=1.d0
       
       do while(.not.endtad)
@@ -5130,12 +5183,17 @@ c***********************************************************************
         call strip(record,lenrec)
         call copystring(record,directive,lenrec)
         
-        if(findstring('endtad',directive,idum))then
+        if(record(1).eq.'#'.or.record(1).eq.'&')then
+c     information only - skip record
+          cycle
+        elseif(findstring('endtad',directive,idum))then
           endtad=.true.
         elseif(findstring('pre',directive,idum))then
           prechk=.true.
+          if(findstring('false',directive,idum))prechk=.false.
         elseif(findstring('all',directive,idum))then
           tadall=.true.
+          if(findstring('false',directive,idum))tadall=.false.
         elseif(findstring('units',directive,idum))then
           hyp_units=energy_unit()
           call getword(cunit,directive,8,lenrec)
@@ -5197,6 +5255,116 @@ c     energy unit conversions
       
       return
       end subroutine tad_option
+
+      subroutine metadyn_option
+     x  (directive,lmetadyn,lstein,ltet,lglobpe,llocpe,idnode,
+     x  ncolvar,nq4,nq6,ntet,hkey,meta_step_int,globpe_scale,
+     x  locpe_scale,ref_W_aug,h_aug,wt_Dt)
+      
+c***********************************************************************
+c     
+c     dl_poly subroutine for reading parameters for metadynamics option
+c     copyright - daresbury laboratory
+c     author    - w. smith    jan 2011
+c     
+c     note: default values are set in metafreeze_module
+c     
+c***********************************************************************
+      
+      implicit none
+      
+      character*1 directive(lenrec)
+      logical lmetadyn,endmet,lstein,ltet,lglobpe,llocpe,safe
+      integer idnode,idum,ncolvar,nq4,nq6,ntet,hkey,meta_step_int
+      real(8) globpe_scale,locpe_scale,ref_W_aug,h_aug,wt_Dt
+      
+      lmetadyn=.true.
+      endmet=.false.          
+      
+      do while(.not.endmet)
+        
+        call getrec(safe,idnode,nread)
+        if(.not.safe)call abort_control_read(1,idnode,nread)
+        call lowcase(record,lenrec)
+        call strip(record,lenrec)
+        call copystring(record,directive,lenrec)
+        
+        if(record(1).eq.'#'.or.record(1).eq.'&')then
+c     information only - skip record
+          cycle
+        elseif(findstring('endmet',directive,idum))then
+          endmet=.true.
+        elseif(findstring('ncolvar',directive,idum))then
+          ncolvar=intstr(directive,lenrec,idum)
+        elseif(findstring('lstein',directive,idum))then
+          lstein=.true.
+          if(findstring('false',directive,idum))lstein=.false.
+        elseif(findstring('ltet',directive,idum))then
+          ltet=.true.
+          if(findstring('false',directive,idum))ltet=.false.
+        elseif(findstring('lglobpe',directive,idum))then
+          lglobpe=.true.
+          if(findstring('false',directive,idum))lglobpe=.false.
+        elseif(findstring('llocpe',directive,idum))then
+          llocpe=.true.
+          if(findstring('false',directive,idum))llocpe=.false.
+        elseif(findstring('globpe_scale',directive,idum))then
+          globpe_scale=dblstr(directive,lenrec,idum)
+        elseif(findstring('locpe_scale',directive,idum))then
+          locpe_scale=dblstr(directive,lenrec,idum)
+        elseif(findstring('nq4',directive,idum))then
+          nq4=intstr(directive,lenrec,idum)
+          nq4=intstr(directive,lenrec,idum) ! do twice - number in name!
+        elseif(findstring('nq6',directive,idum))then
+          nq6=intstr(directive,lenrec,idum)
+          nq6=intstr(directive,lenrec,idum) ! do twice - number in name!
+        elseif(findstring('ntet',directive,idum))then
+          ntet=intstr(directive,lenrec,idum)
+        elseif(findstring('meta_step_int',directive,idum))then
+          meta_step_int=intstr(directive,lenrec,idum)
+        elseif(findstring('ref_w_aug',directive,idum))then
+          ref_W_aug=dblstr(directive,lenrec,idum)
+        elseif(findstring('h_aug',directive,idum))then
+          h_aug=dblstr(directive,lenrec,idum)
+        elseif(findstring('hkey',directive,idum))then
+          hkey=intstr(directive,lenrec,idum)
+        elseif(findstring('wt_dt',directive,idum))then
+          wt_dt=dblstr(directive,lenrec,idum)
+        endif
+        
+      enddo
+      
+      if(idnode.eq.0)then
+        
+        write(nrite,
+     x    "(/,1x,'metadynamics controls'
+     x    /,1x,'total number of collective variables',i10,
+     x    /,1x,'steinhardt parameters option (Q4/Q6)',l10,
+     x    /,1x,'tetrahedral parameters option (zeta)',l10,
+     x    /,1x,'global potential parameter option   ',l10,
+     x    /,1x,'local potential parameter option    ',l10,
+     x    /,1x,'global potential param. scale factor',e12.4,
+     x    /,1x,'local potential param. scale factor ',e12.4)")
+     x    ncolvar,lstein,ltet,lglobpe,llocpe,globpe_scale,locpe_scale
+        
+        write(nrite,
+     x    "(  1x,'number of Q4 atom pair types        ',i10,
+     x      /,1x,'number of Q6 atom pair types        ',i10,
+     x      /,1x,'number of zeta atom triplet types   ',i10)")
+     x    nq4,nq6,ntet
+        
+        write(nrite,
+     x    "(  1x,'gaussian deposition interval        ',i10,
+     x      /,1x,'reference gaussian height           ',e12.4,
+     x      /,1x,'gaussian width parameter            ',e12.4,
+     x      /,1x,'height control key                  ',i10,
+     x      /,1x,'well-tempered control parameter     ',e12.4)")
+     x    meta_step_int,ref_W_aug,h_aug,hkey,wt_Dt
+        
+      endif
+            
+      return
+      end subroutine metadyn_option
       
       subroutine ewald_selection
      x  (directive,lhke,lspme,lewald,lcut,lforc,kill,idnode,keyfce,
@@ -5364,19 +5532,19 @@ c     limit of 512.
         kmaxpow2=1
         do while (kmax1.gt.kmaxpow2.and.kmaxpow2.lt.256)
           kmaxpow2=kmaxpow2 * 2
-        end do
+        enddo
         kmax1=2 * kmaxpow2
         
         kmaxpow2=1
         do while (kmax2.gt.kmaxpow2.and.kmaxpow2.lt.256)
           kmaxpow2=kmaxpow2 * 2
-        end do
+        enddo
         kmax2=2 * kmaxpow2
         
         kmaxpow2=1
         do while (kmax3.gt.kmaxpow2.and.kmaxpow2.lt.256)
           kmaxpow2=kmaxpow2 * 2
-        end do
+        enddo
         kmax3=2 * kmaxpow2
         
       endif
@@ -5645,6 +5813,7 @@ c***********************************************************************
           kfree=intstr(directive,lenrec,idum)
         elseif(findstring('reset_mass',directive,idum))then
           lfrmas=.true.
+          if(findstring('false',directive,idum))lfrmas=.false.
         elseif(findstring('system_a',directive,idum))then
           ind_fre(1)=intstr(directive,lenrec,idum)
           ind_fre(2)=intstr(directive,lenrec,idum)

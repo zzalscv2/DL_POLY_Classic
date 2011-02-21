@@ -9,6 +9,7 @@ c
 c***********************************************************************
       
       use config_module
+      use core_shell_module
       use property_module
       use rigid_body_module
       use utility_module
@@ -171,7 +172,8 @@ c     update chit to 1/2 step
 
 c     thermostat the velocities
       
-      scale=1.d0-tstep*chit
+      scale=exp(-tstep*chit)
+
       do i=iatm0,iatm1
         
         vxx(i)=scale*vxx(i)
@@ -225,7 +227,8 @@ c     update chit to 1/2 step
 
 c     thermostat the velocities
       
-      scale=1.d0-tstep*chit
+      scale=exp(-tstep*chit)
+
       do i=iatm0,iatm1
         
         vxx(i)=scale*vxx(i)
@@ -277,7 +280,8 @@ c     propagate chip to 1/2 step
 
 c     barostat the velocities
       
-      scale=1.d0-tstep*chip
+      scale=exp(-tstep*chip)
+
       do i=iatm0,iatm1
         
         vxx(i)=scale*vxx(i)
@@ -342,7 +346,7 @@ c     update chit to 1/2 step
 
 c     thermostat scale parameter
       
-      scale=1.d0-tstep*chit
+      scale=exp(-tstep*chit)
 
 c     thermostat free atoms
 
@@ -430,7 +434,7 @@ c     update chit to 1/2 tstep
       
 c     thermostat scale parameter
       
-      scale=1.d0-tstep*chit
+      scale=exp(-tstep*chit)
       
 c     thermostat free atoms
       
@@ -515,7 +519,8 @@ c     propagate chip to 1/2 tstep
       
 c     barostat the free atom velocities
       
-      scale=1.d0-tstep*chip
+      scale=exp(-tstep*chip)
+      
       do j=ifre1,ifre2
         
         i=lstfre(j)
@@ -589,7 +594,7 @@ c     update chit to 1/2 step
 
 c     thermostat the velocities
       
-      scale=1.d0-tstep*chit
+      scale=exp(-tstep*chit)
       do i=iatm0,iatm1
         
         vxx(i)=scale*vxx(i)
@@ -757,7 +762,7 @@ c     update chit to 1/2 step
 
 c     thermostat scale parameter
       
-      scale=1.d0-tstep*chit
+      scale=exp(-tstep*chit)
 
 c     thermostat free atoms
 
@@ -987,7 +992,7 @@ c     update chit to 1/2 step
 
 c     thermostat scale parameter
       
-      scale=1.d0-tstep*chit
+      scale=exp(-tstep*chit)
 
 c     thermostat free atoms
 
@@ -1842,5 +1847,88 @@ c     global sum of stress tensor
       return
       end subroutine kinstressf
       
+      subroutine nvtscale_shl
+     x  (idnode,mxnode,ntshl,shlke,sigma_shl,tstep,qmass_shl,
+     x   taut,chit_shl,conint)
+
+c*********************************************************************
+c
+c     dl_poly routine to integrate and apply NVT thermostat
+c     thermostats the core-shell relative motion
+c
+c     copyright daresbury laboratory
+c     author - w.smith october 2002
+c     amended - w.smith january 2005 : f90 conversion
+c     adapted - d. quigley      2006 : core-shell motion
+c
+c*********************************************************************
+
+      implicit none
+
+      integer idnode,mxnode,ntshl,i,ishl1,ishl2,j,k,m
+      real(8) shlke,sigma_shl,tstep,qmass_shl,chit_shl,conint
+      real(8) dvx,dvy,dvz,tmx,tmy,tmz,rmu,scale,taut
+
+      ishl1=(idnode*ntshl)/mxnode+1
+      ishl2=((idnode+1)*ntshl)/mxnode
+
+c     calculate kinetic energy
+      
+      call corshl(idnode,mxnode,ntshl,shlke)
+
+c     update chit to 1/2 step
+      
+      chit_shl=chit_shl+tstep*(shlke-sigma_shl)/qmass_shl
+
+c     thermostat the velocities
+      
+      scale=exp(-tstep*chit_shl)
+
+      m=0
+      do k=ishl1,ishl2
+        
+        m=m+1
+        
+        i=listshl(m,2)
+        j=listshl(m,3)
+
+        rmu=(weight(i)*weight(j))/(weight(i)+weight(j))
+        
+        if(rmu.gt.0.d0)then
+          
+          dvx=vxx(j)-vxx(i)
+          dvy=vyy(j)-vyy(i)
+          dvz=vzz(j)-vzz(i)
+          
+          tmx=weight(i)*vxx(i)+weight(j)*vxx(j)
+          tmy=weight(i)*vyy(i)+weight(j)*vyy(j)
+          tmz=weight(i)*vzz(i)+weight(j)*vzz(j)
+          
+          vxx(i)=tmx/(weight(i)+weight(j))-scale*rmu*dvx/weight(i)
+          vxx(j)=tmx/(weight(i)+weight(j))+scale*rmu*dvx/weight(j)
+          vyy(i)=tmy/(weight(i)+weight(j))-scale*rmu*dvy/weight(i)
+          vyy(j)=tmy/(weight(i)+weight(j))+scale*rmu*dvy/weight(j)
+          vzz(i)=tmz/(weight(i)+weight(j))-scale*rmu*dvz/weight(i)
+          vzz(j)=tmz/(weight(i)+weight(j))+scale*rmu*dvz/weight(j)
+          
+        endif
+
+      enddo
+
+      shlke=shlke*scale**2
+
+c     update chi to full step
+      
+      conint=conint+tstep*chit_shl*qmass_shl/taut**2
+
+c     update chit to full step
+      
+      chit_shl=chit_shl+tstep*(shlke-sigma_shl)/qmass_shl
+
+      if(mxnode.gt.1) call shlmerge(idnode,mxnode,ntshl)
+      
+      return
+      end subroutine nvtscale_shl
+
       end module ensemble_tools_module
 

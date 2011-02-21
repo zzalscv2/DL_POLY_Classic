@@ -57,8 +57,8 @@ c***********************************************************************
 
       subroutine result
      x  (ltad,lbpd,lgofr,lpgr,lzden,idnode,imcon,keyens,mxnode,natms,
-     x  levcfg,nzden,nstep,ntpatm,numacc,numrdf,keybpd,chip,chit,
-     x  conint,rcut,tstep,engcfg,volm,virtot,vircom,zlen,tboost)
+     x  levcfg,nzden,nstep,ntpatm,numacc,numrdf,keybpd,chip,chit,conint,
+     x  rcut,tstep,engcfg,volm,virtot,vircom,zlen,tboost,chit_shl)
 
 c***********************************************************************
 c     
@@ -78,13 +78,14 @@ c***********************************************************************
       integer idnode,imcon,keyens,mxnode,natms,nzden,nstep,ntpatm
       integer levcfg,numacc,numrdf,keybpd,i,iadd,io,j
       real(8) chip,chit,conint,rcut,tstep,volm,timelp,avvol,zlen,dc
-      real(8) engcfg,virtot,vircom,prntim,simtim,tboost
+      real(8) engcfg,virtot,vircom,prntim,simtim,tboost,chit_shl
 
 c     save restart data
       
       call revive
      x  (lgofr,lzden,idnode,imcon,mxnode,natms,levcfg,nstep,nzden,
-     x  numacc,numrdf,chip,chit,conint,tstep,engcfg,virtot,vircom)
+     x  numacc,numrdf,chip,chit,conint,tstep,engcfg,virtot,vircom,
+     x  tboost,chit_shl)
 
 c     for TAD and BPD system averages not generally meaningful 
 c     useful only for BPD in configurational sampling mode
@@ -217,26 +218,26 @@ c     write out remaining registers
             
           endif
           
+c     print out sample of final configuration 
+          
+          write(nrite,"(/,/,1x,'sample of final configuration',/)")
+          write(nrite,"(6x,'i',7x,'x(i)',8x,'y(i)',8x,'z(i)',
+     x      7x,'vx(i)',7x,'vy(i)',7x,'vz(i)',7x,'fx(i)',7x,
+     x      'fy(i)',7x,'fz(i)',/,/)")
+          io=(natms+19)/20
+          
+          do i=1,natms,io
+            
+            write(nrite,"(1x,i6,1p,3e12.4,3e12.4,3e12.4)") 
+     x        i,xxx(i),yyy(i),zzz(i),vxx(i),vyy(i),vzz(i),
+     x        fxx(i),fyy(i),fzz(i)
+            
+          enddo
+          
         endif
         
-c     print out sample of final configuration 
-        
-        write(nrite,"(/,/,1x,'sample of final configuration',/)")
-        write(nrite,"(6x,'i',7x,'x(i)',8x,'y(i)',8x,'z(i)',
-     x    7x,'vx(i)',7x,'vy(i)',7x,'vz(i)',7x,'fx(i)',7x,
-     x    'fy(i)',7x,'fz(i)',/,/)")
-        io=(natms+19)/20
-        
-        do i=1,natms,io
-          
-          write(nrite,"(1x,i6,1p,3e12.4,3e12.4,3e12.4)") 
-     x      i,xxx(i),yyy(i),zzz(i),vxx(i),vyy(i),vzz(i),
-     x      fxx(i),fyy(i),fzz(i)
-          
-        enddo
-
       endif
-          
+      
 c     bypass printing averages for certain tad and bpd options
       
       if(goprint)then
@@ -941,7 +942,8 @@ c     close statistics file at regular intervals
 
       subroutine revive
      x  (lgofr,lzden,idnode,imcon,mxnode,natms,levcfg,nstep,nzden,
-     x   numacc,numrdf,chip,chit,conint,tstep,engcfg,virtot,vircom)
+     x  numacc,numrdf,chip,chit,conint,tstep,engcfg,virtot,vircom,
+     x  tboost,chit_shl)
 
 c***********************************************************************
 c     
@@ -959,6 +961,7 @@ c***********************************************************************
       integer idnode,imcon,mxnode,natms,nstep,nzden,numacc,numrdf
       integer levcfg,nsum,nbuff,i,j
       real(8) chip,chit,conint,tstep,engcfg,rmxnode,virtot,vircom
+      real(8) tboost,chit_shl
 
       if(mxnode.gt.1)then
 
@@ -1020,8 +1023,8 @@ c     write accumulator data to dump file
         
         open(nrest,file='REVIVE',form='unformatted')
         
-        write(nrest) dble(nstep),dble(numacc),dble(numrdf),chit,chip,
-     x    conint,dble(nzden)
+        write(nrest) dble(nstep),dble(numacc),dble(numrdf),chit,
+     x    chip,conint,dble(nzden),tboost,chit_shl
         write(nrest) virtot,vircom,eta,strcns,strbod
         write(nrest) stpval
         write(nrest) sumval
@@ -1146,7 +1149,7 @@ c***********************************************************************
       logical lpgr
       integer idnode,mxnode,ntpatm,nzden,k,j
       real(8) volm,zlen,delzdn,dvolz,factor,sum,rrr,rho
-      
+
       if(idnode.eq.0) write(nrite,
      x  "(/,/,12X,'Z DENSITY PROFILES',/,/,
      x  'calculated using ',i10,' configurations')") nzden

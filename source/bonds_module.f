@@ -8,11 +8,14 @@ c
 c     author    - w. smith    sep 2003
 c     adapted for solvation, free energy and excitation
 c               - p.-a. cazade oct 2007
+c     adapted for metadynamics
+c               - d. quigley 2006
 c     
 c***********************************************************************
       
       use config_module
       use error_module
+      use metafreeze_module
       use parse_module
       use setup_module
       use site_module
@@ -115,7 +118,7 @@ c     test for frozen atom pairs
           nbonds=nbonds+1
           if(nbonds.gt.mxtbnd)call error(idnode,30)
           
-          if    (keyword(1:4).eq.'harm')then
+          if(keyword(1:4).eq.'harm')then
             keybnd(nbonds)=1
           elseif(keyword(1:4).eq.'-hrm')then
             keybnd(nbonds)=-1
@@ -206,15 +209,17 @@ c     modified  - t. forester    may   1994
 c     modified  - t. forester    nov   1994 
 c     modified  - w. smith       nov   2006
 c     modified  - p.-a. cazade   oct   2007, solvation etc.
+c     modified  - d. quigley           2007, metdynamics
 c     
 c***********************************************************************
       
       implicit none
       
       logical safe,lsolva,lfree,lexcite,lselect
+      logical idrive,jdrive
       integer i,fail,ibnd1,ibnd2,idnode,mxnode,ii,ia,ib,imcon
       integer keyb,kk,ntbond
-      real(8) strs(6)
+      real(8) strs(6),strs_loc(6)
       real(8) rab,rrab,omega,gamma,fx,fy,fz,engbnd,virbnd,epsq
       real(8), allocatable :: xdab(:),ydab(:),zdab(:)
       
@@ -240,9 +245,8 @@ c     initialise accumulators
       virbnd=0.d0
       bnd_fre=0.d0
       bnd_vir=0.d0
-      do i=1,6
-        strs(i)=0.d0
-      enddo
+      strs(:)=0.d0
+      strs_loc(:)=0.d0
 
       if(lsolva)then
         
@@ -264,6 +268,15 @@ c     indices of bonded atoms
         ia=listbnd(ii,2)
         ib=listbnd(ii,3)
         
+c     metadynamics local definitions
+        
+        if(lmetadyn)then
+          
+          idrive=driven(ltype(ia))
+          jdrive=driven(ltype(ib))
+          
+        endif
+
 c     components of bond vector
         
         xdab(ii)=xxx(ia)-xxx(ib)
@@ -472,6 +485,36 @@ c     calculate stress tensor
           
         endif
         
+c     metadynamics local parameters
+        
+        if(lmetadyn.and.(idrive.or.jdrive))then
+          
+c     local energy and virial
+          
+          eng_loc=eng_loc+omega
+          vir_loc=vir_loc+gamma*rab*rab
+          
+c     local forces
+          
+          fxx_loc(ia)=fxx_loc(ia)+fx
+          fyy_loc(ia)=fyy_loc(ia)+fy
+          fzz_loc(ia)=fzz_loc(ia)+fz
+          
+          fxx_loc(ib)=fxx_loc(ib)-fx
+          fyy_loc(ib)=fyy_loc(ib)-fy
+          fzz_loc(ib)=fzz_loc(ib)-fz
+          
+c     local stress tensor
+          
+          strs_loc(1)=strs_loc(1)+xdab(ii)*fx
+          strs_loc(2)=strs_loc(2)+xdab(ii)*fy
+          strs_loc(3)=strs_loc(3)+xdab(ii)*fz
+          strs_loc(4)=strs_loc(4)+ydab(ii)*fy
+          strs_loc(5)=strs_loc(5)+ydab(ii)*fz
+          strs_loc(6)=strs_loc(6)+zdab(ii)*fz
+          
+        endif
+        
       enddo
       
 c     complete stress tensor
@@ -485,6 +528,20 @@ c     complete stress tensor
       stress(7)=stress(7)+strs(3)
       stress(8)=stress(8)+strs(5)
       stress(9)=stress(9)+strs(6)
+      
+      if(lmetadyn)then
+        
+        stress_loc(1)=stress_loc(1)+strs_loc(1)
+        stress_loc(2)=stress_loc(2)+strs_loc(2)
+        stress_loc(3)=stress_loc(3)+strs_loc(3)
+        stress_loc(4)=stress_loc(4)+strs_loc(2)
+        stress_loc(5)=stress_loc(5)+strs_loc(4)
+        stress_loc(6)=stress_loc(6)+strs_loc(5)
+        stress_loc(7)=stress_loc(7)+strs_loc(3)
+        stress_loc(8)=stress_loc(8)+strs_loc(5)
+        stress_loc(9)=stress_loc(9)+strs_loc(6)
+      
+      endif
       
 c     check for undefined potentials
       

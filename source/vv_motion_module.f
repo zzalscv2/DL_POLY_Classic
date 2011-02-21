@@ -3,15 +3,16 @@
 c***********************************************************************
 c     
 c     dl_poly module for velocity verlet integration schemes
-c     
 c     copyright - daresbury laboratory
 c     author    - w. smith    aug 2006
+c     adapted   - d. quigley - metadynamics
 c     
 c***********************************************************************
       
       use config_module
       use ensemble_tools_module
       use error_module
+      use metafreeze_module,only : lmetadyn
       use property_module
       use setup_module
       use shake_module
@@ -124,7 +125,7 @@ c     global verification of convergence
 
 c     bypass calculations if all tolerances satisfied 
         
-        if (.not.safe)then
+        if(.not.safe)then
           
 c     initialise increment arrays
           
@@ -282,7 +283,7 @@ c*********************************************************************
       dimension txx(mxatms),tyy(mxatms),tzz(mxatms)
       dimension xxt(mxatms),yyt(mxatms),zzt(mxatms)
       dimension dxx(mxcons),dyy(mxcons),dzz(mxcons)
-
+      
 c     constraint convergence tolerance
 
       tolvel=tolnce/tstep
@@ -434,7 +435,7 @@ c***********************************************************************
       real(8), allocatable :: txx(:),tyy(:),tzz(:)
       real(8), allocatable :: dxx(:),dyy(:),dzz(:)
       real(8), allocatable :: dxt(:),dyt(:),dzt(:)
-
+      
       safe=.true.
 
 c     allocate working arrays
@@ -622,7 +623,7 @@ c***********************************************************************
       real(8), allocatable :: txx(:),tyy(:),tzz(:)
       real(8), allocatable :: dxx(:),dyy(:),dzz(:)
       real(8), allocatable :: dxt(:),dyt(:),dzt(:)
-
+      
       safe=.true.
 
 c     allocate working arrays
@@ -831,7 +832,7 @@ c***********************************************************************
       real(8), allocatable :: txx(:),tyy(:),tzz(:)
       real(8), allocatable :: dxx(:),dyy(:),dzz(:)
       real(8), allocatable :: dxt(:),dyt(:),dzt(:)
-
+      
       safe=.true.
 
 c     allocate working arrays
@@ -1070,7 +1071,8 @@ c     deallocate working arrays
 
       subroutine nvtvv_h1
      x  (safe,lshmov,isw,idnode,mxnode,natms,imcon,nscons,ntcons,
-     x  tstep,taut,sigma,chit,consv,conint,engke,tolnce,vircon)
+     x  ntshl,keyshl,tstep,taut,sigma,chit,consv,conint,engke,
+     x  tolnce,vircon,chit_shl,sigma_shl)
 
 c***********************************************************************
 c     
@@ -1086,6 +1088,7 @@ c
 c     copyright - daresbury laboratory 
 c     author    - w. smith october 2002
 c     amended   - w. smith january 2005 : f90 conversion
+c     adapted   - d. quigley - metadynamics
 c     
 c***********************************************************************
 
@@ -1105,7 +1108,19 @@ c***********************************************************************
       real(8), allocatable :: txx(:),tyy(:),tzz(:)
       real(8), allocatable :: dxx(:),dyy(:),dzz(:)
       real(8), allocatable :: dxt(:),dyt(:),dzt(:)
+      
+c     metadynamics shell thermostat variables
 
+      integer ntshl,keyshl
+      real(8) sigma_shl
+
+      logical,save :: lfirst=.true.
+      real(8)      :: chit_shl  
+      real(8),save :: qmass_shl
+      real(8)      :: shlke
+
+c     end metadynamics shell thermostat variables
+      
       safe=.true.
 
 c     allocate working arrays
@@ -1136,6 +1151,15 @@ c     block indices
       
       iatm0=(idnode*natms)/mxnode+1
       iatm1=((idnode+1)*natms)/mxnode
+
+      if(lmetadyn.and.lfirst.and.(ntshl>0))then
+         write(*,*)"Warning - Metadynamics Modification"
+         write(*,*)"========================="
+         write(*,*)"Coupling core-shell motion thermostat at 1 K"
+         lfirst=.false.
+c        use same relaxation time for global and core-shell?
+         qmass_shl=2.d0*sigma_shl*taut**2
+      endif
 
 c     construct current bond vectors
       
@@ -1169,6 +1193,20 @@ c     integrate and apply nvt thermostat
      x    (idnode,mxnode,natms,engke,sigma,hstep,qmass,taut,
      x    chit,conint)
 
+c     metadynamics shell thermostat
+c     ====================================================
+c     Must first merge update velocities as the core-shell
+c     velocites are not distributed according to the same
+c     rules.
+c     ====================================================
+        if(lmetadyn.and.keyshl.eq.1)then
+          if(mxnode.gt.1)call merge
+     x      (idnode,mxnode,natms,mxbuff,vxx,vyy,vzz,buffer)
+          call nvtscale_shl
+     x      (idnode,mxnode,ntshl,shlke,sigma_shl,hstep,qmass_shl,
+     x      taut,chit_shl,conint)      
+        endif
+        
 c     update velocities
         
         do i=iatm0,iatm1
@@ -1252,9 +1290,27 @@ c     merge velocity data
         if(mxnode.gt.1)
      x    call merge(idnode,mxnode,natms,mxbuff,vxx,vyy,vzz,buffer)
 
+c     metdynamics shell thermostat
+c     ====================================================
+c     Must first merge update velocities as the core-shell
+c     velocites are not distributed according to the same
+c     rules.
+c     ====================================================
+        if(lmetadyn.and.keyshl.eq.1)then
+          call nvtscale_shl
+     x      (idnode,mxnode,ntshl,shlke,sigma_shl,hstep,qmass_shl,
+     x      taut,chit_shl,conint)      
+        endif
+        
 c     conserved quantity less kinetic and potential energy terms
         
         consv=conint+0.5d0*qmass*chit**2
+
+c     metadynamics shell thermostat
+
+        if(lmetadyn.and.keyshl.eq.1)then
+           consv=consv+0.5d0*qmass_shl*chit_shl**2
+        endif
 
 c     kinetic contribution to stress tensor
         
@@ -1344,7 +1400,7 @@ c***********************************************************************
       
       safe=.true.
       
-      if(newjob) then
+      if(newjob)then
 
 c     block indices
         
@@ -1622,8 +1678,9 @@ c     deallocate working arrays
 
       subroutine nptvv_h1
      x  (safe,lshmov,isw,idnode,mxnode,natms,imcon,nscons,ntcons,
-     x  ntpatm,tstep,taut,taup,sigma,temp,chip,chit,consv,conint,
-     x  engke,elrc,tolnce,vircon,virtot,virlrc,volm,press)
+     x  ntpatm,ntshl,keyshl,tstep,taut,taup,sigma,temp,chip,chit,
+     x  consv,conint,engke,elrc,tolnce,vircon,virtot,virlrc,volm,
+     x  press,chit_shl,sigma_shl)
 
 c***********************************************************************
 c     
@@ -1639,6 +1696,7 @@ c
 c     copyright - daresbury laboratory 
 c     author    - w. smith november 2002
 c     amended   - w. smith january 2005: f90 conversion
+c     adapted   - d. quigley - metadynamics
 c     
 c***********************************************************************
 
@@ -1668,6 +1726,18 @@ c***********************************************************************
 
       save newjob,totmas,volm0,elrc0,virlrc0,dens0
       save cell0,iatm0,iatm1,hstep,qstep,fstep,pmass,qmass
+
+c     metadynamics shell thermostat variables
+
+      integer ntshl,keyshl
+      real(8) sigma_shl
+
+      logical,save :: lfirst=.true.
+      real(8)      :: chit_shl 
+      real(8),save :: qmass_shl
+      real(8)      :: shlke
+
+c     end metadynamics shell thermostat variables
 
       data uni/1.d0,0.d0,0.d0,0.d0,1.d0,0.d0,0.d0,0.d0,1.d0/
       data newjob/.true./
@@ -1736,6 +1806,15 @@ c     allocate working arrays
         
       endif
       
+      if(lmetadyn.and.lfirst.and.(ntshl>0))then
+         write(*,*)"Warning - Metdynamics Modification"
+         write(*,*)"========================="
+         write(*,*)"Coupling core-shell motion thermostat at 1 K"
+         lfirst=.false.
+c        use same relaxation time for global and core-shell?
+         qmass_shl=2.d0*sigma_shl*taut**2
+      endif
+
 c     construct current bond vectors
       
       if(ntcons.gt.0)then
@@ -1797,10 +1876,24 @@ c     volume integration parameter
           do icyc=1,ncyc
             
 c     integrate and apply npt thermostat
-          
+            
             call nptscale_t
      x        (idnode,mxnode,natms,engke,temp,sigma,qstep,pmass,qmass,
      x        taut,chip,chit,conint)
+            
+c     metdynamics shell thermostat
+c     ====================================================
+c     Must first merge update velocities as the core-shell
+c     velocites are not distributed according to the same
+c     rules.
+c     ====================================================
+            if(lmetadyn.and.keyshl.eq.1)then
+              if(mxnode.gt.1)call merge
+     x          (idnode,mxnode,natms,mxbuff,vxx,vyy,vzz,buffer)
+              call nvtscale_shl
+     x          (idnode,mxnode,ntshl,shlke,sigma_shl,hstep,qmass_shl,
+     x          taut,chit_shl,conint)      
+            endif           
             
 c     integrate and apply npt barostat
             
@@ -1813,6 +1906,20 @@ c     integrate and apply npt thermostat
             call nptscale_t
      x        (idnode,mxnode,natms,engke,temp,sigma,qstep,pmass,qmass,
      x        taut,chip,chit,conint)
+            
+c     metdynamics shell thermostat
+c     ====================================================
+c     Must first merge update velocities as the core-shell
+c     velocites are not distributed according to the same
+c     rules.
+c     ====================================================
+            if(lmetadyn.and.keyshl.eq.1)then
+              if(mxnode.gt.1)call merge
+     x          (idnode,mxnode,natms,mxbuff,vxx,vyy,vzz,buffer)
+              call nvtscale_shl
+     x          (idnode,mxnode,ntshl,shlke,sigma_shl,hstep,qmass_shl,
+     x          taut,chit_shl,conint)      
+            endif   
             
           enddo
           
@@ -1932,6 +2039,20 @@ c     integrate and apply npt thermostat
      x      (idnode,mxnode,natms,engke,temp,sigma,qstep,pmass,qmass,
      x      taut,chip,chit,conint)
           
+c     metdynamics shell thermostat
+c     ====================================================
+c     Must first merge update velocities as the core-shell
+c     velocites are not distributed according to the same
+c     rules.
+c     ====================================================
+          if(lmetadyn.and.keyshl.eq.1)then
+            if(mxnode.gt.1)call merge
+     x        (idnode,mxnode,natms,mxbuff,vxx,vyy,vzz,buffer)
+            call nvtscale_shl
+     x        (idnode,mxnode,ntshl,shlke,sigma_shl,hstep,qmass_shl,
+     x        taut,chit_shl,conint)      
+          endif  
+          
 c     integrate and apply npt barostat
           
           call nptscale_p
@@ -1944,6 +2065,20 @@ c     integrate and apply npt thermostat
      x      (idnode,mxnode,natms,engke,temp,sigma,qstep,pmass,qmass,
      x      taut,chip,chit,conint)
 
+c     metadynamics shell thermostat
+c     ====================================================
+c     Must first merge update velocities as the core-shell
+c     velocites are not distributed according to the same
+c     rules.
+c     ====================================================
+          if(lmetadyn.and.keyshl.eq.1)then
+            if(mxnode.gt.1)call merge
+     x        (idnode,mxnode,natms,mxbuff,vxx,vyy,vzz,buffer)
+            call nvtscale_shl
+     x        (idnode,mxnode,ntshl,shlke,sigma_shl,hstep,qmass_shl,
+     x        taut,chit_shl,conint)      
+          endif  
+          
         enddo
 
 c     remove system centre of mass velocity
@@ -1979,6 +2114,12 @@ c     kinetic contribution to stress tensor
         
         call kinstress(natms,idnode,mxnode,strkin)
         engke=0.5d0*(strkin(1)+strkin(5)+strkin(9))
+
+c     metadynamics shell thermostat
+
+        if(lmetadyn.and.keyshl.eq.1)then
+          consv=consv+0.5d0*qmass_shl*chit_shl**2
+        endif
 
 c     add contributions to stress tensor
         
@@ -2079,7 +2220,7 @@ c***********************************************************************
       
       safe=.true.
       
-      if(newjob) then
+      if(newjob)then
 
 c     block indices
         
@@ -2374,8 +2515,9 @@ c     deallocate working arrays
 
       subroutine nstvv_h1
      x  (safe,lshmov,isw,idnode,mxnode,natms,imcon,nscons,ntcons,
-     x  ntpatm,mode,tstep,taut,taup,sigma,temp,chit,consv,conint,
-     x  engke,elrc,tolnce,vircon,virlrc,volm,press)
+     x  ntpatm,mode,ntshl,keyshl,tstep,taut,taup,sigma,temp,chit,
+     x  consv,conint,engke,elrc,tolnce,vircon,virlrc,volm,press,
+     x  chit_shl,sigma_shl)
 
 c***********************************************************************
 c     
@@ -2391,6 +2533,7 @@ c
 c     copyright - daresbury laboratory 
 c     author    - w. smith november 2002
 c     amended   - w. smith january 2005 : f90 conversion
+c     adapted   - d. quigley - metadynamics
 c     
 c***********************************************************************
 
@@ -2417,6 +2560,18 @@ c***********************************************************************
 
       integer fail(nnn)
       real(8) com(3),vom(3),czero(9),strkin(9),eta0(9),celp(10)
+      
+c     metadynamics shell thermostat variables
+
+      integer ntshl,keyshl
+      real(8) sigma_shl
+
+      logical,save :: lfirst=.true.
+      real(8)      :: chit_shl  
+      real(8),save :: qmass_shl
+      real(8)      :: shlke
+
+c     end metdynamics shell thermostat variables
       
       data newjob/.true./
 
@@ -2483,6 +2638,15 @@ c     allocate working arrays
           if(fail(i).gt.0)call error(idnode,2090)
         enddo
 
+      endif
+
+      if(lmetadyn.and.lfirst.and.(ntshl>0))then
+         write(*,*)"Warning - Metdynamics Modification"
+         write(*,*)"========================="
+         write(*,*)"Coupling core-shell motion thermostat at 1 K"
+         lfirst=.false.
+c        use same relaxation time for global and core-shell?
+         qmass_shl=2.d0*sigma_shl*taut**2
       endif
 
 c     construct current bond vectors
@@ -2565,6 +2729,20 @@ c     integrate and apply nst thermostat
      x        (idnode,mxnode,natms,mode,engke,temp,sigma,qstep,
      x        pmass,qmass,taut,chit,conint)
             
+c     metdynamics shell thermostat
+c     ====================================================
+c     Must first merge update velocities as the core-shell
+c     velocites are not distributed according to the same
+c     rules.
+c     ====================================================
+            if(lmetadyn.and.keyshl.eq.1)then
+              if(mxnode.gt.1)call merge
+     x          (idnode,mxnode,natms,mxbuff,vxx,vyy,vzz,buffer)
+              call nvtscale_shl
+     x          (idnode,mxnode,ntshl,shlke,sigma_shl,hstep,qmass_shl,
+     x          taut,chit_shl,conint)      
+            endif  
+            
 c     integrate and apply nst barostat
             
             call nstscale_p
@@ -2576,6 +2754,20 @@ c     integrate and apply nst thermostat
      x        (idnode,mxnode,natms,mode,engke,temp,sigma,qstep,
      x        pmass,qmass,taut,chit,conint)
 
+c     metadynamics shell thermostat
+c     ====================================================
+c     Must first merge update velocities as the core-shell
+c     velocites are not distributed according to the same
+c     rules.
+c     ====================================================
+            if(lmetadyn.and.keyshl.eq.1)then
+              if(mxnode.gt.1)call merge
+     x          (idnode,mxnode,natms,mxbuff,vxx,vyy,vzz,buffer)
+              call nvtscale_shl
+     x          (idnode,mxnode,ntshl,shlke,sigma_shl,hstep,qmass_shl,
+     x          taut,chit_shl,conint)      
+            endif  
+            
           enddo
 
 c     update velocities
@@ -2716,6 +2908,20 @@ c     integrate and apply nst thermostat
      x      (idnode,mxnode,natms,mode,engke,temp,sigma,qstep,
      x      pmass,qmass,taut,chit,conint)
           
+c     metadynamics shell thermostat
+c     ====================================================
+c     Must first merge update velocities as the core-shell
+c     velocites are not distributed according to the same
+c     rules.
+c     ====================================================
+          if(lmetadyn.and.keyshl.eq.1)then
+            if(mxnode.gt.1)call merge
+     x        (idnode,mxnode,natms,mxbuff,vxx,vyy,vzz,buffer)
+            call nvtscale_shl
+     x        (idnode,mxnode,ntshl,shlke,sigma_shl,hstep,qmass_shl,
+     x        taut,chit_shl,conint)      
+          endif  
+          
 c     integrate and apply nst barostat
           
           call nstscale_p
@@ -2726,9 +2932,23 @@ c     integrate and apply nst thermostat
           call nstscale_t
      x      (idnode,mxnode,natms,mode,engke,temp,sigma,qstep,
      x      pmass,qmass,taut,chit,conint)
-
+          
+c     metadynamics shell thermostat
+c     ====================================================
+c     Must first merge update velocities as the core-shell
+c     velocites are not distributed according to the same
+c     rules.
+c     ====================================================
+          if(lmetadyn.and.keyshl.eq.1)then
+            if(mxnode.gt.1)call merge
+     x        (idnode,mxnode,natms,mxbuff,vxx,vyy,vzz,buffer)
+            call nvtscale_shl
+     x        (idnode,mxnode,ntshl,shlke,sigma_shl,hstep,qmass_shl,
+     x        taut,chit_shl,conint)      
+          endif  
+          
         enddo
-
+        
 c     remove system centre of mass velocity
         
         call getvom(natms,idnode,mxnode,totmas,vom)
@@ -2752,6 +2972,12 @@ c     conserved quantity less kinetic and potential energy terms
         if(mode.eq.2)chip2=chip2-eta(1)**2
         consv=conint+0.5d0*qmass*chit**2+0.5d0*pmass*chip2+press*volm
 
+c     metadynamics shell thermostat
+
+        if(lmetadyn.and.keyshl.eq.1)then
+          consv=consv+0.5d0*qmass_shl*chit_shl**2
+        endif
+        
 c     kinetic contribution to stress tensor
         
         call kinstress(natms,idnode,mxnode,strkin)

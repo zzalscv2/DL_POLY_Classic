@@ -328,9 +328,9 @@ c     eliminate "flying ice cube" in long simulations (Berendsen)
       subroutine vv_integrate
      x  (lcnb,lshmov,lnfic,isw,idnode,mxnode,imcon,natms,nstep,ngrp,
      x  keyens,nscons,ntcons,ntpatm,ntfree,nspmf,ntpmf,mode,nofic,
-     x  tstep,engke,engrot,tolnce,vircon,vircom,virtot,temp,press,
-     x  volm,sigma,taut,taup,chit,chip,consv,conint,elrc,
-     x  virlrc,virpmf)
+     x  ntshl,keyshl,tstep,engke,engrot,tolnce,vircon,vircom,virtot,
+     x  temp,press,volm,sigma,taut,taup,chit,chip,consv,conint,elrc,
+     x  virlrc,virpmf,chit_shl,sigma_shl)
 
 c***********************************************************************
 c     
@@ -348,9 +348,10 @@ c***********************************************************************
       logical safe,safep,lcnb,lshmov,lnfic
       integer isw,idnode,mxnode,imcon,natms,ngrp,keyens,nscons
       integer ntcons,ntpatm,ntfree,nspmf,ntpmf,mode,nstep,nofic
+      integer ntshl,keyshl
       real(8) tstep,engke,engrot,tolnce,vircon,vircom
       real(8) virtot,temp,press,volm,sigma,taut,taup,chit,chip
-      real(8) consv,conint,elrc,virlrc,virpmf
+      real(8) consv,conint,elrc,virlrc,virpmf,chit_shl,sigma_shl
       
       if(ngrp.eq.0) then
         
@@ -384,8 +385,8 @@ c     Nose-Hoover thermostat
           
           call nvtvv_h1
      x      (safe,lshmov,isw,idnode,mxnode,natms,imcon,nscons,
-     x      ntcons,tstep,taut,sigma,chit,consv,conint,engke,tolnce,
-     x      vircon)
+     x      ntcons,ntshl,keyshl,tstep,taut,sigma,chit,consv,
+     x      conint,engke,tolnce,vircon,chit_shl,sigma_shl)
           
         elseif(keyens.eq.4) then
 
@@ -402,9 +403,9 @@ c     Nose-Hoover thermostat and isotropic barostat
 
           call nptvv_h1
      x      (safe,lshmov,isw,idnode,mxnode,natms,imcon,nscons,
-     x      ntcons,ntpatm,tstep,taut,taup,sigma,temp,chip,chit,
-     x      consv,conint,engke,elrc,tolnce,vircon,virtot,virlrc,
-     x      volm,press)
+     x      ntcons,ntpatm,ntshl,keyshl,tstep,taut,taup,sigma,temp,
+     x      chip,chit,consv,conint,engke,elrc,tolnce,vircon,
+     x      virtot,virlrc,volm,press,chit_shl,sigma_shl)
 
         else if(keyens.eq.6) then
 
@@ -421,8 +422,9 @@ c     Nose-Hoover thermostat and barostat (cell shape varying)
           
           call nstvv_h1
      x      (safe,lshmov,isw,idnode,mxnode,natms,imcon,nscons,
-     x      ntcons,ntpatm,mode,tstep,taut,taup,sigma,temp,chit,consv,
-     x      conint,engke,elrc,tolnce,vircon,virlrc,volm,press)
+     x      ntcons,ntpatm,mode,ntshl,keyshl,tstep,taut,taup,sigma,
+     x      temp,chit,consv,conint,engke,elrc,tolnce,vircon,
+     x      virlrc,volm,press,chit_shl,sigma_shl)
 
         elseif(keyens.eq.8) then
 
@@ -484,15 +486,17 @@ c     invalid option
 
             call nvtqvv_h1
      x        (safe,lshmov,isw,imcon,idnode,mxnode,natms,ngrp,nscons,
-     x        ntcons,ntfree,chit,consv,conint,engke,engrot,taut,sigma,
-     x        tolnce,tstep,vircom,vircon)
+     x        ntcons,ntfree,ntshl,keyshl,chit,consv,conint,engke,
+     x        engrot,taut,sigma,tolnce,tstep,vircom,vircon,chit_shl,
+     x        sigma_shl)
 
           else
 
             call nvtqvv_h2
      x        (safe,lshmov,isw,imcon,idnode,mxnode,natms,ngrp,nscons,
-     x        ntcons,ntfree,chit,consv,conint,engke,engrot,taut,sigma,
-     x        tolnce,tstep,vircom,vircon)
+     x        ntcons,ntfree,ntshl,keyshl,chit,consv,conint,engke,
+     x        engrot,taut,sigma,tolnce,tstep,vircom,vircon,chit_shl,
+     x        sigma_shl)
 
           endif
           
@@ -519,18 +523,20 @@ c     invalid option
           if(.not.lcnb) then 
 
             call nptqvv_h1
-     x        (safe,lshmov,isw,idnode,mxnode,natms,imcon,ngrp,
-     x        nscons,ntcons,ntpatm,ntfree,tstep,taut,taup,sigma,
+     x        (safe,lshmov,isw,idnode,mxnode,natms,imcon,ngrp,nscons,
+     x        ntcons,ntpatm,ntfree,ntshl,keyshl,tstep,taut,taup,sigma,
      x        temp,chip,chit,consv,conint,engke,engrot,elrc,tolnce,
-     x        vircon,virtot,virlrc,vircom,volm,press)
+     x        vircon,virtot,virlrc,vircom,volm,press,chit_shl,
+     x        sigma_shl)
 
           else
       
             call nptqvv_h2
      x        (safe,lshmov,isw,idnode,mxnode,natms,imcon,ngrp,nscons,
-     x        ntcons,ntpatm,ntfree,tstep,taut,taup,sigma,temp,chip,chit,
-     x        consv,conint,engke,engrot,elrc,tolnce,vircom,vircon,
-     x        virtot,virlrc,volm,press)
+     x        ntcons,ntpatm,ntfree,ntshl,keyshl,tstep,taut,taup,sigma,
+     x        temp,chip,chit,consv,conint,engke,engrot,elrc,tolnce,
+     x        vircom,vircon,virtot,virlrc,volm,press,chit_shl,
+     x        sigma_shl)
       
           endif
           
@@ -558,17 +564,17 @@ c     invalid option
 
             call nstqvv_h1
      x        (safe,lshmov,isw,idnode,mxnode,natms,imcon,ngrp,nscons,
-     x        ntcons,ntpatm,ntfree,mode,tstep,taut,taup,sigma,temp,
-     x        chit,consv,conint,engke,engrot,elrc,tolnce,vircon,virlrc,
-     x        vircom,volm,press)
+     x        ntcons,ntpatm,ntfree,mode,ntshl,keyshl,tstep,taut,taup,
+     x        sigma,temp,chit,consv,conint,engke,engrot,elrc,tolnce,
+     x        vircon,virlrc,vircom,volm,press,chit_shl,sigma_shl)
 
           else
 
             call nstqvv_h2
      x        (safe,lshmov,isw,idnode,mxnode,natms,imcon,ngrp,nscons,
-     x        ntcons,ntpatm,ntfree,mode,tstep,taut,taup,sigma,temp,
-     x        chit,consv,conint,engke,engrot,elrc,tolnce,vircom,vircon,
-     x        virlrc,volm,press)
+     x        ntcons,ntpatm,ntfree,mode,ntshl,keyshl,tstep,taut,taup,
+     x        sigma,temp,chit,consv,conint,engke,engrot,elrc,tolnce,
+     x        vircom,vircon,virlrc,volm,press,chit_shl,sigma_shl)
             
           endif
 

@@ -4,14 +4,15 @@ c***********************************************************************
 c     
 c     dl_poly module for defining valence angle potentials
 c     copyright - daresbury laboratory
-c     
 c     author    - w. smith    sep 2003
-c     adapted for solvation, free energy and excitation
-c               - p.-a. cazade oct 2007
+c     modified  - p.-a.cazade      oct 2007 : solvation etc.
+c     modified  - d. quigley           2010 : metadynamics
+c     
 c***********************************************************************
 
       use config_module
       use error_module
+      use metafreeze_module
       use parse_module
       use property_module
       use setup_module
@@ -181,7 +182,7 @@ c     test for frozen atom pairs
             if(idnode.eq.0)write(nrite,*)message
             call error(idnode,440)
           endif
-          
+
           lstang(nangle,1)=iatm1
           lstang(nangle,2)=iatm2
           lstang(nangle,3)=iatm3
@@ -192,11 +193,11 @@ c     test for frozen atom pairs
           prmang(nangle,5)=dblstr(record,lenrec,idum)
           prmang(nangle,6)=dblstr(record,lenrec,idum)
           
-          if(idnode.eq.0)
+          if(idnode.eq.0) 
      x      write(nrite,"(27x,a4,3i10,1p,e12.4,0p,9f12.6)")
      x      keyword(1:4),(lstang(nangle,ia),ia=1,3),
      x      (prmang(nangle,ja),ja=1,mxpang)
-          
+
 c     convert energies to internal units
           
           prmang(nangle,1)=prmang(nangle,1)*engunit
@@ -207,7 +208,7 @@ c     convert energies to internal units
             prmang(nangle,2)=prmang(nangle,2)*engunit            
             prmang(nangle,3)=prmang(nangle,3)*engunit
           endif
-          
+
 c     convert angles to radians
           
           if(abs(keyang(nangle)).eq.12)then
@@ -215,7 +216,7 @@ c     convert angles to radians
           elseif(abs(keyang(nangle)).ne.10)then
             prmang(nangle,2)=prmang(nangle,2)*(pi/180.d0) 
           endif
-          
+
         endif
 
       enddo
@@ -239,23 +240,22 @@ c     modified  - t. forester      feb 1993
 c     modified  - t. forester      nov 1994 : block data
 c     modified  - t. forester      may 1995 : stress tensor 
 c     modified  - p.-a.cazade      oct 2007 : solvation etc.
+c     modified  - d. quigley       nov 2010 : metadynamics
 c     
 c***********************************************************************
       
       implicit none
       
       logical safe,lsolva,lfree,lexcite,lselect
+      logical idrive,jdrive,kdrive
       integer idnode,mxnode,imcon,ntangl,fail1,fail2
       integer ii,iang1,iang2,i,ia,ib,ic,kk,keya
       real(8) engang,virang,theta,fxc,fyc,fzc,rab,xab
-      real(8) strs(6)
       real(8) yab,zab,rbc,xbc,ybc,zbc,sint,cost,pterm,vterm
       real(8) gamma,gamsa,gamsc,rrbc,rrab,fxa,fya,fza
+      real(8) strs(6),strs_loc(6)
       real(8), allocatable :: xdab(:),ydab(:),zdab(:)
       real(8), allocatable :: xdbc(:),ydbc(:),zdbc(:)
-
-c     define angular potential function and derivative
-c     using the parameters in array prmang
       
       allocate (xdab(msbad),ydab(msbad),zdab(msbad),stat=fail1)
       allocate (xdbc(msbad),ydbc(msbad),zdbc(msbad),stat=fail2)
@@ -280,10 +280,8 @@ c     zero accumulators
       virang=0.d0
       ang_fre=0.d0
       ang_vir=0.d0
-
-      do i=1,6
-        strs(i)=0.d0
-      enddo
+      strs(:)=0.d0
+      strs_loc(:)=0.d0
       
       if(lsolva)then
         
@@ -299,7 +297,7 @@ c     calculate atom separation vectors
       do i=iang1,iang2
         
         ii=ii+1
-        
+
 c     indices of bonded atoms
         
         ia=listang(ii,2)
@@ -319,12 +317,12 @@ c     components of second bond vector
         zdbc(ii)=zzz(ic)-zzz(ib)
         
       enddo
-      
+
 c     periodic boundary condition
       
       call images(imcon,0,1,ii,cell,xdab,ydab,zdab)
       call images(imcon,0,1,ii,cell,xdbc,ydbc,zdbc)
-      
+
 c     loop over all specified angle potentials
       
       ii=0
@@ -529,6 +527,16 @@ c     indices of bonded atoms
         ib=listang(ii,3)
         ic=listang(ii,4)
 
+c     metadynamics local definitions
+        
+        if(lmetadyn)then
+          
+          idrive=driven(ltype(ia))
+          jdrive=driven(ltype(ib))
+          kdrive=driven(ltype(ic))
+          
+        endif
+
 c     set selection control
         
         lselect=.true.
@@ -608,7 +616,7 @@ c     calculate atomic forces
           fzc=gamma*(zab-zbc*cost)*rrbc+gamsc*zbc
           
 c     sum atomic forces
-          
+
           fxx(ia)=fxx(ia)+fxa
           fyy(ia)=fyy(ia)+fya
           fzz(ia)=fzz(ia)+fza
@@ -632,8 +640,42 @@ c     calculate stress tensor
           
         endif
         
+c     metadynamics local parameters
+        
+        if(lmetadyn.and.(idrive.or.jdrive.or.kdrive))then
+          
+c     local energy and virial
+          
+          eng_loc=eng_loc+pterm
+          vir_loc=vir_loc+vterm
+          
+c     local forces
+          
+          fxx_loc(ia)=fxx_loc(ia)+fxa
+          fyy_loc(ia)=fyy_loc(ia)+fya
+          fzz_loc(ia)=fzz_loc(ia)+fza
+          
+          fxx_loc(ib)=fxx_loc(ib)-fxa-fxc
+          fyy_loc(ib)=fyy_loc(ib)-fya-fyc
+          fzz_loc(ib)=fzz_loc(ib)-fza-fzc
+          
+          fxx_loc(ic)=fxx_loc(ic)+fxc
+          fyy_loc(ic)=fyy_loc(ic)+fyc
+          fzz_loc(ic)=fzz_loc(ic)+fzc
+          
+c     local stress tensor
+          
+          strs_loc(1)=strs_loc(1)+rab*xab*fxa+rbc*xbc*fxc
+          strs_loc(2)=strs_loc(2)+rab*xab*fya+rbc*xbc*fyc
+          strs_loc(3)=strs_loc(3)+rab*xab*fza+rbc*xbc*fzc
+          strs_loc(4)=strs_loc(4)+rab*yab*fya+rbc*ybc*fyc
+          strs_loc(5)=strs_loc(5)+rab*yab*fza+rbc*ybc*fzc
+          strs_loc(6)=strs_loc(6)+rab*zab*fza+rbc*zbc*fzc
+
+        endif
+        
       enddo
-      
+
 c     check for undefined potentials
 
       if(mxnode.gt.1)call gstate(safe)
@@ -650,6 +692,20 @@ c     complete stress tensor
       stress(7)=stress(7)+strs(3)
       stress(8)=stress(8)+strs(5)
       stress(9)=stress(9)+strs(6)
+      
+      if(lmetadyn)then
+        
+        stress_loc(1)=stress_loc(1)+strs_loc(1)
+        stress_loc(2)=stress_loc(2)+strs_loc(2)
+        stress_loc(3)=stress_loc(3)+strs_loc(3)
+        stress_loc(4)=stress_loc(4)+strs_loc(2)
+        stress_loc(5)=stress_loc(5)+strs_loc(4)
+        stress_loc(6)=stress_loc(6)+strs_loc(5)
+        stress_loc(7)=stress_loc(7)+strs_loc(3)
+        stress_loc(8)=stress_loc(8)+strs_loc(5)
+        stress_loc(9)=stress_loc(9)+strs_loc(6)
+        
+      endif
       
 c     sum up contributions to potential and virial
       

@@ -13,6 +13,7 @@ c***********************************************************************
       use config_module
       use error_module
       use exclude_module
+      use metafreeze_module
       use pair_module
       use property_module
       use setup_module
@@ -1179,9 +1180,9 @@ c     calculate stress tensor (symmetrical)
 c     virial term
       
       vircpe=-scal1*(omg(1)+omg(5)+omg(9)+3.d0*eng1)-3.d0*qfix
+      
       cou_fre=0.d0
       cou_vir=0.d0
-      
       return
       end subroutine ewald1
       
@@ -1211,18 +1212,19 @@ c***********************************************************************
       
       implicit none
       
-      logical lsolva,lfree,lghost,lselect,lskip
+      logical lsolva,lfree,lghost,lselect,lskip,idrive,jdrive
       integer m,ik,iatm,jatm,ll,l1,l2,kkk
       real(8) engcpe,vircpe,drewd,rcut,epsq
-      real(8) rcsq,rdrewd,strs1,strs2,strs3,strs5,strs6,strs9,chgea
-      real(8) chgprd,rsq,rrr,ppp,vk0,vk1,vk2,t1,t2,erfcr,egamma,fx,fy
-      real(8) fz,fi
+      real(8) chgprd,rsq,rrr,ppp,vk0,vk1,vk2,t1,t2,erfcr,egamma
+      real(8) rcsq,rdrewd,chgea,fx,fy,fz,fi
+      real(8) strs(6),strs_loc(6)
       
       dimension fi(3)
       
 CDIR$ CACHE_ALIGN fi
       
       lskip=(lfree.or.lghost)
+      if(lmetadyn)idrive=driven(ltype(iatm))
       
 c     set cutoff condition for pair forces
       
@@ -1234,12 +1236,8 @@ c     reciprocal of interpolation interval
       
 c     initialise stress tensor accumulators
       
-      strs1=0.d0
-      strs2=0.d0
-      strs3=0.d0
-      strs5=0.d0
-      strs6=0.d0
-      strs9=0.d0
+      strs(:)=0.d0
+      strs_loc(:)=0.d0
       
 c     initialise potential energy and virial
       
@@ -1261,6 +1259,7 @@ c     start of primary loop for forces evaluation
 c     atomic index and charge product
           
           jatm=ilist(m)
+          if(lmetadyn)jdrive=driven(ltype(jatm))          
           
           if(lskip)then
             if(atm_fre(iatm)*atm_fre(jatm).eq.2)cycle
@@ -1345,7 +1344,7 @@ c     set hamiltonian mixing parameter
                 elseif((atm_fre(iatm).eq.2).or.(atm_fre(jatm).eq.2))then
                   
 c     set hamiltonian mixing parameter
-
+                  
                   cou_fre=cou_fre+erfcr
                   cou_vir=cou_vir-egamma*rsq
                   erfcr=lambda2*erfcr
@@ -1382,12 +1381,42 @@ c     calculate forces
                 
 c     calculate stress tensor
                 
-                strs1=strs1+xdf(m)*fx
-                strs2=strs2+xdf(m)*fy
-                strs3=strs3+xdf(m)*fz
-                strs5=strs5+ydf(m)*fy
-                strs6=strs6+ydf(m)*fz
-                strs9=strs9+zdf(m)*fz
+                strs(1)=strs(1)+xdf(m)*fx
+                strs(2)=strs(2)+xdf(m)*fy
+                strs(3)=strs(3)+xdf(m)*fz
+                strs(4)=strs(4)+ydf(m)*fy
+                strs(5)=strs(5)+ydf(m)*fz
+                strs(6)=strs(6)+zdf(m)*fz
+                
+              endif
+              
+c     metadynamics local parameters
+              
+              if(lmetadyn.and.(idrive.or.jdrive))then
+                
+c     local energy and virial
+                
+                eng_loc=eng_loc+erfcr
+                vir_loc=vir_loc-egamma*rsq
+                
+c     local forces
+                
+                fxx_loc(iatm)=fxx_loc(iatm)+fx
+                fyy_loc(iatm)=fyy_loc(iatm)+fy
+                fzz_loc(iatm)=fzz_loc(iatm)+fz
+                
+                fxx_loc(jatm)=fxx_loc(jatm)-fx
+                fyy_loc(jatm)=fyy_loc(jatm)-fy
+                fzz_loc(jatm)=fzz_loc(jatm)-fz
+                
+c     local stress tensor
+                
+                strs_loc(1)=strs_loc(1)+xdf(m)*fx
+                strs_loc(2)=strs_loc(2)+xdf(m)*fy
+                strs_loc(3)=strs_loc(3)+xdf(m)*fz
+                strs_loc(4)=strs_loc(4)+ydf(m)*fy
+                strs_loc(5)=strs_loc(5)+ydf(m)*fz
+                strs_loc(6)=strs_loc(6)+zdf(m)*fz
                 
               endif
               
@@ -1396,7 +1425,7 @@ c     calculate stress tensor
           endif
           
         enddo
-        
+      
 c     load temps back to fxx(iatm) etc
         
         fxx(iatm)=fi(1)
@@ -1405,15 +1434,29 @@ c     load temps back to fxx(iatm) etc
         
 c     complete stress tensor
         
-        stress(1)=stress(1)+strs1
-        stress(2)=stress(2)+strs2
-        stress(3)=stress(3)+strs3
-        stress(4)=stress(4)+strs2
-        stress(5)=stress(5)+strs5
-        stress(6)=stress(6)+strs6
-        stress(7)=stress(7)+strs3
-        stress(8)=stress(8)+strs6
-        stress(9)=stress(9)+strs9
+        stress(1)=stress(1)+strs(1)
+        stress(2)=stress(2)+strs(2)
+        stress(3)=stress(3)+strs(3)
+        stress(4)=stress(4)+strs(2)
+        stress(5)=stress(5)+strs(4)
+        stress(6)=stress(6)+strs(5)
+        stress(7)=stress(7)+strs(3)
+        stress(8)=stress(8)+strs(5)
+        stress(9)=stress(9)+strs(6)
+
+        if(lmetadyn)then
+          
+          stress_loc(1)=stress_loc(1)+strs_loc(1)
+          stress_loc(2)=stress_loc(2)+strs_loc(2)
+          stress_loc(3)=stress_loc(3)+strs_loc(3)
+          stress_loc(4)=stress_loc(4)+strs_loc(2)
+          stress_loc(5)=stress_loc(5)+strs_loc(4)
+          stress_loc(6)=stress_loc(6)+strs_loc(5)
+          stress_loc(7)=stress_loc(7)+strs_loc(3)
+          stress_loc(8)=stress_loc(8)+strs_loc(5)
+          stress_loc(9)=stress_loc(9)+strs_loc(6)
+          
+        endif
         
       endif
       
@@ -1439,11 +1482,12 @@ c
 c***********************************************************************
       implicit none
       
-      logical lsolva,lfree,lghost,lselect,lskip
+      logical lsolva,lfree,lghost,lselect,lskip,idrive,jdrive
       integer iatm,jatm,ilst,m,kkk
       real(8) engcpe,vircpe,alpha,epsq,a1,a2,a3
       real(8) a4,a5,pp,rr3,r10,r42,r216,chgea,chgprd,rrr,rsq,alpr
       real(8) alpr2,erfr,egamma,tt,exp1,fx,fy,fz
+      real(8) strs(6),strs_loc(6)
       
       data a1,a2,a3/0.254829592d0,-0.284496736d0,1.421413741d0/
       data a4,a5,pp/-1.453152027d0,1.061405429d0,0.3275911d0/
@@ -1451,11 +1495,17 @@ c***********************************************************************
       data r216/4.62962962963d-3/
       
       lskip=(lfree.or.lghost)
+      if(lmetadyn)idrive=driven(ltype(iatm))
       
 c     initialise potential energy and virial
       
       engcpe=0.d0
       vircpe=0.d0
+      
+c     initialise stress accumulators
+      
+      strs(:)=0.d0
+      strs_loc(:)=0.d0
       
 c     start of primary loop for forces evaluation
       
@@ -1466,6 +1516,7 @@ c     start of primary loop for forces evaluation
 c     atomic index and charge product
         
         jatm=lexatm(ilst,m)
+        if(lmetadyn)jdrive=driven(ltype(jatm))
         
         if(lskip)then
           if(atm_fre(iatm)*atm_fre(jatm).eq. 2)cycle
@@ -1578,12 +1629,42 @@ c     calculate forces
           
 c     calculate stress tensor
           
-          stress(1)=stress(1)+xdf(m)*fx
-          stress(2)=stress(2)+xdf(m)*fy
-          stress(3)=stress(3)+xdf(m)*fz
-          stress(5)=stress(5)+ydf(m)*fy
-          stress(6)=stress(6)+ydf(m)*fz
-          stress(9)=stress(9)+zdf(m)*fz
+          strs(1)=strs(1)+xdf(m)*fx
+          strs(2)=strs(2)+xdf(m)*fy
+          strs(3)=strs(3)+xdf(m)*fz
+          strs(4)=strs(4)+ydf(m)*fy
+          strs(5)=strs(5)+ydf(m)*fz
+          strs(6)=strs(6)+zdf(m)*fz
+          
+        endif
+        
+c     metadynamics local parameters
+        
+        if(lmetadyn.and.(idrive.or.jdrive))then
+          
+c     local energy and virial
+
+          eng_loc=eng_loc-erfr
+          vir_loc=vir_loc-egamma*rsq
+        
+c     local forces
+          
+          fxx_loc(iatm)=fxx_loc(iatm)+fx
+          fyy_loc(iatm)=fyy_loc(iatm)+fy
+          fzz_loc(iatm)=fzz_loc(iatm)+fz
+          
+          fxx_loc(jatm)=fxx_loc(jatm)-fx
+          fyy_loc(jatm)=fyy_loc(jatm)-fy
+          fzz_loc(jatm)=fzz_loc(jatm)-fz
+          
+c     local stress tensor
+          
+          strs_loc(1)=strs_loc(1)+xdf(m)*fx
+          strs_loc(2)=strs_loc(2)+xdf(m)*fy
+          strs_loc(3)=strs_loc(3)+xdf(m)*fz
+          strs_loc(4)=strs_loc(4)+ydf(m)*fy
+          strs_loc(5)=strs_loc(5)+ydf(m)*fz
+          strs_loc(6)=strs_loc(6)+zdf(m)*fz
           
         endif
         
@@ -1591,9 +1672,29 @@ c     calculate stress tensor
       
 c     complete stress tensor
       
-      stress(4)=stress(2)
-      stress(7)=stress(3)
-      stress(8)=stress(6)
+      stress(1)=stress(1)+strs(1)
+      stress(2)=stress(2)+strs(2)
+      stress(3)=stress(3)+strs(3)
+      stress(4)=stress(4)+strs(2)
+      stress(5)=stress(5)+strs(4)
+      stress(6)=stress(6)+strs(5)
+      stress(7)=stress(7)+strs(3)
+      stress(8)=stress(8)+strs(5)
+      stress(9)=stress(9)+strs(6)
+
+      if(lmetadyn)then
+        
+        stress_loc(1)=stress_loc(1)+strs_loc(1)
+        stress_loc(2)=stress_loc(2)+strs_loc(2)
+        stress_loc(3)=stress_loc(3)+strs_loc(3)
+        stress_loc(4)=stress_loc(4)+strs_loc(2)
+        stress_loc(5)=stress_loc(5)+strs_loc(4)
+        stress_loc(6)=stress_loc(6)+strs_loc(5)
+        stress_loc(7)=stress_loc(7)+strs_loc(3)
+        stress_loc(8)=stress_loc(8)+strs_loc(5)
+        stress_loc(9)=stress_loc(9)+strs_loc(6)
+        
+      endif
       
       return
       end subroutine ewald3

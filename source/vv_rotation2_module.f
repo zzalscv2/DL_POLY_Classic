@@ -4,15 +4,16 @@ c***********************************************************************
 c     
 c     dl_poly module 2 for velocity verlet rotational integration 
 c     schemes
-c     
 c     copyright - daresbury laboratory
 c     author    - w. smith    aug 2006
+c     adapted   - d. quigley - metadynamics
 c     
 c***********************************************************************
       
       use config_module
       use ensemble_tools_module
       use error_module
+      use metafreeze_module, only : lmetadyn
       use property_module
       use rigid_body_module
       use setup_module
@@ -122,7 +123,7 @@ c     global verification of convergence
 
 c     continue if any tolerances unsatisfied 
       
-      if (.not.safe) then
+      if(.not.safe)then
 
 c     initialise force increment arrays
         
@@ -143,7 +144,7 @@ c     calculate constraint forces
           j=listcon(k,3)
           dis2=prmcon(listcon(k,1))**2
 
-          if(newstep) then
+          if(newstep)then
 
             call pivot(1,i,k,ik,tqa,dxx,dyy,dzz)
             call pivot(1,j,k,ik,tqb,dxx,dyy,dzz)
@@ -313,7 +314,7 @@ c     global verification of convergence
 
 c     continue if all tolerances satisfied else return to calling routine 
       
-      if(.not.safe) then
+      if(.not.safe)then
 
 c     initialise velocity correction arrays
         
@@ -333,7 +334,7 @@ c     calculate constraint correction
           i=listcon(k,2)
           j=listcon(k,3)
 
-          if(newstep) then
+          if(newstep)then
 
             call pivot(2,i,k,ik,tqa,dxx,dyy,dzz)
             call pivot(2,j,k,ik,tqb,dxx,dyy,dzz)
@@ -577,7 +578,7 @@ c     check work arrays are large enough
         
         safe=(igrp2-igrp1+1.le.msgrp) 
         if(mxnode.gt.1) call gstate(safe)
-        if(.not.safe) then 
+        if(.not.safe)then 
           igrp=igrp2-igrp1+1
           call gimax(igrp,1,idum)
           if(idnode.eq.0) write(nrite,*) ' make msgrp >=',igrp
@@ -1226,7 +1227,7 @@ c     check work arrays are large enough
 
         safe=(igrp2-igrp1+1.le.msgrp) 
         if(mxnode.gt.1) call gstate(safe)
-        if(.not.safe) then 
+        if(.not.safe)then 
           igrp=igrp2-igrp1+1
           call gimax(igrp,1,idum)
           if(idnode.eq.0) write(nrite,*) ' make msgrp >=',igrp
@@ -1824,8 +1825,8 @@ c     deallocate working arrays
 
       subroutine nvtqvv_h2
      x  (safe,lshmov,isw,imcon,idnode,mxnode,natms,ngrp,nscons,
-     x  ntcons,ntfree,chit,consv,conint,engke,engrot,taut,sigma,
-     x  tolnce,tstep,vircom,vircon)
+     x  ntcons,ntfree,ntshl,keyshl,chit,consv,conint,engke,engrot,
+     x  taut,sigma,tolnce,tstep,vircom,vircon,chit_shl,sigma_shl)
       
 c***********************************************************************
 c     
@@ -1844,6 +1845,7 @@ c     rotinx,y,z =rotational inertia in body fixed frame
 c     
 c     copyright daresbury laboratory
 c     author      w.smith april 2005
+c     adapted     d.quigley : metadynamics
 c     
 c**********************************************************************
 
@@ -1880,6 +1882,18 @@ c**********************************************************************
       real(8), allocatable :: dtx(:),dty(:),dtz(:)
       real(8), allocatable :: fxo(:),fyo(:),fzo(:)
 
+c     metadynamics shell thermostat variables
+
+      integer ntshl,keyshl
+      real(8) sigma_shl
+
+      logical,save :: lfirst=.true.
+      real(8)      :: chit_shl  
+      real(8),save :: qmass_shl
+      real(8)      :: shlke
+
+c     end metadynamics shell thermostat variables
+      
       save newstep,newjob,p0,p1,p2,p3,hstep,qmass,ifre1,ifre2
       save igrp1,igrp2
 
@@ -1917,7 +1931,7 @@ c     check work arrays are large enough
         
         safe=(igrp2-igrp1+1.le.msgrp) 
         if(mxnode.gt.1) call gstate(safe)
-        if(.not.safe) then 
+        if(.not.safe)then 
           igrp=igrp2-igrp1+1
           call gimax(igrp,1,idum)
           if(idnode.eq.0) write(nrite,*) ' make msgrp >=',igrp
@@ -1960,6 +1974,15 @@ c     allocate working arrays
         if(fail(i).gt.0)call error(idnode,2150)
       enddo
 
+      if(lmetadyn.and.lfirst.and.(ntshl>0))then
+        write(*,*)"Warning - Metadynamics Modification"
+        write(*,*)"========================="
+        write(*,*)"Coupling core-shell motion thermostat at 1 K"
+        lfirst=.false.
+c     use same relaxation time for global and core-shell?
+        qmass_shl=2.d0*sigma_shl*taut**2
+      endif
+      
 c     initialise constraint virial
 
       if(isw.eq.1)then
@@ -1979,6 +2002,20 @@ c     apply thermostat for first stage
         call nvtqscl
      x    (idnode,mxnode,ntfree,ngrp,engfke,engtrn,engrot,sigma,
      x    hstep,qmass,taut,chit,conint)
+        
+c     metadynamics shell thermostat
+c     ====================================================
+c     Must first merge update velocities as the core-shell
+c     velocites are not distributed according to the same
+c     rules.
+c     ====================================================
+        if(lmetadyn.and.keyshl.eq.1)then
+          if(mxnode.gt.1)call merge
+     x      (idnode,mxnode,natms,mxbuff,vxx,vyy,vzz,buffer)
+          call nvtscale_shl
+     x      (idnode,mxnode,ntshl,shlke,sigma_shl,hstep,qmass_shl,
+     x      taut,chit_shl,conint)      
+        endif
         
       endif
 
@@ -2405,12 +2442,32 @@ c     apply thermostat for second stage and calculate kinetic energy
      x    (idnode,mxnode,ntfree,ngrp,engfke,engtrn,engrot,sigma,
      x    hstep,qmass,taut,chit,conint)
 
+c     metadynamics shell thermostat
+c     ====================================================
+c     Must first merge update velocities as the core-shell
+c     velocites are not distributed according to the same
+c     rules.
+c     ====================================================
+        if(lmetadyn.and.keyshl.eq.1)then
+          if(mxnode.gt.1)call merge
+     x      (idnode,mxnode,natms,mxbuff,vxx,vyy,vzz,buffer)
+          call nvtscale_shl
+     x      (idnode,mxnode,ntshl,shlke,sigma_shl,hstep,qmass_shl,
+     x      taut,chit_shl,conint)      
+        endif
+        
         engke=engfke+engtrn
 
 c     conserved quantity less kinetic and potential energy terms
         
         consv=conint+0.5d0*qmass*chit**2
-
+        
+c     metadynamics shell thermostat
+        
+        if(lmetadyn.and.keyshl.eq.1)then
+          consv=consv+0.5d0*qmass_shl*chit_shl**2
+        endif
+        
 c     kinetic contribution to stress tensor
         
         call kinstressf(ntfree,idnode,mxnode,strkin)
@@ -2424,7 +2481,7 @@ c     add contributions to stress tensor
         
       endif
 
-      if(mxnode.gt.1) then
+      if(mxnode.gt.1)then
 
 c     merge new group coordinates and velocities
 
@@ -2588,7 +2645,7 @@ c     check work arrays are large enough
 
         safe=(igrp2-igrp1+1.le.msgrp) 
         if(mxnode.gt.1) call gstate(safe)
-        if(.not.safe) then 
+        if(.not.safe)then 
           igrp=igrp2-igrp1+1
           call gimax(igrp,1,idum)
           if(idnode.eq.0) write(nrite,*) ' make msgrp >=',igrp
@@ -3258,9 +3315,9 @@ c     deallocate working arrays
 
       subroutine nptqvv_h2
      x  (safe,lshmov,isw,idnode,mxnode,natms,imcon,ngrp,nscons,
-     x  ntcons,ntpatm,ntfree,tstep,taut,taup,sigma,temp,chip,chit,
-     x  consv,conint,engke,engrot,elrc,tolnce,vircom,vircon,virtot,
-     x  virlrc,volm,press)
+     x  ntcons,ntpatm,ntfree,ntshl,keyshl,tstep,taut,taup,sigma,
+     x  temp,chip,chit,consv,conint,engke,engrot,elrc,tolnce,
+     x  vircom,vircon,virtot,virlrc,volm,press,chit_shl,sigma_shl)
       
 c***********************************************************************
 c     
@@ -3279,6 +3336,7 @@ c     rotinx,y,z =rotational inertia in body fixed frame
 c     
 c     copyright daresbury laboratory
 c     author      w.smith april 2005
+c     adapted     d.quigley : metadynamics
 c     
 c**********************************************************************
 
@@ -3323,6 +3381,18 @@ c**********************************************************************
       real(8), allocatable :: gvxo(:),gvyo(:),gvzo(:)
       real(8), allocatable :: gvx1(:),gvy1(:),gvz1(:)
 
+c     metadynamics shell thermostat variables
+
+      integer ntshl,keyshl
+      real(8) sigma_shl
+
+      logical,save :: lfirst=.true.
+      real(8)      :: chit_shl  
+      real(8),save :: qmass_shl
+      real(8)      :: shlke
+
+c     end metadynamics shell thermostat variables
+      
       save newstep,newjob,p0,p1,p2,p3,hstep,fstep,qmass,ifre1,ifre2
       save igrp1,igrp2,volm0,elrc0,virlrc0,qstep,dens0,totmas
       save pmass
@@ -3382,7 +3452,7 @@ c     check work arrays are large enough
         
         safe=(igrp2-igrp1+1.le.msgrp) 
         if(mxnode.gt.1) call gstate(safe)
-        if(.not.safe) then 
+        if(.not.safe)then 
           igrp=igrp2-igrp1+1
           call gimax(igrp,1,idum)
           if(idnode.eq.0) write(nrite,*) ' make msgrp >=',igrp
@@ -3427,7 +3497,16 @@ c     allocate working arrays
       do i=1,nnn
         if(fail(i).gt.0)call error(idnode,2230)
       enddo
-
+      
+      if(lmetadyn.and.lfirst.and.(ntshl>0))then
+        write(*,*)"Warning - Metadynamics Modification"
+        write(*,*)"========================="
+        write(*,*)"Coupling core-shell motion thermostat at 1 K"
+        lfirst=.false.
+c     use same relaxation time for global and core-shell?
+        qmass_shl=2.d0*sigma_shl*taut**2
+      endif
+      
 c     construct current bond vectors
       
       if(ntcons.gt.0)then
@@ -3616,6 +3695,20 @@ c     integrate and apply npt thermostat
      x        (idnode,mxnode,ntfree,ngrp,engfke,engtrn,engrot,temp,
      x        sigma,qstep,pmass,qmass,taut,chip,chit,conint)
             
+c     metadynamics shell thermostat
+c     ====================================================
+c     Must first merge update velocities as the core-shell
+c     velocites are not distributed according to the same
+c     rules.
+c     ====================================================
+            if(lmetadyn.and.keyshl.eq.1)then
+              if(mxnode.gt.1)call merge
+     x          (idnode,mxnode,natms,mxbuff,vxx,vyy,vzz,buffer)
+              call nvtscale_shl
+     x          (idnode,mxnode,ntshl,shlke,sigma_shl,hstep,qmass_shl,
+     x          taut,chit_shl,conint)      
+            endif  
+            
 c     integrate and apply npt barostat
             
             call nptqscl_p
@@ -3627,6 +3720,20 @@ c     integrate and apply npt thermostat
             call nptqscl_t
      x        (idnode,mxnode,ntfree,ngrp,engfke,engtrn,engrot,temp,
      x        sigma,qstep,pmass,qmass,taut,chip,chit,conint)
+            
+c     metadynamics shell thermostat
+c     ====================================================
+c     Must first merge update velocities as the core-shell
+c     velocites are not distributed according to the same
+c     rules.
+c     ====================================================
+            if(lmetadyn.and.keyshl.eq.1)then
+              if(mxnode.gt.1)call merge
+     x          (idnode,mxnode,natms,mxbuff,vxx,vyy,vzz,buffer)
+              call nvtscale_shl
+     x          (idnode,mxnode,ntshl,shlke,sigma_shl,hstep,qmass_shl,
+     x          taut,chit_shl,conint)      
+            endif  
             
           enddo
           
@@ -3940,6 +4047,20 @@ c     integrate and apply npt thermostat
      x        (idnode,mxnode,ntfree,ngrp,engfke,engtrn,engrot,temp,
      x        sigma,qstep,pmass,qmass,taut,chip,chit,conint)
             
+c     metadynamics shell thermostat
+c     ====================================================
+c     Must first merge update velocities as the core-shell
+c     velocites are not distributed according to the same
+c     rules.
+c     ====================================================
+            if(lmetadyn.and.keyshl.eq.1)then
+              if(mxnode.gt.1)call merge
+     x          (idnode,mxnode,natms,mxbuff,vxx,vyy,vzz,buffer)
+              call nvtscale_shl
+     x          (idnode,mxnode,ntshl,shlke,sigma_shl,hstep,qmass_shl,
+     x          taut,chit_shl,conint)      
+            endif  
+            
 c     integrate and apply npt barostat
             
             call nptqscl_p
@@ -3951,6 +4072,20 @@ c     integrate and apply npt thermostat
             call nptqscl_t
      x        (idnode,mxnode,ntfree,ngrp,engfke,engtrn,engrot,temp,
      x        sigma,qstep,pmass,qmass,taut,chip,chit,conint)
+            
+c     metadynamics shell thermostat
+c     ====================================================
+c     Must first merge update velocities as the core-shell
+c     velocites are not distributed according to the same
+c     rules.
+c     ====================================================
+            if(lmetadyn.and.keyshl.eq.1)then
+              if(mxnode.gt.1)call merge
+     x          (idnode,mxnode,natms,mxbuff,vxx,vyy,vzz,buffer)
+              call nvtscale_shl
+     x          (idnode,mxnode,ntshl,shlke,sigma_shl,hstep,qmass_shl,
+     x          taut,chit_shl,conint)      
+            endif  
             
           enddo
           
@@ -3988,6 +4123,12 @@ c     calculate conserved variable
         consv=conint+0.5d0*qmass*chit**2+press*volm
      x    +0.5d0*pmass*chip**2
         
+c     metadynamics shell thermostat
+
+        if(lmetadyn.and.keyshl.eq.1)then
+          consv=consv+0.5d0*qmass_shl*chit_shl**2
+        endif
+        
 c     merge velocity arrays
         
         if(mxnode.gt.1)call merge1
@@ -4020,7 +4161,7 @@ c     construct scaling tensor (for tethered atoms)
         eta(i)=chip*uni(i)
       enddo
       
-      if(mxnode.gt.1) then
+      if(mxnode.gt.1)then
 
 c     merge new group coordinates and velocities
 
@@ -4174,7 +4315,7 @@ c     check work arrays are large enough
 
         safe=(igrp2-igrp1+1.le.msgrp) 
         if(mxnode.gt.1) call gstate(safe)
-        if(.not.safe) then 
+        if(.not.safe)then 
           igrp=igrp2-igrp1+1
           call gimax(igrp,1,idum)
           if(idnode.eq.0) write(nrite,*) ' make msgrp >=',igrp
@@ -4863,9 +5004,9 @@ c     deallocate working arrays
 
       subroutine nstqvv_h2
      x  (safe,lshmov,isw,idnode,mxnode,natms,imcon,ngrp,nscons,
-     x  ntcons,ntpatm,ntfree,mode,tstep,taut,taup,sigma,temp,chit,
-     x  consv,conint,engke,engrot,elrc,tolnce,vircom,vircon,
-     x  virlrc,volm,press)
+     x  ntcons,ntpatm,ntfree,mode,ntshl,keyshl,tstep,taut,taup,
+     x  sigma,temp,chit,consv,conint,engke,engrot,elrc,tolnce,
+     x  vircom,vircon,virlrc,volm,press,chit_shl,sigma_shl)
       
 c***********************************************************************
 c     
@@ -4884,6 +5025,7 @@ c     rotinx,y,z =rotational inertia in body fixed frame
 c     
 c     copyright daresbury laboratory
 c     author      w.smith sept 2005
+c     adapted     d. quigley : metadynamics
 c     
 c**********************************************************************
 
@@ -4929,7 +5071,19 @@ c**********************************************************************
       real(8), allocatable :: p0(:),p1(:),p2(:),p3(:)
       real(8), allocatable :: gvxo(:),gvyo(:),gvzo(:)
       real(8), allocatable :: gvx1(:),gvy1(:),gvz1(:)
-
+      
+c     metadynamics shell thermostat variables
+      
+      integer ntshl,keyshl
+      real(8) sigma_shl
+      
+      logical,save :: lfirst=.true.
+      real(8)      :: chit_shl  
+      real(8),save :: qmass_shl
+      real(8)      :: shlke
+      
+c     end metadynamics shell thermostat variables
+      
       save newstep,newjob,p0,p1,p2,p3,hstep,fstep,qmass,ifre1,ifre2
       save igrp1,igrp2,volm0,elrc0,virlrc0,qstep,dens0,totmas
       save pmass
@@ -4988,7 +5142,7 @@ c     check work arrays are large enough
         
         safe=(igrp2-igrp1+1.le.msgrp) 
         if(mxnode.gt.1) call gstate(safe)
-        if(.not.safe) then 
+        if(.not.safe)then 
           igrp=igrp2-igrp1+1
           call gimax(igrp,1,idum)
           if(idnode.eq.0) write(nrite,*) ' make msgrp >=',igrp
@@ -5034,6 +5188,15 @@ c     allocate working arrays
         if(fail(i).gt.0)call error(idnode,2230)
       enddo
 
+      if(lmetadyn.and.lfirst.and.(ntshl>0))then
+        write(*,*)"Warning - Metadynamics Modification"
+        write(*,*)"========================="
+        write(*,*)"Coupling core-shell motion thermostat at 1 K"
+        lfirst=.false.
+c     use same relaxation time for global and core-shell?
+        qmass_shl=2.d0*sigma_shl*taut**2
+      endif
+      
 c     construct current bond vectors
       
       if(ntcons.gt.0)then
@@ -5227,7 +5390,21 @@ c     integrate and apply nst thermostat
             call nstqscl_t2
      x        (idnode,mxnode,ntfree,ngrp,mode,engfke,engtrn,engrot,temp,
      x        sigma,qstep,pmass,qmass,taut,chit,conint,strkin,strgrp)
-
+            
+c     metadynamics shell thermostat
+c     ====================================================
+c     Must first merge update velocities as the core-shell
+c     velocites are not distributed according to the same
+c     rules.
+c     ====================================================
+            if(lmetadyn.and.keyshl.eq.1)then
+              if(mxnode.gt.1)call merge
+     x          (idnode,mxnode,natms,mxbuff,vxx,vyy,vzz,buffer)
+              call nvtscale_shl
+     x          (idnode,mxnode,ntshl,shlke,sigma_shl,hstep,qmass_shl,
+     x          taut,chit_shl,conint)      
+            endif  
+            
 c     integrate and apply nst barostat
             
             call nstqscl_p2
@@ -5239,6 +5416,20 @@ c     integrate and apply nst thermostat
             call nstqscl_t2
      x        (idnode,mxnode,ntfree,ngrp,mode,engfke,engtrn,engrot,temp,
      x        sigma,qstep,pmass,qmass,taut,chit,conint,strkin,strgrp)
+            
+c     metadynamics shell thermostat
+c     ====================================================
+c     Must first merge update velocities as the core-shell
+c     velocites are not distributed according to the same
+c     rules.
+c     ====================================================
+            if(lmetadyn.and.keyshl.eq.1)then
+              if(mxnode.gt.1)call merge
+     x          (idnode,mxnode,natms,mxbuff,vxx,vyy,vzz,buffer)
+              call nvtscale_shl
+     x          (idnode,mxnode,ntshl,shlke,sigma_shl,hstep,qmass_shl,
+     x          taut,chit_shl,conint)      
+            endif  
             
           enddo
           
@@ -5572,6 +5763,20 @@ c     integrate and apply nst thermostat
      x        (idnode,mxnode,ntfree,ngrp,mode,engfke,engtrn,engrot,temp,
      x        sigma,qstep,pmass,qmass,taut,chit,conint,strkin,strgrp)
             
+c     metadynamics shell thermostat
+c     ====================================================
+c     Must first merge update velocities as the core-shell
+c     velocites are not distributed according to the same
+c     rules.
+c     ====================================================
+            if(lmetadyn.and.keyshl.eq.1)then
+              if(mxnode.gt.1)call merge
+     x          (idnode,mxnode,natms,mxbuff,vxx,vyy,vzz,buffer)
+              call nvtscale_shl
+     x          (idnode,mxnode,ntshl,shlke,sigma_shl,hstep,qmass_shl,
+     x          taut,chit_shl,conint)      
+            endif  
+            
 c     integrate and apply nst barostat
             
             call nstqscl_p2
@@ -5583,6 +5788,20 @@ c     integrate and apply nst thermostat
             call nstqscl_t2
      x        (idnode,mxnode,ntfree,ngrp,mode,engfke,engtrn,engrot,temp,
      x        sigma,qstep,pmass,qmass,taut,chit,conint,strkin,strgrp)
+            
+c     metadynamics shell thermostat
+c     ====================================================
+c     Must first merge update velocities as the core-shell
+c     velocites are not distributed according to the same
+c     rules.
+c     ====================================================
+            if(lmetadyn.and.keyshl.eq.1)then
+              if(mxnode.gt.1)call merge
+     x          (idnode,mxnode,natms,mxbuff,vxx,vyy,vzz,buffer)
+              call nvtscale_shl
+     x          (idnode,mxnode,ntshl,shlke,sigma_shl,hstep,qmass_shl,
+     x          taut,chit_shl,conint)      
+            endif  
             
           enddo
           
@@ -5620,6 +5839,12 @@ c     calculate conserved variable
         if(mode.eq.2)chip2=chip2-eta(1)**2
         consv=conint+0.5d0*qmass*chit**2+0.5d0*pmass*chip2+press*volm
         
+c     metadynamics shell thermostat
+
+        if(lmetadyn.and.keyshl.eq.1)then
+          consv=consv+0.5d0*qmass_shl*chit_shl**2
+        endif
+
 c     merge velocity arrays
         
         if(mxnode.gt.1)call merge1
@@ -5635,7 +5860,7 @@ c     adjust long range corrections and number density
         dens(k)=dens0(k)*(volm0/volm)
       enddo
       
-      if(mxnode.gt.1) then
+      if(mxnode.gt.1)then
 
 c     merge new group coordinates and velocities
 

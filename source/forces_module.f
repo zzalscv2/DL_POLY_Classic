@@ -5,6 +5,7 @@ c
 c     dl_poly module for calculation of atomic forces
 c     copyright - daresbury laboratory
 c     author    - w. smith    sep 2003
+c     adapted   - d. quigley : metadynamics
 c     
 c***********************************************************************
       
@@ -16,6 +17,7 @@ c***********************************************************************
       use external_field_module
       use four_body_module
       use hkewald_module
+      use metafreeze_module
       use metal_module
       use neu_coul_module
       use nlist_builders_module
@@ -42,7 +44,7 @@ c***********************************************************************
      x  rcuttb,engtbp,virtbp,rcutfb,engfbp,virfbp,rctter,engter,
      x  virter,engbnd,virbnd,engang,virang,engdih,virdih,enginv,
      x  virinv,engtet,virtet,engshl,shlke,virshl,engfld,virfld,
-     x  engcfg,fmax,temp)
+     x  engcfg,fmax,temp,engord,virord)
       
 c*********************************************************************
 c     
@@ -69,7 +71,7 @@ c*********************************************************************
       real(8) elrc,virlrc,rcuttb,engtbp,virtbp,rcutfb,engfbp,virfbp
       real(8) rctter,engter,virter,engbnd,virbnd,engang,virang,engdih
       real(8) virdih,enginv,virinv,engtet,virtet,engshl,virshl,engfld
-      real(8) virfld,fmax,temp,shlke,engcfg
+      real(8) virfld,fmax,temp,shlke,engcfg,tmpeng,tmpvir,engord,virord
       
       llsolva=.false.
       
@@ -102,6 +104,19 @@ c     initialize energy and virial accumulators
       virtet=0.d0
       engmet=0.d0
       virmet=0.d0
+      virord=0.0d0
+      engord=0.0d0
+      
+      if(lmetadyn)then
+        
+        eng_loc=0.0d0
+        vir_loc=0.0d0
+        fxx_loc(:)=0.0d0
+        fyy_loc(:)=0.0d0
+        fzz_loc(:)=0.0d0
+        stress_loc(:)=0.0d0
+        
+      endif
       
 c     initialise free energy accumulators
       
@@ -301,6 +316,21 @@ c     external field
       
       if(keyfld.gt.0)call extnfld
      x  (idnode,imcon,keyfld,mxnode,natms,engfld,virfld)
+      
+c     metadynamics option : use potential energy as order parameter
+      
+      if(lmetadyn)then
+        
+        tmpeng=engsrp+engcpe+engbnd+engang+engdih+engfld+
+     x         engtbp+engfbp+engshl+enginv+engter+engmet
+        
+        tmpvir=vircpe+virsrp+virbnd+virtbp+virter+virfld+
+     x         virang+virshl+virtet+virmet
+        
+        call metafreeze_driver
+     x    (imcon,natms,temp,nstep,tmpeng,tmpvir,engord,virord)
+        
+      endif
       
 c     global summation of force arrays (basic replicated data strategy)
       

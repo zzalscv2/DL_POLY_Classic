@@ -5,15 +5,15 @@ c
 c     dl_poly module for defining dihedral potential arrays
 c     copyright - daresbury laboratory
 c     
-c     author    - w. smith    sep 2003
-c     
-c     adapted for solvation, free energy and excitation
-c               - p.-a. cazade oct 2007
+c     author  - w. smith     sep 2003
+c     adapted - p.-a. cazade oct 2007 : solvation, free energy, etc.
+c     adapted - w.smith      jan 2011 : metadynamics
 c     
 c***********************************************************************
       
       use config_module
       use error_module
+      use metafreeze_module
       use parse_module
       use property_module
       use setup_module
@@ -220,6 +220,7 @@ c***********************************************************************
       implicit none
       
       logical safe,lsolva,lfree,lexcite,lselect
+      logical idrive,jdrive,kdrive,ldrive
       integer i,k,ii,kk,ntdihd,idnode,mxnode,idih1,idih2,ia,ib
       integer ic,id,imcon,ka,kb,l,keyfce,fail1,fail2,fail3,kkk
       real(8) phi,twopi,rtwopi,dterm,srpot
@@ -231,7 +232,7 @@ c***********************************************************************
       real(8) ppp,dlrpot,t1,t2,vk0,vk1,vk2,gk0,gk1,gk2,epsq,engcpe
       real(8) vircpe,rcut,rvdw,engsrp,virsrp,xac,yac,zac,vcon,fcon
       real(8) virc14,b0,rfld0,rfld1,rfld2,alpha,a1,a2,a3,a4,a5,pp,tt
-      real(8) cou14_vir,vdw14_vir,strs(6)
+      real(8) cou14_vir,vdw14_vir,strs(6),strs_loc(6)
       real(8), allocatable :: xdab(:),ydab(:),zdab(:)
       real(8), allocatable :: xdbc(:),ydbc(:),zdbc(:)
       real(8), allocatable :: xdcd(:),ydcd(:),zdcd(:)
@@ -264,9 +265,8 @@ c     initialise accumulators
       virdih=0.d0
       dih_fre=0.d0
       dih_vir=0.d0
-      do i=1,6
-        strs(i)=0.d0
-      enddo
+      strs(:)=0.d0
+      strs_loc(:)=0.d0
 
       if(lsolva)then
         
@@ -510,6 +510,17 @@ c     indices of bonded atoms
         ic=listdih(ii,4)
         id=listdih(ii,5)
         
+c     metadynamics local definitions
+        
+        if(lmetadyn)then
+          
+          idrive=driven(ltype(ia))
+          jdrive=driven(ltype(ib))
+          kdrive=driven(ltype(ic))
+          ldrive=driven(ltype(id))
+          
+        endif
+        
 c     set selection control for angle potential
         
         lselect=.true.
@@ -612,6 +623,43 @@ c     stress tensor for dihedral term
           strs(4)=strs(4)+yab*fay+ybc*(fb1y-fcy)-ycd*fd1y 
           strs(5)=strs(5)+yab*faz+ybc*(fb1z-fcz)-ycd*fd1z 
           strs(6)=strs(6)+zab*faz+zbc*(fb1z-fcz)-zcd*fd1z 
+          
+        endif
+        
+c     metadynamics local parameters
+        
+        if(lmetadyn.and.(idrive.or.jdrive.or.kdrive.or.ldrive))then
+          
+c     local energy (no virial)
+          
+          eng_loc=eng_loc+dterm
+          
+c     local forces
+          
+          fxx_loc(ia)=fxx_loc(ia)+fax
+          fyy_loc(ia)=fyy_loc(ia)+fay
+          fzz_loc(ia)=fzz_loc(ia)+faz
+          
+          fxx_loc(ib)=fxx_loc(ib)-fax-fcx+fb1x
+          fyy_loc(ib)=fyy_loc(ib)-fay-fcy+fb1y
+          fzz_loc(ib)=fzz_loc(ib)-faz-fcz+fb1z
+          
+          fxx_loc(ic)=fxx_loc(ic)+fcx-fb1x-fd1x
+          fyy_loc(ic)=fyy_loc(ic)+fcy-fb1y-fd1y
+          fzz_loc(ic)=fzz_loc(ic)+fcz-fb1z-fd1z
+          
+          fxx_loc(id)=fxx_loc(id)+fd1x
+          fyy_loc(id)=fyy_loc(id)+fd1y
+          fzz_loc(id)=fzz_loc(id)+fd1z
+          
+c     local stress tensor
+          
+          strs_loc(1)=strs_loc(1)+xab*fax+xbc*(fb1x-fcx)-xcd*fd1x
+          strs_loc(2)=strs_loc(2)+yab*fax+ybc*(fb1x-fcx)-ycd*fd1x
+          strs_loc(3)=strs_loc(3)+zab*fax+zbc*(fb1x-fcx)-zcd*fd1x
+          strs_loc(4)=strs_loc(4)+yab*fay+ybc*(fb1y-fcy)-ycd*fd1y
+          strs_loc(5)=strs_loc(5)+yab*faz+ybc*(fb1z-fcz)-ycd*fd1z
+          strs_loc(6)=strs_loc(6)+zab*faz+zbc*(fb1z-fcz)-zcd*fd1z
           
         endif
         
@@ -787,6 +835,36 @@ c     stress tensor for coulombic 1-4 term
               strs(4)=strs(4)+yad*fy
               strs(5)=strs(5)+yad*fz
               strs(6)=strs(6)+zad*fz
+            
+            endif
+            
+c     metadynamics local parameters
+            
+            if(lmetadyn.and.(idrive.or.ldrive))then
+              
+c     local energy and virial
+              
+              eng_loc=eng_loc+coul
+              vir_loc=vir_loc-fcoul*rad**2
+              
+c     local forces
+              
+              fxx_loc(ia)=fxx_loc(ia)+fx
+              fyy_loc(ia)=fyy_loc(ia)+fy
+              fzz_loc(ia)=fzz_loc(ia)+fz
+              
+              fxx_loc(id)=fxx_loc(id)-fx
+              fyy_loc(id)=fyy_loc(id)-fy
+              fzz_loc(id)=fzz_loc(id)-fz
+              
+c     local stress tensor
+              
+              strs_loc(1)=strs_loc(1)+xad*fx
+              strs_loc(2)=strs_loc(2)+xad*fy
+              strs_loc(3)=strs_loc(3)+xad*fz
+              strs_loc(4)=strs_loc(4)+yad*fy
+              strs_loc(5)=strs_loc(5)+yad*fz
+              strs_loc(6)=strs_loc(6)+zad*fz
               
             endif
             
@@ -922,6 +1000,36 @@ c     stress tensor for short ranged 1-4 term
                   
                 endif
                 
+c     metadynamics local parameters
+                  
+                if(lmetadyn.and.(idrive.or.ldrive))then
+                  
+c     local energy and virial
+                  
+                  eng_loc=eng_loc+srpot
+                  vir_loc=vir_loc-gamma*rad**2
+                  
+c     local forces
+                  
+                  fxx_loc(ia)=fxx_loc(ia)+fx
+                  fyy_loc(ia)=fyy_loc(ia)+fy
+                  fzz_loc(ia)=fzz_loc(ia)+fz
+                  
+                  fxx_loc(id)=fxx_loc(id)-fx
+                  fyy_loc(id)=fyy_loc(id)-fy
+                  fzz_loc(id)=fzz_loc(id)-fz
+                  
+c     stress tensor for short ranged 1-4 term
+                  
+                  strs_loc(1)=strs_loc(1)+xad*fx
+                  strs_loc(2)=strs_loc(2)+xad*fy
+                  strs_loc(3)=strs_loc(3)+xad*fz
+                  strs_loc(4)=strs_loc(4)+yad*fy
+                  strs_loc(5)=strs_loc(5)+yad*fz
+                  strs_loc(6)=strs_loc(6)+zad*fz
+                  
+                endif
+                
               endif
               
             endif
@@ -943,6 +1051,20 @@ c     complete stress tensor
       stress(7)=stress(7)+strs(3)
       stress(8)=stress(8)+strs(5)
       stress(9)=stress(9)+strs(6)
+
+      if(lmetadyn)then
+        
+        stress_loc(1)=stress_loc(1)+strs_loc(1)
+        stress_loc(2)=stress_loc(2)+strs_loc(2)
+        stress_loc(3)=stress_loc(3)+strs_loc(3)
+        stress_loc(4)=stress_loc(4)+strs_loc(2)
+        stress_loc(5)=stress_loc(5)+strs_loc(4)
+        stress_loc(6)=stress_loc(6)+strs_loc(5)
+        stress_loc(7)=stress_loc(7)+strs_loc(3)
+        stress_loc(8)=stress_loc(8)+strs_loc(5)
+        stress_loc(9)=stress_loc(9)+strs_loc(6)
+        
+      endif
       
 c     sum contributions to potentials
       

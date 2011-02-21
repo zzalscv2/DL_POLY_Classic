@@ -5,6 +5,7 @@ c
 c     dl_poly module for defining simulation driver routines
 c     copyright - daresbury laboratory
 c     author    - w. smith    sep 2003
+c     adapted   - d.quigley   nov 2010 metadynamics
 c     
 c***********************************************************************
       
@@ -32,7 +33,7 @@ c***********************************************************************
      x  epsq,fmax,opttol,rctter,rcut,rcutfb,rcuttb,rprim,rvdw,shlke,
      x  engcfg,temp,tstep,virang,virbnd,vircpe,virdih,virfbp,virfld,
      x  virinv,virlrc,virmet,virshl,virsrp,virtbp,virter,virtet,volm,
-     x  engmet,virtot)
+     x  engmet,virtot,engord,virord)
       
 c***********************************************************************
 c     
@@ -41,6 +42,7 @@ c     molecular dynamics simulation
 c     
 c     copyright - daresbury laboratory
 c     author    - w. smith    aug 2006
+c     adapted   - d.quigley   nov 2010 metadynamics
 c     
 c***********************************************************************
       
@@ -63,6 +65,7 @@ c***********************************************************************
       real(8) tstep,virang,virbnd,vircpe,virdih,virfbp
       real(8) virfld,virinv,virlrc,virmet,virshl,virsrp
       real(8) virtbp,virter,virtet,volm,engmet,virtot
+      real(8) engord,virord
       
 c     construct verlet neighbour list
       
@@ -83,7 +86,7 @@ c     calculate atomic forces
      x  rcuttb,engtbp,virtbp,rcutfb,engfbp,virfbp,rctter,engter,
      x  virter,engbnd,virbnd,engang,virang,engdih,virdih,enginv,
      x  virinv,engtet,virtet,engshl,shlke,virshl,engfld,virfld,
-     x  engcfg,fmax,temp)
+     x  engcfg,fmax,temp,engord,virord)
       
 c     frozen atoms option
       
@@ -109,7 +112,7 @@ c     total virial (excluding constraint virial and c.o.m virial)
 c     for npt routines     note: virsrp already includes virlrc
       
       virtot=vircpe+virsrp+virbnd+virtbp+virter+virfld+
-     x  virang+virshl+virtet+virmet
+     x  virang+virshl+virtet+virmet+virord
       
       return
       end subroutine molecular_dynamics
@@ -126,7 +129,7 @@ c     for npt routines     note: virsrp already includes virlrc
      x  rprim,rvdw,shlke,engcfg,temp,tstep,virang,virbnd,vircpe,
      x  virdih,virfbp,virfld,virinv,virlrc,virmet,virshl,virsrp,
      x  virtbp,virter,virtet,volm,engmet,virtot,rlxtol,pass0,
-     x  pass1,pass2)
+     x  pass1,pass2,engord,virord)
       
 c***********************************************************************
 c     
@@ -135,11 +138,13 @@ c     relaxed shell molecular dynamics simulation
 c
 c     copyright - daresbury laboratory
 c     author    - w. smith    aug 2006
+c     adapted   - d.quigley   nov 2010 metadynamics
 c     
 c***********************************************************************
       
       implicit none
 
+      logical,save :: lfirst = .true.
       logical lfcap,lgofr,lneut,lnsq,loglnk,lzeql,ltad
       logical newlst,relaxed,shgofr,lsolva,lfree,lghost
 
@@ -148,7 +153,7 @@ c***********************************************************************
       integer nhko,nlatt,nneut,nospl,nstbgr,nstep,nsteql
       integer ntangl,ntbond,ntdihd,ntinv,ntpfbp,ntpmet
       integer ntptbp,ntpter,ntpvdw,ntshl,ntteth,numrdf
-      integer keyrlx,ntpmls,pass,nsolva,isolva
+      integer keyrlx,ntpmls,pass,nsolva,isolva,ia,ib,ishl
 
       real(8) alpha,delr,dlrpot,drewd,elrc,engang,engbnd
       real(8) engcpe,engdih,engfbp,engfld,enginv,engshl,engsrp
@@ -157,12 +162,35 @@ c***********************************************************************
       real(8) tstep,virang,virbnd,vircpe,virdih,virfbp
       real(8) virfld,virinv,virlrc,virmet,virshl,virsrp
       real(8) virtbp,virter,virtet,volm,engmet,virtot,rlxtol
-      real(8) pass0,pass1,pass2
+      real(8) pass0,pass1,pass2,engord,virord
       
+      real(8),allocatable,dimension(:),save :: xdcs,ydcs,zdcs 
+
       pass=0
       keyrlx=0
       shgofr=lgofr
       relaxed=.false.
+ 
+      if(lfirst)then
+        
+        allocate(xdcs(1:ntshl))
+        allocate(ydcs(1:ntshl))
+        allocate(zdcs(1:ntshl))
+        lfirst = .false.
+        
+      else
+        
+        do ishl=1,ntshl
+          
+          ia=listshl(ishl,2)
+          ib=listshl(ishl,3)
+          xxx(ib)=xxx(ia)+xdcs(ishl)
+          yyy(ib)=yyy(ia)+ydcs(ishl)
+          zzz(ib)=zzz(ia)+zdcs(ishl)
+          
+        enddo
+        
+      endif
       
       do while(.not.relaxed.and.pass.le.mxpass)
         
@@ -185,7 +213,7 @@ c     calculate atomic forces
      x    rcuttb,engtbp,virtbp,rcutfb,engfbp,virfbp,rctter,engter,
      x    virter,engbnd,virbnd,engang,virang,engdih,virdih,enginv,
      x    virinv,engtet,virtet,engshl,shlke,virshl,engfld,virfld,
-     x    engcfg,fmax,temp)
+     x    engcfg,fmax,temp,engord,virord)
         
 c     frozen atoms option
         
@@ -195,7 +223,7 @@ c     total virial (excluding constraint virial and c.o.m virial)
 c     for npt routines     note: virsrp already includes virlrc
         
         virtot=vircpe+virsrp+virbnd+virtbp+virter+virfld+
-     x    virang+virshl+virtet+virmet
+     x    virang+virshl+virtet+virmet+virord
         
 c     relaxed shell option
         
@@ -209,6 +237,7 @@ c     relaxed shell option
           pass0=pass0+1.d0
           pass1=pass1/pass0+pass/pass0
           pass2=max(dble(pass),pass2)
+c$$$          write(104,'("Relaxed shells before step: ",I5)')pass+1          
           
         endif
         
@@ -219,6 +248,20 @@ c     relaxed shell option
 c     end of shell relaxation
         
       enddo
+      
+c     store vector connecting the cores to the shells
+      
+      do ishl=1,ntshl
+        
+        ia=listshl(ishl,2)
+        ib=listshl(ishl,3)
+        xdcs(ishl)=xxx(ib)-xxx(ia)
+        ydcs(ishl)=yyy(ib)-yyy(ia)
+        zdcs(ishl)=zzz(ib)-zzz(ia)
+        
+      enddo
+      
+      call images(imcon,0,1,ntshl,cell,xdcs,ydcs,zdcs)
       
       return
       end subroutine shell_relaxation
@@ -234,7 +277,7 @@ c     end of shell relaxation
      x  rcut,rcutfb,rcuttb,rprim,rvdw,shlke,engcfg,temp,tstep,
      x  virang,virbnd,vircpe,virdih,virfbp,virfld,virinv,virlrc,
      x  virmet,virshl,virsrp,virtbp,virter,virtet,volm,engmet,
-     x  virtot,sigma,tolnce,engunit)
+     x  virtot,sigma,tolnce,engunit,engord,virord)
       
 c***********************************************************************
 c     
@@ -243,6 +286,7 @@ c     minimisation simulation
 c
 c     copyright - daresbury laboratory
 c     author    - w. smith    may 2007
+c     adapted   - d.quigley   nov 2010 metadynamics
 c     
 c***********************************************************************
       
@@ -266,6 +310,7 @@ c***********************************************************************
       real(8) virfld,virinv,virlrc,virmet,virshl,virsrp,tolnce
       real(8) virtbp,virter,virtet,volm,engmet,virtot,engcon
       real(8) cfgmin,engunit,hnorm,grad0,grad1,ff1,sgn
+      real(8) engord,virord
       
       real(8), allocatable :: sxx(:),syy(:),szz(:)
       
@@ -321,7 +366,7 @@ c     calculate atomic forces
      x    rcuttb,engtbp,virtbp,rcutfb,engfbp,virfbp,rctter,engter,
      x    virter,engbnd,virbnd,engang,virang,engdih,virdih,enginv,
      x    virinv,engtet,virtet,engshl,shlke,virshl,engfld,virfld,
-     x    engcfg,fmax,temp)
+     x    engcfg,fmax,temp,engord,virord)
         
 c     frozen atoms option
         
@@ -331,7 +376,7 @@ c     total virial (excluding constraint virial and c.o.m virial)
 c     for npt routines     note: virsrp already includes virlrc
         
         virtot=vircpe+virsrp+virbnd+virtbp+virter+virfld+
-     x    virang+virshl+virtet+virmet
+     x    virang+virshl+virtet+virmet+virord
         
 c     conjugate gradient structure optimisation
         

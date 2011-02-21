@@ -5,14 +5,15 @@ c
 c     dl_poly module for defining inversion potential arrays
 c     copyright - daresbury laboratory
 c     
-c     author    - w. smith    sep 2003
-c     adapted for solvation, free energy and excitation
-c               - w. smith    jun 2008
+c     author  - w. smith  sep 2003
+c     adapted - w. smith  jun 2008 : solvation, free energy, excitation
+c     adapted - w. smith  jan 2011 : metadynamics
 c     
 c***********************************************************************
 
       use config_module
       use error_module
+      use metafreeze_module
       use parse_module
       use property_module
       use setup_module
@@ -61,7 +62,9 @@ c***********************************************************************
 
 c***********************************************************************
 c     
-c     dl_poly subroutine for defining inversion angles
+c     dl_poly subroutine for defining inversion angle potentials
+c     note: includes calcite planar potential which is not strictly
+c     an inversion potential and is different in implementation
 c     
 c     copyright - daresbury laboratory
 c     author    - w. smith    aug 2003
@@ -130,6 +133,8 @@ c     test for frozen atom pairs
             keyinv(ninver)=2
           elseif(keyword(1:4).eq.'plan')then
             keyinv(ninver)=3
+          elseif(keyword(1:4).eq.'calc')then
+            keyinv(ninver)=4
           else
             if(idnode.eq.0)write(nrite,*)record
             call error(idnode,449)
@@ -155,6 +160,10 @@ c     convert energies to internal units and angles to radians
 
             prminv(ninver,2)=cos(prminv(ninver,2)*(pi/180.d0))
 
+          elseif(keyinv(ninver).eq.4)then
+            
+            prminv(ninver,2)=prminv(ninver,2)*engunit
+            
           endif
           
         endif
@@ -174,28 +183,31 @@ c     terms in molecular dynamics.
 c     
 c     copyright - daresbury laboratory 1996
 c     author    - w. smith       may   1996
+c     modified  - w.smith        jan   2011 : metadynamics
 c     
 c***********************************************************************
             
       implicit none
 
-      logical safe,lsolva,lfree,lexcite,lselect
+      logical safe,lsolva,lfree,lexcite,lselect,lcalcite
+      logical idrive,jdrive,kdrive,ldrive
       integer idnode,imcon,mxnode,ntinv,fail1,fail2
       integer fail3,inv1,inv2,i,ii,ia,id,kk,ib,ic
-      real(8) strs(6)
+      real(8) strs(6),strs_loc(6)
       real(8) xab,yab,zab,rab2,rrab,xac,yac,zac,rac2,rrac,xad,yad
       real(8) zad,rad2,rrad,rbc,rcd,rdb,ubx,uby,ubz,ubn,rub,vbx
       real(8) vby,vbz,rvb,wwb,ucx,ucy,ucz,ucn,vcx,vcy,vcz,rvc,wwc
       real(8) udx,udy,udz,udn,vdx,vdy,vdz,vdn,rvd,wwd,cosb,cosc
       real(8) cosd,thb,thc,thd,gamb,gamc,gamd,rubc,rubd,rucd,rucb
-      real(8) rudb,rudc,rvbc,rvbd,rvcd,rvcb,rvdb,rvdc,fbx,fby,fbz
-      real(8) fcx,fcy,fcz,fdx,fdy,fdz,vbn,vcn,ruc,rud
-      real(8) enginv,virinv,omega
+      real(8) rudb,rudc,rvbc,rvbd,rvcd,rvcb,rvdb,rvdc,fax,fay,faz
+      real(8) fbx,fby,fbz,fcx,fcy,fcz,fdx,fdy,fdz,vbn,vcn,ruc,rud
+      real(8) uuu,uu2,uun,uux,uuy,uuz,enginv,virinv,omega,gamma
+      real(8) gamvir
 
       real(8), allocatable :: xdab(:),ydab(:),zdab(:)
       real(8), allocatable :: xdac(:),ydac(:),zdac(:)
       real(8), allocatable :: xdad(:),ydad(:),zdad(:)
-
+      
       data fail1,fail2,fail3/0,0,0/
 
       allocate (xdab(msbad),ydab(msbad),zdab(msbad),stat=fail1)
@@ -221,9 +233,8 @@ c     initialise accumulators
       virinv=0.d0
       inv_fre=0.d0
       inv_vir=0.d0
-      do i=1,6
-        strs(i)=0.d0
-      enddo
+      strs(:)=0.d0
+      strs_loc(:)=0.d0
 
       if(lsolva)then
         
@@ -239,7 +250,11 @@ c     calculate bond vectors
       do i=inv1,inv2
         
         ii=ii+1
-
+        
+c     potential energy function type
+        
+        kk=listinv(ii,1)
+        
 c     indices of bonded atoms
         
         ia=listinv(ii,2)
@@ -253,13 +268,27 @@ c     define components of bond vectors
         ydab(ii)=yyy(ib)-yyy(ia)
         zdab(ii)=zzz(ib)-zzz(ia)
         
-        xdac(ii)=xxx(ic)-xxx(ia)
-        ydac(ii)=yyy(ic)-yyy(ia)
-        zdac(ii)=zzz(ic)-zzz(ia)
-        
-        xdad(ii)=xxx(id)-xxx(ia)
-        ydad(ii)=yyy(id)-yyy(ia)
-        zdad(ii)=zzz(id)-zzz(ia)
+        if(keyinv(kk).eq.4)then
+
+          xdac(ii)=xxx(ic)-xxx(ib)
+          ydac(ii)=yyy(ic)-yyy(ib)
+          zdac(ii)=zzz(ic)-zzz(ib)
+          
+          xdad(ii)=xxx(id)-xxx(ib)
+          ydad(ii)=yyy(id)-yyy(ib)
+          zdad(ii)=zzz(id)-zzz(ib)
+          
+        else
+          
+          xdac(ii)=xxx(ic)-xxx(ia)
+          ydac(ii)=yyy(ic)-yyy(ia)
+          zdac(ii)=zzz(ic)-zzz(ia)
+          
+          xdad(ii)=xxx(id)-xxx(ia)
+          ydad(ii)=yyy(id)-yyy(ia)
+          zdad(ii)=zzz(id)-zzz(ia)
+          
+        endif   
         
       enddo
       
@@ -274,9 +303,14 @@ c     loop over all specified inversions
       ii=0
       do i=inv1,inv2
         
-c     define components of bond vectors
-        
         ii=ii+1
+        
+c     select potential energy function type
+        
+        kk=listinv(ii,1)
+        lcalcite=(keyinv(kk).eq.4)
+        
+c     define components of bond vectors
         
         xab=xdab(ii)
         yab=ydab(ii)
@@ -296,78 +330,93 @@ c     define components of bond vectors
         rad2=xad*xad+yad*yad+zad*zad
         rrad=1.d0/sqrt(rad2)
         
-        rbc=xab*xac+yab*yac+zab*zac
-        rcd=xac*xad+yac*yad+zac*zad
-        rdb=xad*xab+yad*yab+zad*zab
+        if(lcalcite)then
+          
+c     calculate vector normal to plane
+        
+          uux=yac*zad-zac*yad
+          uuy=zac*xad-xac*zad
+          uuz=xac*yad-yac*xad
+          uun=1.d0/sqrt(ubx**2+uby**2+ubz**2)
+          uux=uun*uux
+          uuy=uun*uuy
+          uuz=uun*uuz
+          uuu=xab*uux+yab*uuy+zab*uuz
+          
+        else
+          
+c     scalar products of bond vectors
+        
+          rbc=xab*xac+yab*yac+zab*zac
+          rcd=xac*xad+yac*yad+zac*zad
+          rdb=xad*xab+yad*yab+zad*zab
         
 c     calculate bond-angle-plane vectors
         
-        ubx=xac*rrac+xad*rrad
-        uby=yac*rrac+yad*rrad
-        ubz=zac*rrac+zad*rrad
-        ubn=1.d0/sqrt(ubx**2+uby**2+ubz**2)
-        ubx=ubn*ubx
-        uby=ubn*uby
-        ubz=ubn*ubz
-        rub=xab*ubx+yab*uby+zab*ubz
-        
-        vbx=xac*rrac-xad*rrad
-        vby=yac*rrac-yad*rrad
-        vbz=zac*rrac-zad*rrad
-        vbn=1.d0/sqrt(vbx**2+vby**2+vbz**2)
-        vbx=vbn*vbx
-        vby=vbn*vby
-        vbz=vbn*vbz
-        rvb=xab*vbx+yab*vby+zab*vbz
-        wwb=sqrt(rub**2+rvb**2)
-        
-        ucx=xad*rrad+xab*rrab
-        ucy=yad*rrad+yab*rrab
-        ucz=zad*rrad+zab*rrab
-        ucn=1.d0/sqrt(ucx**2+ucy**2+ucz**2)
-        ucx=ucn*ucx
-        ucy=ucn*ucy
-        ucz=ucn*ucz
-        ruc=xac*ucx+yac*ucy+zac*ucz
-        
-        vcx=xad*rrad-xab*rrab
-        vcy=yad*rrad-yab*rrab
-        vcz=zad*rrad-zab*rrab
-        vcn=1.d0/sqrt(vcx**2+vcy**2+vcz**2)
-        vcx=vcn*vcx
-        vcy=vcn*vcy
-        vcz=vcn*vcz
-        rvc=xac*vcx+yac*vcy+zac*vcz
-        wwc=sqrt(ruc**2+rvc**2)
-        
-        udx=xab*rrab+xac*rrac
-        udy=yab*rrab+yac*rrac
-        udz=zab*rrab+zac*rrac
-        udn=1.d0/sqrt(udx**2+udy**2+udz**2)
-        udx=udn*udx
-        udy=udn*udy
-        udz=udn*udz
-        rud=xad*udx+yad*udy+zad*udz
-        
-        vdx=xab*rrab-xac*rrac
-        vdy=yab*rrab-yac*rrac
-        vdz=zab*rrab-zac*rrac
-        vdn=1.d0/sqrt(vdx**2+vdy**2+vdz**2)
-        vdx=vdn*vdx
-        vdy=vdn*vdy
-        vdz=vdn*vdz
-        rvd=xad*vdx+yad*vdy+zad*vdz
-        wwd=sqrt(rud**2+rvd**2)
-        
+          ubx=xac*rrac+xad*rrad
+          uby=yac*rrac+yad*rrad
+          ubz=zac*rrac+zad*rrad
+          ubn=1.d0/sqrt(ubx**2+uby**2+ubz**2)
+          ubx=ubn*ubx
+          uby=ubn*uby
+          ubz=ubn*ubz
+          rub=xab*ubx+yab*uby+zab*ubz
+          
+          vbx=xac*rrac-xad*rrad
+          vby=yac*rrac-yad*rrad
+          vbz=zac*rrac-zad*rrad
+          vbn=1.d0/sqrt(vbx**2+vby**2+vbz**2)
+          vbx=vbn*vbx
+          vby=vbn*vby
+          vbz=vbn*vbz
+          rvb=xab*vbx+yab*vby+zab*vbz
+          wwb=sqrt(rub**2+rvb**2)
+          
+          ucx=xad*rrad+xab*rrab
+          ucy=yad*rrad+yab*rrab
+          ucz=zad*rrad+zab*rrab
+          ucn=1.d0/sqrt(ucx**2+ucy**2+ucz**2)
+          ucx=ucn*ucx
+          ucy=ucn*ucy
+          ucz=ucn*ucz
+          ruc=xac*ucx+yac*ucy+zac*ucz
+          
+          vcx=xad*rrad-xab*rrab
+          vcy=yad*rrad-yab*rrab
+          vcz=zad*rrad-zab*rrab
+          vcn=1.d0/sqrt(vcx**2+vcy**2+vcz**2)
+          vcx=vcn*vcx
+          vcy=vcn*vcy
+          vcz=vcn*vcz
+          rvc=xac*vcx+yac*vcy+zac*vcz
+          wwc=sqrt(ruc**2+rvc**2)
+          
+          udx=xab*rrab+xac*rrac
+          udy=yab*rrab+yac*rrac
+          udz=zab*rrab+zac*rrac
+          udn=1.d0/sqrt(udx**2+udy**2+udz**2)
+          udx=udn*udx
+          udy=udn*udy
+          udz=udn*udz
+          rud=xad*udx+yad*udy+zad*udz
+          
+          vdx=xab*rrab-xac*rrac
+          vdy=yab*rrab-yac*rrac
+          vdz=zab*rrab-zac*rrac
+          vdn=1.d0/sqrt(vdx**2+vdy**2+vdz**2)
+          vdx=vdn*vdx
+          vdy=vdn*vdy
+          vdz=vdn*vdz
+          rvd=xad*vdx+yad*vdy+zad*vdz
+          wwd=sqrt(rud**2+rvd**2)
+          
 c     calculate inversion angle cosines
-        
-        cosb=wwb*rrab
-        cosc=wwc*rrac
-        cosd=wwd*rrad
-        
-c     select potential energy function type
-        
-        kk=listinv(ii,1)
+          
+          cosb=wwb*rrab
+          cosc=wwc*rrac
+          cosd=wwd*rrad
+          
+        endif
         
 c     calculate potential energy and scalar force term
         
@@ -380,6 +429,7 @@ c     key=1 for harmonic inversion potential
           thd=acos(cosd)
           omega=0.5d0*prminv(kk,1)*((thb-prminv(kk,2))**2+
      x      (thc-prminv(kk,2))**2+(thd-prminv(kk,2))**2)/3.d0
+          gamvir=0.d0
           
           gamb=0.d0
           if(abs(thb).gt.1.d-12)
@@ -397,6 +447,7 @@ c     key=2 for harmonic cosine inversion potential
           
           omega=0.5d0*prminv(kk,1)*((cosb-prminv(kk,2))**2+
      x      (cosc-prminv(kk,2))**2+(cosb-prminv(kk,2))**2)/3.d0
+          gamvir=0.d0
 
           gamb=-prminv(kk,1)*(cosb-prminv(kk,2))/3.d0
           gamc=-prminv(kk,1)*(cosc-prminv(kk,2))/3.d0
@@ -407,16 +458,27 @@ c     key=2 for harmonic cosine inversion potential
 c     key=3 for planar inversion potentials
           
           omega=prminv(kk,1)*((1.d0-cosb)+(1.d0-cosc)+(1.d0-cosd))/3.d0
+          gamvir=0.d0
           
           gamb=prminv(kk,1)/3.d0
           gamc=prminv(kk,1)/3.d0
           gamd=prminv(kk,1)/3.d0
+
+        else if(keyinv(kk).eq.4)then
+          
+c     key=4 for planar calcite potential
+          
+          uu2=uuu*uuu
+          omega=uu2*(prminv(kk,1)+prminv(kk,2)*uu2)
+          gamvir=uu2*(2.d0*prminv(kk,1)+4.d0*prminv(kk,2)*uu2)
+          gamma=-uuu*(2.d0*prminv(kk,1)+4.d0*prminv(kk,2)*uu2)
 
         else
 
 c     undefined potential
           
           safe=.false.
+          gamvir=0.d0
           gamb=0.d0
           gamc=0.d0
           gamd=0.d0
@@ -430,6 +492,17 @@ c     indices of bonded atoms
         ic=listinv(ii,4)
         id=listinv(ii,5)
 
+c     metadynamics local definitions
+        
+        if(lmetadyn)then
+          
+          idrive=driven(ltype(ia))
+          jdrive=driven(ltype(ib))
+          kdrive=driven(ltype(ic))
+          ldrive=driven(ltype(id))
+          
+        endif
+        
 c     set selection control
         
         lselect=.true.
@@ -484,35 +557,69 @@ c     set hamiltonian mixing parameter
         
 c     calculate bond and u,v scalar products
         
-        rubc=xab*ucx+yab*ucy+zab*ucz
-        rubd=xab*udx+yab*udy+zab*udz
-        rucd=xac*udx+yac*udy+zac*udz
-        rucb=xac*ubx+yac*uby+zac*ubz
-        rudb=xad*ubx+yad*uby+zad*ubz
-        rudc=xad*ucx+yad*ucy+zad*ucz
-        
-        rvbc=xab*vcx+yab*vcy+zab*vcz
-        rvbd=xab*vdx+yab*vdy+zab*vdz
-        rvcd=xac*vdx+yac*vdy+zac*vdz
-        rvcb=xac*vbx+yac*vby+zac*vbz
-        rvdb=xad*vbx+yad*vby+zad*vbz
-        rvdc=xad*vcx+yad*vcy+zad*vcz
+        if(.not.lcalcite)then
+          
+          rubc=xab*ucx+yab*ucy+zab*ucz
+          rubd=xab*udx+yab*udy+zab*udz
+          rucd=xac*udx+yac*udy+zac*udz
+          rucb=xac*ubx+yac*uby+zac*ubz
+          rudb=xad*ubx+yad*uby+zad*ubz
+          rudc=xad*ucx+yad*ucy+zad*ucz
+          
+          rvbc=xab*vcx+yab*vcy+zab*vcz
+          rvbd=xab*vdx+yab*vdy+zab*vdz
+          rvcd=xac*vdx+yac*vdy+zac*vdz
+          rvcb=xac*vbx+yac*vby+zac*vbz
+          rvdb=xad*vbx+yad*vby+zad*vbz
+          rvdc=xad*vcx+yad*vcy+zad*vcz
+          
+        endif
         
         if(lselect)then
           
-c     calculate potential energy
+c     calculate potential energy and virial
           
           enginv=enginv+omega
+          virinv=virinv+gamvir
           
 c     calculate solvation energy
           
           if(lsolva)then
             inv_sol(atmolt(ia))=inv_sol(atmolt(ia))+omega
           endif
-
+          
 c     calculate atomic forces
           
-          fbx=gamb*(-cosb*xab*rrab**2+rrab*(rub*ubx+rvb*vbx)/wwb)
+          if(lcalcite)then
+            
+            fax=-gamma*uux
+            fay=-gamma*uuy
+            faz=-gamma*uuz
+            
+            fcx=gamma*uun*((yad*zab-zad*yab)-uuu*(yad*uuz-zad*uuy))
+            fcy=gamma*uun*((zad*xab-xad*zab)-uuu*(zad*uux-xad*uuz))
+            fcz=gamma*uun*((xad*yab-yad*xab)-uuu*(xad*uuy-yad*uux))
+            
+            fdx=gamma*uun*((yab*zac-zab*yac)-uuu*(zac*uuy-yac*uuz))
+            fdy=gamma*uun*((zab*xac-xab*zac)-uuu*(xac*uuz-zac*uux))
+            fdz=gamma*uun*((xab*yac-yab*xac)-uuu*(yac*uux-xac*uuy))
+            
+            fbx=-(fax+fcx+fdx)
+            fby=-(fay+fcy+fdy)
+            fbz=-(faz+fcz+fdz)
+            
+c     stress tensor calculation for calcite terms
+            
+            strs(1)=strs(1)+uuu*gamma*uux*uux
+            strs(2)=strs(2)+uuu*gamma*uux*uuy
+            strs(3)=strs(3)+uuu*gamma*uux*uuz
+            strs(4)=strs(4)+uuu*gamma*uuy*uuy
+            strs(5)=strs(5)+uuu*gamma*uuy*uuz
+            strs(6)=strs(6)+uuu*gamma*uuz*uuz
+          
+          else
+            
+            fbx=gamb*(-cosb*xab*rrab**2+rrab*(rub*ubx+rvb*vbx)/wwb)
      x      +(ruc*ucn*rrab*(xac-ruc*ucx-(rbc-ruc*rubc)*xab*rrab**2)
      x      -rvc*vcn*rrab*(xac-rvc*vcx-(rbc-rvc*rvbc)*xab*rrab**2))
      x      *gamc*rrac/wwc
@@ -520,7 +627,7 @@ c     calculate atomic forces
      x      +rvd*vdn*rrab*(xad-rvd*vdx-(rdb-rvd*rvbd)*xab*rrab**2))
      x      *gamd*rrad/wwd
           
-          fby=gamb*(-cosb*yab*rrab**2+rrab*(rub*uby+rvb*vby)/wwb)
+            fby=gamb*(-cosb*yab*rrab**2+rrab*(rub*uby+rvb*vby)/wwb)
      x      +(ruc*ucn*rrab*(yac-ruc*ucy-(rbc-ruc*rubc)*yab*rrab**2)
      x      -rvc*vcn*rrab*(yac-rvc*vcy-(rbc-rvc*rvbc)*yab*rrab**2))
      x      *gamc*rrac/wwc
@@ -528,7 +635,7 @@ c     calculate atomic forces
      x      +rvd*vdn*rrab*(yad-rvd*vdy-(rdb-rvd*rvbd)*yab*rrab**2))
      x      *gamd*rrad/wwd
           
-          fbz=gamb*(-cosb*zab*rrab**2+rrab*(rub*ubz+rvb*vbz)/wwb)
+            fbz=gamb*(-cosb*zab*rrab**2+rrab*(rub*ubz+rvb*vbz)/wwb)
      x      +(ruc*ucn*rrab*(zac-ruc*ucz-(rbc-ruc*rubc)*zab*rrab**2)
      x      -rvc*vcn*rrab*(zac-rvc*vcz-(rbc-rvc*rvbc)*zab*rrab**2))
      x      *gamc*rrac/wwc
@@ -536,7 +643,7 @@ c     calculate atomic forces
      x      +rvd*vdn*rrab*(zad-rvd*vdz-(rdb-rvd*rvbd)*zab*rrab**2))
      x      *gamd*rrad/wwd
           
-          fcx=gamc*(-cosc*xac*rrac**2+rrac*(ruc*ucx+rvc*vcx)/wwc)
+            fcx=gamc*(-cosc*xac*rrac**2+rrac*(ruc*ucx+rvc*vcx)/wwc)
      x      +(rud*udn*rrac*(xad-rud*udx-(rcd-rud*rucd)*xac*rrac**2)
      x      -rvd*vdn*rrac*(xad-rvd*vdx-(rcd-rvd*rvcd)*xac*rrac**2))
      x      *gamd*rrad/wwd
@@ -544,7 +651,7 @@ c     calculate atomic forces
      x      +rvb*vbn*rrac*(xab-rvb*vbx-(rbc-rvb*rvcb)*xac*rrac**2))
      x      *gamb*rrab/wwb
           
-          fcy=gamc*(-cosc*yac*rrac**2+rrac*(ruc*ucy+rvc*vcy)/wwc)
+            fcy=gamc*(-cosc*yac*rrac**2+rrac*(ruc*ucy+rvc*vcy)/wwc)
      x      +(rud*udn*rrac*(yad-rud*udy-(rcd-rud*rucd)*yac*rrac**2)
      x      -rvd*vdn*rrac*(yad-rvd*vdy-(rcd-rvd*rvcd)*yac*rrac**2))
      x      *gamd*rrad/wwd
@@ -552,7 +659,7 @@ c     calculate atomic forces
      x      +rvb*vbn*rrac*(yab-rvb*vby-(rbc-rvb*rvcb)*yac*rrac**2))
      x      *gamb*rrab/wwb
           
-          fcz=gamc*(-cosc*zac*rrac**2+rrac*(ruc*ucz+rvc*vcz)/wwc)
+            fcz=gamc*(-cosc*zac*rrac**2+rrac*(ruc*ucz+rvc*vcz)/wwc)
      x      +(rud*udn*rrac*(zad-rud*udz-(rcd-rud*rucd)*zac*rrac**2)
      x      -rvd*vdn*rrac*(zad-rvd*vdz-(rcd-rvd*rvcd)*zac*rrac**2))
      x      *gamd*rrad/wwd
@@ -560,7 +667,7 @@ c     calculate atomic forces
      x      +rvb*vbn*rrac*(zab-rvb*vbz-(rbc-rvb*rvcb)*zac*rrac**2))
      x      *gamb*rrab/wwb
           
-          fdx=gamd*(-cosd*xad*rrad**2+rrad*(rud*udx+rvd*vdx)/wwd)
+            fdx=gamd*(-cosd*xad*rrad**2+rrad*(rud*udx+rvd*vdx)/wwd)
      x      +(rub*ubn*rrad*(xab-rub*ubx-(rdb-rub*rudb)*xad*rrad**2)
      x      -rvb*vbn*rrad*(xab-rvb*vbx-(rdb-rvb*rvdb)*xad*rrad**2))
      x      *gamb*rrab/wwb
@@ -568,7 +675,7 @@ c     calculate atomic forces
      x      +rvc*vcn*rrad*(xac-rvc*vcx-(rcd-rvc*rvdc)*xad*rrad**2))
      x      *gamc*rrac/wwc
           
-          fdy=gamd*(-cosd*yad*rrad**2+rrad*(rud*udy+rvd*vdy)/wwd)
+            fdy=gamd*(-cosd*yad*rrad**2+rrad*(rud*udy+rvd*vdy)/wwd)
      x      +(rub*ubn*rrad*(yab-rub*uby-(rdb-rub*rudb)*yad*rrad**2)
      x      -rvb*vbn*rrad*(yab-rvb*vby-(rdb-rvb*rvdb)*yad*rrad**2))
      x      *gamb*rrab/wwb
@@ -576,7 +683,7 @@ c     calculate atomic forces
      x      +rvc*vcn*rrad*(yac-rvc*vcy-(rcd-rvc*rvdc)*yad*rrad**2))
      x      *gamc*rrac/wwc
           
-          fdz=gamd*(-cosd*zad*rrad**2+rrad*(rud*udz+rvd*vdz)/wwd)
+            fdz=gamd*(-cosd*zad*rrad**2+rrad*(rud*udz+rvd*vdz)/wwd)
      x      +(rub*ubn*rrad*(zab-rub*ubz-(rdb-rub*rudb)*zad*rrad**2)
      x      -rvb*vbn*rrad*(zab-rvb*vbz-(rdb-rvb*rvdb)*zad*rrad**2))
      x      *gamb*rrab/wwb
@@ -584,14 +691,29 @@ c     calculate atomic forces
      x      +rvc*vcn*rrad*(zac-rvc*vcz-(rcd-rvc*rvdc)*zad*rrad**2))
      x      *gamc*rrac/wwc
           
-          fxx(ia)=fxx(ia)-(fbx+fcx+fdx)
-          fyy(ia)=fyy(ia)-(fby+fcy+fdy)
-          fzz(ia)=fzz(ia)-(fbz+fcz+fdz)
+            fax=-(fbx+fcx+fdx)
+            fay=-(fby+fcy+fdy)
+            faz=-(fbz+fcz+fdz)
+            
+c     stress tensor calculation for inversion terms
+            
+            strs(1)=strs(1)+xab*fbx+xac*fcx+xad*fdx 
+            strs(2)=strs(2)+yab*fbx+yac*fcx+yad*fdx 
+            strs(3)=strs(3)+zab*fbx+zac*fcx+zad*fdx 
+            strs(4)=strs(4)+yab*fby+yac*fcy+yad*fdy 
+            strs(5)=strs(5)+yab*fbz+yac*fcz+yad*fdz 
+            strs(6)=strs(6)+zab*fbz+zac*fcz+zad*fdz 
+          
+          endif
+          
+          fxx(ia)=fxx(ia)+fax
+          fyy(ia)=fyy(ia)+fay
+          fzz(ia)=fzz(ia)+faz
           
           fxx(ib)=fxx(ib)+fbx
           fyy(ib)=fyy(ib)+fby
           fzz(ib)=fzz(ib)+fbz
-          
+        
           fxx(ic)=fxx(ic)+fcx
           fyy(ic)=fyy(ic)+fcy
           fzz(ic)=fzz(ic)+fcz
@@ -600,14 +722,43 @@ c     calculate atomic forces
           fyy(id)=fyy(id)+fdy
           fzz(id)=fzz(id)+fdz
           
-c     stress tensor calculation for inversion terms
+        endif
         
-          strs(1)=strs(1)+xab*fbx+xac*fcx+xad*fdx 
-          strs(2)=strs(2)+yab*fbx+yac*fcx+yad*fdx 
-          strs(3)=strs(3)+zab*fbx+zac*fcx+zad*fdx 
-          strs(4)=strs(4)+yab*fby+yac*fcy+yad*fdy 
-          strs(5)=strs(5)+yab*fbz+yac*fcz+yad*fdz 
-          strs(6)=strs(6)+zab*fbz+zac*fcz+zad*fdz 
+c     metadynamics local parameters
+        
+        if(lmetadyn.and.(idrive.or.jdrive.or.kdrive.or.ldrive))then
+          
+c     local energy and virial
+          
+          eng_loc=eng_loc+omega
+          vir_loc=vir_loc+gamvir
+          
+c     local forces
+          
+          fxx_loc(ia)=fxx_loc(ia)+fax
+          fyy_loc(ia)=fyy_loc(ia)+fay
+          fzz_loc(ia)=fzz_loc(ia)+faz
+          
+          fxx_loc(ib)=fxx_loc(ib)+fbx
+          fyy_loc(ib)=fyy_loc(ib)+fby
+          fzz_loc(ib)=fzz_loc(ib)+fbz
+          
+          fxx_loc(ic)=fxx_loc(ic)+fcx
+          fyy_loc(ic)=fyy_loc(ic)+fcy
+          fzz_loc(ic)=fzz_loc(ic)+fcz
+          
+          fxx_loc(id)=fxx_loc(id)+fdx
+          fyy_loc(id)=fyy_loc(id)+fdy
+          fzz_loc(id)=fzz_loc(id)+fdz
+          
+c     local stress tensor
+          
+          strs_loc(1)=strs_loc(1)+xab*fbx+xac*fcx+xad*fdx 
+          strs_loc(2)=strs_loc(2)+yab*fbx+yac*fcx+yad*fdx 
+          strs_loc(3)=strs_loc(3)+zab*fbx+zac*fcx+zad*fdx 
+          strs_loc(4)=strs_loc(4)+yab*fby+yac*fcy+yad*fdy 
+          strs_loc(5)=strs_loc(5)+yab*fbz+yac*fcz+yad*fdz 
+          strs_loc(6)=strs_loc(6)+zab*fbz+zac*fcz+zad*fdz 
           
         endif
         
@@ -625,6 +776,20 @@ c     complete stress tensor
       stress(8)=stress(8)+strs(5)
       stress(9)=stress(9)+strs(6)
 
+      if(lmetadyn)then
+        
+        stress_loc(1)=stress_loc(1)+strs_loc(1)
+        stress_loc(2)=stress_loc(2)+strs_loc(2)
+        stress_loc(3)=stress_loc(3)+strs_loc(3)
+        stress_loc(4)=stress_loc(4)+strs_loc(2)
+        stress_loc(5)=stress_loc(5)+strs_loc(4)
+        stress_loc(6)=stress_loc(6)+strs_loc(5)
+        stress_loc(7)=stress_loc(7)+strs_loc(3)
+        stress_loc(8)=stress_loc(8)+strs_loc(5)
+        stress_loc(9)=stress_loc(9)+strs_loc(6)
+        
+      endif
+      
 c     check for undefined potentials
       
       if(mxnode.gt.1)call gstate(safe)

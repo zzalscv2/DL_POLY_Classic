@@ -459,9 +459,7 @@ c     create mock cell vectors for non-periodic system
 
 c     initialise stress tensor accumulators
 
-      do i=1,6
-        strs(i)=0.d0
-      enddo
+      strs(:)=0.d0
 
 c     check for appropriate boundary conditions
       
@@ -610,15 +608,15 @@ c     calculate three body (attractive) terms
       
 c     calculate stress tensor
               
-      stress(1)=strs(1)
-      stress(2)=strs(2)
-      stress(3)=strs(3)
-      stress(4)=strs(2)
-      stress(5)=strs(4)
-      stress(6)=strs(5)
-      stress(7)=strs(3)
-      stress(8)=strs(5)
-      stress(9)=strs(6)
+      stress(1)=stress(1)+strs(1)
+      stress(2)=stress(2)+strs(2)
+      stress(3)=stress(3)+strs(3)
+      stress(4)=stress(4)+strs(2)
+      stress(5)=stress(5)+strs(4)
+      stress(6)=stress(6)+strs(5)
+      stress(7)=stress(7)+strs(3)
+      stress(8)=stress(8)+strs(5)
+      stress(9)=stress(9)+strs(6)
 
 c     check for undefined potentials
 
@@ -893,12 +891,14 @@ c     calculate bond factor
             
             if(flag)then
               
+c     tersoff energy and virial
+
               gam_ij=prmter2(1,jjter)*(1.d0+(bi*eterm)**ei)**(-0.5d0/ei)
               gamma=0.5d0*prmter2(1,jjter)*bi*(bi*eterm)**(ei-1.d0)*
      x          eat(jj)*(1.d0+(bi*eterm)**ei)**(-0.5d0/ei-1.d0)
               engter=engter+ert(jj)-gam_ij*eat(jj)
               virter=virter+gamma*vterm+(grt(jj)-gam_ij*gat(jj))*rtf(jj)
-              
+
 c     calculate 3-body forces
               
               do kk=1,limit
@@ -955,7 +955,7 @@ c     calculate contributions to stress tensor
      x                fyc*ztf(kk)*rtf(kk))
                     strs(6)=strs(6)+(fza*ztf(jj)*rtf(jj)+
      x                fzc*ztf(kk)*rtf(kk))
-                    
+
                   endif
                   
                 endif
@@ -967,9 +967,9 @@ c     calculate contributions to stress tensor
               gam_ij=prmter2(1,jjter)
               engter=engter+ert(jj)-gam_ij*eat(jj)
               virter=virter+(grt(jj)-gam_ij*gat(jj))*rtf(jj)
-              
+
             endif
-            
+
 c     calculate two body force terms
             
             gterm=0.5d0*(grt(jj)-gam_ij*gat(jj))
@@ -988,7 +988,7 @@ c     calculate contributions to stress tensor
             strs(4)=strs(4)-gterm*rtf(jj)*ytf(jj)*ytf(jj)
             strs(5)=strs(5)-gterm*rtf(jj)*ytf(jj)*ztf(jj)
             strs(6)=strs(6)-gterm*rtf(jj)*ztf(jj)*ztf(jj)
-            
+
           endif
           
         endif

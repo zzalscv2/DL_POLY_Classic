@@ -44,6 +44,7 @@ c     declare required modules
       use integrator_module
       use inversion_module
       use metal_module
+      use metafreeze_module
       use nlist_builders_module
       use pair_module
       use pmf_module
@@ -70,7 +71,7 @@ c     declare required modules
       logical newlst,lneut,loglnk,lnsq,lzden,lshmov,lcnb,ltad,lneb
       logical stropt,lzero,nolink,newgau,lminim,lminnow,lhit,lbpd
       logical prechk,tadall,lexcite,lsolva,lfree,lfrmas,lswitch
-      logical lghost,llswitch,lnfic,nebgo
+      logical lghost,llswitch,lnfic,nebgo,lpcos
       
       integer npage,lines,idnode,mxnode,memr,intsta,istraj,nsbzdn
       integer keyens,keyfce,keyres,keytrj,kmax1,kmax2,kmax3,multt
@@ -94,7 +95,8 @@ c     declare required modules
       real(8) stpeng,stpeth,stpprs,stptmp,stpvir,stpvol,width,zlen
       real(8) timelp,engmet,virmet,pass0,pass1,pass2,rlxtol,opttol
       real(8) catchrad,sprneb,deltad,tlow,engtke,ehit,xhit,yhit,zhit
-      real(8) ebias,vmin,hyp_units,estar
+      real(8) ebias,vmin,hyp_units,estar,chit_shl,sigma_shl
+      real(8) engord,virord
       real(8), allocatable :: tbuffer(:)
       
       data timelp/0.d0/,lminnow/.false./,ntrack/10/
@@ -166,22 +168,22 @@ c     input the control parameters defining the simulation
       call simdef
      x  (seek,lfcap,lgofr,lnsq,loptim,lzero,lminim,lpgr,ltraj,ltscal,
      x  lzeql,lzden,nolink,newgau,lhit,lbpd,ltad,lneb,prechk,tadall,
-     x  lsolva,lfree,lfrmas,lexcite,lswitch,lghost,lnfic,nebgo,idnode,
-     x  minstp,intsta,istraj,keybpd,keyens,keyfce,keyres,keyver,keytrj,
-     x  kmax1,kmax2,kmax3,multt,nstack,nstbgr,nsbzdn,nstbpo,nhko,nlatt,
-     x  nstbts,nsteql,nstraj,nstrun,nospl,keytol,numgau,khit,nhit,
-     x  nblock,ntrack,blkout,numneb,mode,nsolva,isolva,nofic,alpha,
-     x  delr,epsq,fmax,press,quattol,rcut,rprim,rvdw,taup,taut,temp,
-     x  timcls,timjob,tolnce,tstep,rlxtol,opttol,zlen,ehit,xhit,yhit,
-     x  zhit,ebias,vmin,catchrad,sprneb,deltad,tlow,hyp_units)
+     x  lsolva,lfree,lfrmas,lexcite,lswitch,lghost,lnfic,nebgo,lpcos,
+     x  idnode,minstp,intsta,istraj,keybpd,keyens,keyfce,keyres,keyver,
+     x  keytrj,kmax1,kmax2,kmax3,multt,nstack,nstbgr,nsbzdn,nstbpo,
+     x  nhko,nlatt,nstbts,nsteql,nstraj,nstrun,nospl,keytol,numgau,
+     x  khit,nhit,nblock,ntrack,blkout,numneb,mode,nsolva,isolva,nofic,
+     x  alpha,delr,epsq,fmax,press,quattol,rcut,rprim,rvdw,taup,taut,
+     x  temp,timcls,timjob,tolnce,tstep,rlxtol,opttol,zlen,ehit,xhit,
+     x  yhit,zhit,ebias,vmin,catchrad,sprneb,deltad,tlow,hyp_units)
       
 c     input the system force field
       
       call sysdef
      x  (lneut,lnsq,lsolva,lfree,lexcite,lswitch,lghost,idnode,keyfce,
      x  keyfld,natms,ngrp,ntpatm,ntpmls,ntpvdw,ntptbp,ntpmet,ntpfbp,
-     x  ntpter,nshels,keyshl,ntghost,dlrpot,engunit,rvdw,rcuttb,rctter,
-     x  rcutfb)
+     x  ntpter,nshels,keyshl,ntghost,keyver,dlrpot,engunit,rvdw,rcuttb,
+     x  rctter,rcutfb)
       
       if(ntpmet.gt.0.and.multt.gt.1)call error(idnode,153)
       
@@ -217,10 +219,15 @@ c     set initial system temperature
 c     read thermodynamic and structural data from restart file
       
       call sysinit
-     x  (lgofr,lzden,lsolva,lfree,lghost,idnode,imcon,keyfce,
+     x  (lgofr,lzden,lsolva,lfree,lghost,lpcos,idnode,imcon,keyfce,
      x  keyres,mxnode,natms,ntshl,nstep,numacc,numrdf,ntpatm,
      x  ntpmet,ntpvdw,nzden,chip,chit,conint,elrc,engunit,virlrc,
-     x  rvdw,volm,virtot,vircom)
+     x  rvdw,volm,virtot,vircom,tboost,chit_shl)
+      
+c     metadynamics by d. quigley
+      
+      if(lmetadyn)
+     x  call define_metadynamics(idnode,mxnode,natms,temp)
       
 c     synchronise LRC, SIC and system charge terms for switching
       
@@ -263,6 +270,10 @@ c     define target kinetic energy
       
       sigma=temp*boltz*degfre*0.5d0
       
+c     metadynamics by d. quigley
+      
+      sigma_shl=boltz*degshl*0.5d0      
+      
 c     convert BPD parameters to internal units
       
       if(lbpd)then
@@ -298,7 +309,7 @@ c     first step of minimisation programme
      x    rcut,rcutfb,rcuttb,rprim,rvdw,shlke,engcfg,temp,tstep,
      x    virang,virbnd,vircpe,virdih,virfbp,virfld,virinv,virlrc,
      x    virmet,virshl,virsrp,virtbp,virter,virtet,volm,engmet,
-     x    virtot,sigma,tolnce,engunit)
+     x    virtot,sigma,tolnce,engunit,engord,virord)
       
 c     calculate initial conditions for velocity verlet
       
@@ -329,7 +340,7 @@ c     calculate initial forces
      x    opttol,rctter,rcut,rcutfb,rcuttb,rprim,rvdw,shlke,
      x    engcfg,temp,tstep,virang,virbnd,vircpe,virdih,
      x    virfbp,virfld,virinv,virlrc,virmet,virshl,virsrp,
-     x    virtbp,virter,virtet,volm,engmet,virtot)
+     x    virtbp,virter,virtet,volm,engmet,virtot,engord,virord)
         
 c     bias potential dynamics option - reset forces
         
@@ -512,16 +523,17 @@ c     integrate equations of motion stage 1 of velocity verlet
             if(llswitch)call copy_force(idnode,mxnode)
             
             call vv_integrate
-     x        (lcnb,lshmov,lnfic,isw,idnode,mxnode,imcon,natms2,nstep,
-     x        ngrp,keyens,nscons,ntcons,ntpatm,ntfree,nspmf,ntpmf,mode,
-     x        nofic,tstep,engke,engrot,tolnce,vircon,vircom,virtot,temp,
-     x        press,volm,sigma,taut,taup,chit,chip,consv,conint,elrc,
-     x        virlrc,virpmf)
+     x      (lcnb,lshmov,lnfic,isw,idnode,mxnode,imcon,natms2,nstep,
+     x      ngrp,keyens,nscons,ntcons,ntpatm,ntfree,nspmf,ntpmf,mode,
+     x      nofic,ntshl,keyshl,tstep,engke,engrot,tolnce,vircon,vircom,
+     x      virtot,temp,press,volm,sigma,taut,taup,chit,chip,consv,
+     x      conint,elrc,virlrc,virpmf,chit_shl,sigma_shl)
+            
             if(lghost)call update_ghost(idnode,mxnode)
             
             if(lfree.or.lghost)
-     x        call lrcorrect_fre(lfree,imcon,volm,elrc,virlrc)
-            if(lsolva)call lrcorrect_sol(lghost,imcon,volm)
+     x        call lrcorrect_fre(lfree,volm,elrc,virlrc)
+            if(lsolva)call lrcorrect_sol(lghost,volm)
             
           endif
 
@@ -548,7 +560,7 @@ c     scale t=0 tether reference positions (constant pressure only)
      x      rcut,rcutfb,rcuttb,rprim,rvdw,shlke,engcfg,temp,tstep,
      x      virang,virbnd,vircpe,virdih,virfbp,virfld,virinv,virlrc,
      x      virmet,virshl,virsrp,virtbp,virter,virtet,volm,engmet,
-     x      virtot,sigma,tolnce,engunit)
+     x      virtot,sigma,tolnce,engunit,engord,virord)
         
         elseif(loptim.or.keyshl.ne.2)then
           
@@ -565,7 +577,7 @@ c     scale t=0 tether reference positions (constant pressure only)
      x      opttol,rctter,rcut,rcutfb,rcuttb,rprim,rvdw,shlke,
      x      engcfg,temp,tstep,virang,virbnd,vircpe,virdih,
      x      virfbp,virfld,virinv,virlrc,virmet,virshl,virsrp,
-     x      virtbp,virter,virtet,volm,engmet,virtot)
+     x      virtbp,virter,virtet,volm,engmet,virtot,engord,virord)
           
         else
           
@@ -581,7 +593,7 @@ c     scale t=0 tether reference positions (constant pressure only)
      x      rprim,rvdw,shlke,engcfg,temp,tstep,virang,virbnd,vircpe,
      x      virdih,virfbp,virfld,virinv,virlrc,virmet,virshl,virsrp,
      x      virtbp,virter,virtet,volm,engmet,virtot,rlxtol,pass0,
-     x      pass1,pass2)
+     x      pass1,pass2,engord,virord)
           
         endif
         
@@ -614,9 +626,9 @@ c     integrate equations of motion by velocity verlet (stage 2)
           if(.not.loptim)call vv_integrate
      x      (lcnb,lshmov,lnfic,isw,idnode,mxnode,imcon,natms2,nstep,
      x      ngrp,keyens,nscons,ntcons,ntpatm,ntfree,nspmf,ntpmf,mode,
-     x      nofic,tstep,engke,engrot,tolnce,vircon,vircom,virtot,temp,
-     x      press,volm,sigma,taut,taup,chit,chip,consv,conint,elrc,
-     x      virlrc,virpmf)
+     x      nofic,ntshl,keyshl,tstep,engke,engrot,tolnce,vircon,vircom,
+     x      virtot,temp,press,volm,sigma,taut,taup,chit,chip,consv,
+     x      conint,elrc,virlrc,virpmf,chit_shl,sigma_shl)
           
         endif
         
@@ -626,11 +638,11 @@ c     update the atomic positions for the ghost molecule
         
 c     long range correction adjustment for free energy and solvation
         
-        if(lsolva)call lrcorrect_sol(lghost,imcon,volm)
+        if(lsolva)call lrcorrect_sol(lghost,volm)
         
         if(lfree.or.lghost)
-     x    call lrcorrect_fre(lfree,imcon,volm,elrc,virlrc)
-        if(lsolva)call lrcorrect_sol(lghost,imcon,volm)
+     x    call lrcorrect_fre(lfree,volm,elrc,virlrc)
+        if(lsolva)call lrcorrect_sol(lghost,volm)
         
 c     application of transition analysis procedures
         
@@ -667,7 +679,7 @@ c     reset average boost factor in BPD during equilibration
 c     calculate shell kinetic energy
         
         if(keyshl.eq.1)then
-
+          
           call corshl(idnode,mxnode,ntshl,shlke)
           
         endif
@@ -686,6 +698,7 @@ c     apply temperature scaling
      x    mod(nstep-nsteql,nstbts).eq.0)then
           
           chit=0.d0
+          chit_shl=0.d0
           chip=0.d0
           do i=1,9
             eta(i)=0.d0
@@ -745,7 +758,8 @@ c     terminate program if boundary conditions violated
           levcfg=2
           call revive
      x      (lgofr,lzden,idnode,imcon,mxnode,natms,levcfg,nstep,nzden,
-     x      numacc,numrdf,chip,chit,conint,tstep,engcfg,virtot,vircom)
+     x      numacc,numrdf,chip,chit,conint,tstep,engcfg,virtot,vircom,
+     x      tboost,chit_shl)
           call error(idnode,95)
           
         endif
@@ -844,7 +858,8 @@ c     save restart data in event of system crash
           levcfg=2
           call revive
      x      (lgofr,lzden,idnode,imcon,mxnode,natms,levcfg,nstep,nzden,
-     x      numacc,numrdf,chip,chit,conint,tstep,engcfg,virtot,vircom)
+     x      numacc,numrdf,chip,chit,conint,tstep,engcfg,virtot,vircom,
+     x      tboost,chit_shl)
           
           if(ltad.or.lbpd)
      x      call hyper_close(ltad,idnode,mxnode,natms,nsteql)
@@ -888,7 +903,8 @@ c     produce summary of simulation
       if(.not.lneb)call result
      x  (ltad,lbpd,lgofr,lpgr,lzden,idnode,imcon,keyens,mxnode,natms,
      x  levcfg,nzden,nstep,ntpatm,numacc,numrdf,keybpd,chip,chit,
-     x  conint,rcut,tstep,engcfg,volm,virtot,vircom,zlen,tboost)
+     x  conint,rcut,tstep,engcfg,volm,virtot,vircom,zlen,tboost,
+     x  chit_shl)
       
 c     write hyperdynamics restart file
       
