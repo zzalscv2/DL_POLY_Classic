@@ -17,8 +17,8 @@ TYPE=par
 # Define object files
 
 OBJ_MOD = parse_module.o setup_module.o error_module.o \
-	site_module.o config_module.o pair_module.o \
-	utility_module.o solvation_module.o tether_module.o \
+	site_module.o config_module.o pair_module.o utility_module.o \
+	metafreeze_module.o solvation_module.o tether_module.o \
 	vdw_module.o property_module.o rigid_body_module.o \
 	angles_module.o bonds_module.o shake_module.o \
 	inversion_module.o dihedral_module.o core_shell_module.o \

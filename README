@@ -1,0 +1,20 @@
+The DL_POLY Classic README File
+
+DL_POLY Classic is a general purpose (parallel and serial)
+molecular dynamics simulation package derived from the package
+known as DL_POLY_2 (Version 20) which was originally written by
+W. Smith and T.R. Forester at Daresbury Laboratory to support the
+CCP5 project `Computer Simulation of Condensed Phases'. The terms
+under which this package is made available are given in the
+DL_POLY Classic Licence supplied with the source code.
+
+The availability of this package carries no obligation on the
+part of the authors, CCP5, the suppliers or laboratory of
+origin. In particular, no support or advice is offered. Users of
+the package are referred to the User Manual supplied.
+
+DL_POLY Classic is distinct from the packages DL_POLY_3 or
+DL_POLY_4, which are available from Daresbury Laboratory under
+DIFFERENT licence terms. Permissions granted under the DL_POLY
+Classic Licence DO NOT extend to DL_POLY_3 or DL_POLY_4.
+

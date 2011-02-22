@@ -23,8 +23,9 @@ W. Smith.
 
 Note that it is intended that this facility be used to study phase transitions
 and there is an accompanying expectation that such studies will be undertaken
-using either an NVT, NPT or N$\sigma$T ensemble. Note also that metadynamics
-simulations are currently restricted to velocity Verlet integration.
+using either an NVT, NPT or N$\sigma$T ensemble. Note also that when used
+together with shell model electrostatics the metadynamics routines revert
+to velocity Verlet integration .
 
 \section{Theory of Metadynamics}
 \index{metadynamics!theory of}
@@ -49,6 +50,7 @@ $\vek{r}^{N}$ of the atoms in system. The bias potential is time dependent in
 the sense that it can be `grown' by adding, at periodic intervals of time
 $\tau_{G}$, a Gaussian term of weight $w$ and width $\delta h$:
 \begin{equation}
+\index{metadynamics!Gaussian potential}
 V[\vek{s}^{M}(\vek{r}^{N}),t]=w\sum_{k=1}^{N_{G}}
 exp \left [\frac{-|\vek{s}^{M}(k\tau_{G})-\vek{s}^{M}(t)|^{2}}
 {2\delta h^{2}} \right ], \label{depgauss}
@@ -329,7 +331,7 @@ The recommended procedure for running metadynamics with \D{} is as follows.
 \item You {\bf must} select one of the Nos\'{e}-Hoover NVT, NPT or
       N$\sigma$T ensembles.  Metadynamics is only available for one of these
       options. The program automatically defaults to velocity Verlet 
-      integration, even if you have not selected this.
+      integration, if you use shell model electrostatics.
 \item If you wish to follow the structural changes, set the {\bf
       trajectory} option in the CONTROL file. This will produce a HISTORY file
       you can view or analyse later.
@@ -427,8 +429,8 @@ The recommended procedure for running metadynamics with \D{} is as follows.
 \item {\bf Well-tempered dynamics}. The well-tempered scheme uses a maximum
   energy criterion. A threshold energy $V_{max}$ is set above the largest
   expected energy barrier and at each step the Gaussian deposition height is
-  given by \[ w=w_{0}exp[-V_{aug}(\vek{s}^{M})/V_{max}] \] where $V_{aug}$ is the
-  system configuration energy including the bias energy. The parameters
+  given by \[ w=w_{0}exp[-V_{aug}(\vek{s}^{M})/V_{max}] \] where $V_{aug}$ is
+  the current value of the bias energy. The parameters
   $w_{0}$ and $V_{max}$ are defined by the input directives {\bf ref\_W\_aug}
   and {\bf wt\_Dt} in the CONTROL file (see above). Set {\bf hkey=2} for
   this option.

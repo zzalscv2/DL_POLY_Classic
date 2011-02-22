@@ -71,7 +71,7 @@ c     declare required modules
       logical newlst,lneut,loglnk,lnsq,lzden,lshmov,lcnb,ltad,lneb
       logical stropt,lzero,nolink,newgau,lminim,lminnow,lhit,lbpd
       logical prechk,tadall,lexcite,lsolva,lfree,lfrmas,lswitch
-      logical lghost,llswitch,lnfic,nebgo,lpcos
+      logical lghost,llswitch,lnfic,nebgo,lpsoc
       
       integer npage,lines,idnode,mxnode,memr,intsta,istraj,nsbzdn
       integer keyens,keyfce,keyres,keytrj,kmax1,kmax2,kmax3,multt
@@ -168,7 +168,7 @@ c     input the control parameters defining the simulation
       call simdef
      x  (seek,lfcap,lgofr,lnsq,loptim,lzero,lminim,lpgr,ltraj,ltscal,
      x  lzeql,lzden,nolink,newgau,lhit,lbpd,ltad,lneb,prechk,tadall,
-     x  lsolva,lfree,lfrmas,lexcite,lswitch,lghost,lnfic,nebgo,lpcos,
+     x  lsolva,lfree,lfrmas,lexcite,lswitch,lghost,lnfic,nebgo,lpsoc,
      x  idnode,minstp,intsta,istraj,keybpd,keyens,keyfce,keyres,keyver,
      x  keytrj,kmax1,kmax2,kmax3,multt,nstack,nstbgr,nsbzdn,nstbpo,
      x  nhko,nlatt,nstbts,nsteql,nstraj,nstrun,nospl,keytol,numgau,
@@ -219,7 +219,7 @@ c     set initial system temperature
 c     read thermodynamic and structural data from restart file
       
       call sysinit
-     x  (lgofr,lzden,lsolva,lfree,lghost,lpcos,idnode,imcon,keyfce,
+     x  (lgofr,lzden,lsolva,lfree,lghost,lpsoc,idnode,imcon,keyfce,
      x  keyres,mxnode,natms,ntshl,nstep,numacc,numrdf,ntpatm,
      x  ntpmet,ntpvdw,nzden,chip,chit,conint,elrc,engunit,virlrc,
      x  rvdw,volm,virtot,vircom,tboost,chit_shl)

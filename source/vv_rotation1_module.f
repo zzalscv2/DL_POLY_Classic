@@ -1315,12 +1315,14 @@ c     allocate working arrays
       newjob=.false.
 
       if(lmetadyn.and.lfirst.and.(ntshl>0))then
-         write(*,*)"Warning - Metadynamics Modification"
-         write(*,*)"========================="
-         write(*,*)"Coupling core-shell motion thermostat at 1 K"
-         lfirst=.false.
-c        use same relaxation time for global and core-shell?
-         qmass_shl=2.d0*sigma_shl*taut**2
+        if(idnode.eq.0)then
+          write(*,*)"Warning - Metadynamics Modification"
+          write(*,*)"========================="
+          write(*,*)"Coupling core-shell motion thermostat at 1 K"
+        endif
+        lfirst=.false.
+c     use same relaxation time for global and core-shell?
+        qmass_shl=2.d0*sigma_shl*taut**2
       endif
 
       if(ntcons.gt.0)then
@@ -2569,12 +2571,14 @@ c     allocate working arrays
       newjob=.false.
 
       if(lmetadyn.and.lfirst.and.(ntshl>0))then
-         write(*,*)"Warning - Metadynamics Modification"
-         write(*,*)"========================="
-         write(*,*)"Coupling core-shell motion thermostat at 1 K"
-         lfirst=.false.
-c        use same relaxation time for global and core-shell?
-         qmass_shl=2.d0*sigma_shl*taut**2
+        if(idnode.eq.0)then
+          write(*,*)"Warning - Metadynamics Modification"
+          write(*,*)"========================="
+          write(*,*)"Coupling core-shell motion thermostat at 1 K"
+        endif
+        lfirst=.false.
+c     use same relaxation time for global and core-shell?
+        qmass_shl=2.d0*sigma_shl*taut**2
       endif
       
       if(ntcons.gt.0)then
@@ -4052,12 +4056,14 @@ c     allocate working arrays
       newjob=.false.
 
       if(lmetadyn.and.lfirst.and.(ntshl>0))then
-         write(*,*)"Warning - Metadynamics Modification"
-         write(*,*)"========================="
-         write(*,*)"Coupling core-shell motion thermostat at 1 K"
-         lfirst=.false.
-c        use same relaxation time for global and core-shell?
-         qmass_shl=2.d0*sigma_shl*taut**2
+        if(idnode.eq.0)then
+          write(*,*)"Warning - Metadynamics Modification"
+          write(*,*)"========================="
+          write(*,*)"Coupling core-shell motion thermostat at 1 K"
+        endif
+        lfirst=.false.
+c     use same relaxation time for global and core-shell?
+        qmass_shl=2.d0*sigma_shl*taut**2
       endif
       
       if(ntcons.gt.0)then

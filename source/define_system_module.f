@@ -47,7 +47,7 @@ c***********************************************************************
       subroutine simdef
      x  (seek,lfcap,lgofr,lnsq,loptim,lzero,lminim,lpgr,ltraj,ltscal,
      x  lzeql,lzden,nolink,newgau,lhit,lbpd,ltad,lneb,prechk,tadall,
-     x  lsolva,lfree,lfrmas,lexcite,lswitch,lghost,lnfic,nebgo,lpcos,
+     x  lsolva,lfree,lfrmas,lexcite,lswitch,lghost,lnfic,nebgo,lpsoc,
      x  idnode,minstp,intsta,istraj,keybpd,keyens,keyfce,keyres,keyver,
      x  keytrj,kmax1,kmax2,kmax3,multt,nstack,nstbgr,nsbzdn,nstbpo,
      x  nhko,nlatt,nstbts,nsteql,nstraj,nstrun,nospl,keytol,numgau,
@@ -78,7 +78,7 @@ c***********************************************************************
       character*8 cunit,seek
       character*1 hms
       character*1 directive(lenrec)
-      logical lsolva,lfree,lfrmas,lexcite,lswitch,lghost,lnfic,lpcos
+      logical lsolva,lfree,lfrmas,lexcite,lswitch,lghost,lnfic,lpsoc
       logical ltscal,lzeql,loptim,ltraj,lfcap,lgofr,lpgr,lpres,safe
       logical lstep,ltemp,lcut,ldelr,lprim,lforc,lens,lvdw,lrvdw,kill
       logical lnsq,lzden,lewald,lspme,lhke,loop,lzero,nolink,newgau
@@ -188,7 +188,7 @@ c     temp scaling interval
       lneb=.false.
       loop=.true.
       lnfic=.false.
-      lpcos=.false.
+      lpsoc=.false.
       lzero=.false.
       ltscal=.false.
       lewald=.false.
@@ -297,13 +297,13 @@ c     cancel possible "flying ice cube" in Berendsen thermostats
           lnfic=.true.
           nofic=intstr(directive,lenrec,idum)
           
-        elseif(findstring('cores',directive,idum).and.
+        elseif(findstring('shells',directive,idum).and.
      x      findstring('on',directive,idum).and.
-     x      findstring('shells',directive,idum))then
+     x      findstring('cores',directive,idum))then
           
-c     put cores on shells at start - shell model only (else null)
+c     put shells on cores at start - shell model only (else null)
           
-          lpcos=.true.
+          lpsoc=.true.
           
         elseif(findstring('densvar',directive,idum))then
           
@@ -2139,7 +2139,7 @@ c     error exit for config file read
       end subroutine sysgen
       
       subroutine sysinit
-     x  (lgofr,lzden,lsolva,lfree,lghost,lpcos,idnode,imcon,keyfce,
+     x  (lgofr,lzden,lsolva,lfree,lghost,lpsoc,idnode,imcon,keyfce,
      x  keyres,mxnode,natms,ntshl,nstep,numacc,numrdf,ntpatm,
      x  ntpmet,ntpvdw,nzden,chip,chit,conint,elrc,engunit,virlrc,
      x  rvdw,volm,virtot,vircom,tboost,chit_shl)
@@ -2158,7 +2158,7 @@ c***********************************************************************
       
       implicit none
       
-      logical lgofr,lzden,lfree,lsolva,lghost,lpcos
+      logical lgofr,lzden,lfree,lsolva,lghost,lpsoc
       integer idnode,imcon,keyfce,keyres,mxnode,natms,nstep,numacc
       integer numrdf,ntpatm,nzden,i,j,k,ntpmet,ntshl,ntpvdw
       real(8) chip,chit,conint,elrc,engunit,virlrc,rvdw,volm
@@ -2283,7 +2283,7 @@ c     initialise accumulator arrays
       
 c     put shells on cores at start
       
-      if(lpcos.and.keyres.ne.1.and.ntshl.gt.0)
+      if(lpsoc.and.keyres.ne.1.and.ntshl.gt.0)
      x  call put_shells_on_cores(idnode,mxnode,ntshl)
       
 c     if restart then broadcast stored variables via a global sum

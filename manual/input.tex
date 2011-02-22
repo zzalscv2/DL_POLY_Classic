@@ -241,6 +241,7 @@ position, with: \\
 \> \> (for multiple timestep\index{algorithm!multiple timestep} algorithm only)\\
 \>{\bf print} {\em n} \> Print system data every {\em n} timesteps \\
 \>{\bf print rdf} \> Print radial distribution functions \\
+\>{\bf put shells on cores} \> Superimpose electrostatic shells and cores at start\\
 \>{\bf quaternion} {\em f} \> Set quaternion\index{quaternions} tolerance to  {\em f}
  (default 10$^{-8}$)\\
 \>{\bf rdf} {\em n w}\> Calculate radial distribution functions with:\\
@@ -456,6 +457,9 @@ only}).
   from the system kinetic energy to the centre-of-mass momentum, resulting in
   a zero Kelvin structure with a net linear momentum. This option removes the
   COM momentum at user selected intervals.
+\item The {\bf put shells on cores} directive ensures that associated cores
+  and shells start the simulation at exactly the same place. It is not usual
+  to do this however.
 \end{enumerate}
 
 \begin{table}[ht]
@@ -1255,6 +1259,8 @@ $\\
 {\bf plan} & Planar & $A$ &  & $U(\phi)= A \left [ 1 - \cos (\phi)\right] 
 $\\
 & & & & \\
+{\bf calc} & Calcite & $A$ & $B$  & $U(u)= Au^{2}+Bu^{4}$ \\
+& & & & \\
 \hline
 \multicolumn{5}{l}{\ddag $\phi$ is the inversion angle\index{potential!inversion}.}\\
 \multicolumn{5}{c}{~}\\
@@ -1262,7 +1268,8 @@ $\\
 
 \end{centering}
 \end{table}
-
+Note that the calcite potential is not dependent on an angle $\phi$, but on a
+{\em displacement} $u$. See section \ref{calcite} for details.
 \item{\bf rigid {\em n}}\\
 where {\em n} is the number of rigid units in the molecule. It is 
 followed by at least {\em n} records, each specifying the sites in a rigid
