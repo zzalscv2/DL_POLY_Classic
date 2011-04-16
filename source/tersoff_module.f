@@ -270,12 +270,12 @@ c     start processing double atom potential parameters
 
 c     generate tersoff interpolation arrays
 
-      call tergen(ntpter,rctter)
+      call tergen(ntpatm,rctter)
 
       return
       end subroutine define_tersoff
 
-      subroutine tergen(ntpter,rctter)
+      subroutine tergen(ntpatm,rctter)
 
 c***********************************************************************
 c     
@@ -292,7 +292,7 @@ c***********************************************************************
       
       implicit none
 
-      integer ntpter,katm0,katm1,ipt,jpt,kpt,i
+      integer ntpatm,katm0,katm1,ipt,jpt,kpt,i
       real(8) dlrpot,rctter,baij,saij,bbij,sbij,rij,sij,att,arg
       real(8) rrr,rep
       
@@ -302,82 +302,92 @@ c     define grid resolution for potential arrays
 
 c     construct arrays for all types of short ranged  potential
       
-      do katm0=1,ntpter
+      do katm0=1,ntpatm
 
-        do katm1=1,katm0
-        
-          if((ltpter(katm0).eq.1).and.(ltpter(katm1).eq.1))then
-
-            ipt=lstter(katm0)
-            jpt=lstter(katm1)
-            kpt=loc2(ipt,jpt)
-
+        if(filter(katm0))then
+          
+          ipt=lstter(katm0)
+          
+          do katm1=1,katm0
+            
+            if(filter(katm1))then
+              
+              jpt=lstter(katm1)
+              
+              if((ltpter(ipt).eq.1).and.(ltpter(jpt).eq.1))then
+                
+                kpt=loc2(ipt,jpt)
+                
 c     define tersoff parameters
-
-            baij=sqrt(prmter(ipt,1)*prmter(jpt,1))
-            saij=0.5d0*(prmter(ipt,2)+prmter(jpt,2))
-            bbij=sqrt(prmter(ipt,3)*prmter(jpt,3))
-            sbij=0.5d0*(prmter(ipt,4)+prmter(jpt,4))
-            rij=sqrt(prmter(ipt,5)*prmter(jpt,5))
-            sij=sqrt(prmter(ipt,6)*prmter(jpt,6))
-          
+                
+                baij=sqrt(prmter(ipt,1)*prmter(jpt,1))
+                saij=0.5d0*(prmter(ipt,2)+prmter(jpt,2))
+                bbij=sqrt(prmter(ipt,3)*prmter(jpt,3))
+                sbij=0.5d0*(prmter(ipt,4)+prmter(jpt,4))
+                rij=sqrt(prmter(ipt,5)*prmter(jpt,5))
+                sij=sqrt(prmter(ipt,6)*prmter(jpt,6))
+                
 c     store potential cutoff
-
-            vmbp(1,kpt,1)=sij
-
+                
+                vmbp(1,kpt,1)=sij
+                
 c     calculate screening function
-
-            do i=2,mxgrid
-            
-              rrr=dble(i)*dlrpot
-              
-              if(rrr.le.rij)then
-
-                vmbp(i,kpt,1)=1.d0
-                gmbp(i,kpt,1)=0.d0
-
-              else
-
-                arg=pi*(rrr-rij)/(sij-rij)
-                vmbp(i,kpt,1)=0.5d0*(1.d0+cos(arg))
-                gmbp(i,kpt,1)=0.5d0*pi*rrr*sin(arg)/(sij-rij)
-            
-              endif
-
-            enddo
-
+                
+                do i=2,mxgrid
+                  
+                  rrr=dble(i)*dlrpot
+                  
+                  if(rrr.le.rij)then
+                    
+                    vmbp(i,kpt,1)=1.d0
+                    gmbp(i,kpt,1)=0.d0
+                    
+                  else
+                    
+                    arg=pi*(rrr-rij)/(sij-rij)
+                    vmbp(i,kpt,1)=0.5d0*(1.d0+cos(arg))
+                    gmbp(i,kpt,1)=0.5d0*pi*rrr*sin(arg)/(sij-rij)
+                    
+                  endif
+                  
+                enddo
+                
 c     calculate screened repulsion function
-
-            do i=2,mxgrid
-
-              rrr=dble(i)*dlrpot
-
-              rep=baij*exp(-saij*rrr)
-              vmbp(i,kpt,2)=rep*vmbp(i,kpt,1)
-              gmbp(i,kpt,2)=rep*(gmbp(i,kpt,1)+
-     x          saij*rrr*vmbp(i,kpt,1))
-
-            enddo
-
+                
+                do i=2,mxgrid
+                  
+                  rrr=dble(i)*dlrpot
+                  
+                  rep=baij*exp(-saij*rrr)
+                  vmbp(i,kpt,2)=rep*vmbp(i,kpt,1)
+                  gmbp(i,kpt,2)=rep*(gmbp(i,kpt,1)+
+     x              saij*rrr*vmbp(i,kpt,1))
+                  
+                enddo
+                
 c     calculate screened attraction function
-
-            do i=2,mxgrid
+                
+                do i=2,mxgrid
+                  
+                  rrr=dble(i)*dlrpot
+                  
+                  att=bbij*exp(-sbij*rrr)
+                  vmbp(i,kpt,3)=att*vmbp(i,kpt,1)
+                  gmbp(i,kpt,3)=att*(gmbp(i,kpt,1)+
+     x              sbij*rrr*vmbp(i,kpt,1))
+                  
+                enddo
+                
+              endif
               
-              rrr=dble(i)*dlrpot
-              
-              att=bbij*exp(-sbij*rrr)
-              vmbp(i,kpt,3)=att*vmbp(i,kpt,1)
-              gmbp(i,kpt,3)=att*(gmbp(i,kpt,1)+
-     x          sbij*rrr*vmbp(i,kpt,1))
-              
-            enddo
+            endif
             
-          endif
+          enddo
           
-        enddo
-
+        endif
+        
       enddo
-      
+          
       return
       end subroutine tergen
 
