@@ -51,8 +51,8 @@ c     allocate data arrays
 c     update counter
         
         count=count+1
-        fac1=1.d0/dble(count)
-        fac2=dble(count-1)/dble(count)
+        fac2=1.d0/dble(count)
+        fac1=dble(count-1)/dble(count)
         
 c     read data records
         
