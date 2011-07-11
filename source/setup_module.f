@@ -151,7 +151,7 @@ c     array allocation parameters (set by subroutine parset)
       
       contains
       
-      subroutine parset(idnode,mxnode,buffer)
+      subroutine parset(redirect,idnode,mxnode,buffer)
       
 c***********************************************************************
 c     
@@ -164,7 +164,7 @@ c
 c***********************************************************************
       
       logical loglnk,lewald,lspme,lhke,nolink,lcshft
-      logical lsolva,lfree,lfrmas,lghost
+      logical lsolva,lfree,lfrmas,lghost,redirect
       real(8) cell,celprp,rctbp,rcfbp,volm,xhi,yhi,zhi,rcut,rvdw
       real(8) densvar,delr,cut,dens,ratio,drdf,dzdn,rcter,buffer
       real(8) zlen
@@ -178,6 +178,7 @@ c***********************************************************************
       lewald=.false.
       lcshft=.false.
       nolink=.false.
+      redirect=.false.
       mxtmls_sol=1
       mxebuf_sol=1
       mxatms_sol=1
@@ -205,8 +206,8 @@ c     scan CONFIG file data
 c     scan CONTROL file data
       
       call conscan
-     x  (lewald,lspme,lhke,nolink,lcshft,lsolva,lfree,lfrmas,lghost,
-     x  idnode,imcon,nhko,rcut,rvdw,delr,densvar,drdf,dzdn,
+     x  (redirect,lewald,lspme,lhke,nolink,lcshft,lsolva,lfree,lfrmas,
+     x  lghost,idnode,imcon,nhko,rcut,rvdw,delr,densvar,drdf,dzdn,
      x  zlen,cell)
       
 c     set dimension of working coordinate arrays
@@ -1229,8 +1230,8 @@ c     specify molecular dynamics simulation cell
       end subroutine cfgscan
       
       subroutine conscan
-     x  (lewald,lspme,lhke,nolink,lcshft,lsolva,lfree,lfrmas,lghost,
-     x  idnode,imcon,nhko,rcut,rvdw,delr,densvar,drdf,dzdn,
+     x  (redirect,lewald,lspme,lhke,nolink,lcshft,lsolva,lfree,lfrmas,
+     x  lghost,idnode,imcon,nhko,rcut,rvdw,delr,densvar,drdf,dzdn,
      x  zlen,cell)
       
 c***********************************************************************
@@ -1243,7 +1244,7 @@ c
 c***********************************************************************
       
       logical safe,lewald,lspme,lhke,peek,nolink,lcshft,lmetad
-      logical lsolva,lfree,lfrmas,lghost
+      logical lsolva,lfree,lfrmas,lghost,redirect
       real(8) cell,celprp,rcut,rvdw,delr,eps,alpha,fac,tol,tol1
       real(8) densvar,drdf,dzdn,zlen
       integer nhko,idnode,imcon,idum,jmp
@@ -1276,6 +1277,7 @@ c***********************************************************************
       lfrmas=.false.
       lsolva=.false.
       lmetad=.false.
+      redirect=.false.
       
 c     open the simulation input file
       
@@ -1308,6 +1310,10 @@ c     open the simulation input file
               call lowcase(record,lenrec)
               lmetad=.not.findstring('endmet',record,idum)
             enddo
+            
+          elseif(findstring('redirect',record,idum))then
+            
+            redirect=.true.
             
           elseif(findstring('densvar',record,idum))then
             

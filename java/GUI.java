@@ -380,6 +380,8 @@ author    - w.smith 2003
 	itemGAm.addActionListener(new GUIMenuHandler());
 	itemGAn.addActionListener(new GUIMenuHandler());
 	itemGAo.addActionListener(new GUIMenuHandler());
+	itemGAp.addActionListener(new GUIMenuHandler());
+	itemGAq.addActionListener(new GUIMenuHandler());
 	itemGBa.addActionListener(new GUIMenuHandler());
 	itemGBb.addActionListener(new GUIMenuHandler());
 	itemGBc.addActionListener(new GUIMenuHandler());

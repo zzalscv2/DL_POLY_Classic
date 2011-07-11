@@ -264,6 +264,11 @@ c     convert to lowercase and strip out leading blanks
 c     record is commented out
           cycle
           
+        elseif(findstring('redirect',directive,idum))then
+          
+c     ignore this option in this context
+          cycle
+          
         elseif(findstring('steps',directive,idum))then
           
 c     number of timesteps

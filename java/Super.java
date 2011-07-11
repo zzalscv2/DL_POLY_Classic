@@ -623,11 +623,9 @@ author    - w.smith 2001
 			if((imcon==4 && (Math.abs(ssx)+Math.abs(ssy)+Math.abs(ssz) >= 0.75)) ||
 			   (imcon==5 && (Math.abs(ssx)+Math.abs(ssy)+Math.abs(2.0*ssz) >= 1.0)))
 			    {
-				if(imcon==5)ssz*=RT2;
 				ssx-=0.5*BML.sign(ssx);
 				ssy-=0.5*BML.sign(ssy);
 				ssz-=0.5*BML.sign(ssz);
-				if(imcon==5)ssz/=RT2;
 			    }
 		    }
 		
@@ -673,11 +671,9 @@ author    - w.smith 2001
 				if((imcon==4 && (Math.abs(ssx)+Math.abs(ssy)+Math.abs(ssz) >= 0.75)) ||
 				   (imcon==5 && (Math.abs(ssx)+Math.abs(ssy)+Math.abs(2.0*ssz) >= 1.0)))
 				    {
-					if(imcon==5)ssz*=RT2;
 					ssx-=0.5*BML.sign(ssx);
 					ssy-=0.5*BML.sign(ssy);
 					ssz-=0.5*BML.sign(ssz);
-					if(imcon==5)ssz/=RT2;
 				    }
 			    }
 

@@ -1679,8 +1679,11 @@ author    - w.smith 2002
 	hyb=0;
 	val=0;
 	str=config.atoms[k].zsym;
-	stick=config.atoms[k].zrad+(new Element("H_")).zrad;
-
+	if(str.indexOf("OW") >= 0)
+	    stick=config.atoms[k].zrad+(new Element("HW")).zrad;
+	else
+	    stick=config.atoms[k].zrad+(new Element("H_")).zrad;
+	
 	if(str.indexOf("C_1") >= 0)
 	    {
 		hyb=1;
@@ -3009,7 +3012,9 @@ author    - w.smith 2002
 					angle[0][n]=bond[j][i];
 					angle[1][n]=m;
 					angle[2][n]=bond[k][i];
-					if(config.atoms[m].zsym.charAt(2) == '3')
+					if(config.atoms[m].zsym.charAt(1) == 'W')
+					    angcon[n]=-1.0/3.0;
+					else if(config.atoms[m].zsym.charAt(2) == '3')
 					    angcon[n]=-1.0/3.0;
 					else if(config.atoms[m].zsym.charAt(2) == '2')
 					    angcon[n]=-1.0/2.0;
@@ -3177,6 +3182,7 @@ author    - w.smith 2000
 			config.cell[0]=10;
 			config.cell[4]=10;
 			config.cell[8]=10;
+			if(boxtyp==5) config.cell[8]=10*Math.sqrt(2.0);
 			config.setBox();
 			safe=false;
 		    }

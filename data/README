@@ -47,6 +47,8 @@ TEST34 - Simulation of liquid DMSO with energy decomposition.
 TEST35 - Free energy difference of DMSO and DMSO* in DMSO as solvent.
 TEST36 - Solvent shift calculation for DMSO* in DMSO solvent.
 TEST37 - Solvent relaxation (switch) calculation for DMSO*/DMSO.
+TEST38 - Metadynamics of freezing of TIP4P water. 512 molecules.
+TEST39 - Metadynamics of calcite nanoparticle in water. 2984 atoms.
 
 If you wish to run them with your compiled version of DL_POLY
 you should copy the required input files CONTROL, FIELD, 

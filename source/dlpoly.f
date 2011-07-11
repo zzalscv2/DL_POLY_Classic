@@ -71,7 +71,7 @@ c     declare required modules
       logical newlst,lneut,loglnk,lnsq,lzden,lshmov,lcnb,ltad,lneb
       logical stropt,lzero,nolink,newgau,lminim,lminnow,lhit,lbpd
       logical prechk,tadall,lexcite,lsolva,lfree,lfrmas,lswitch
-      logical lghost,llswitch,lnfic,nebgo,lpsoc
+      logical lghost,llswitch,lnfic,nebgo,lpsoc,redirect
       
       integer npage,lines,idnode,mxnode,memr,intsta,istraj,nsbzdn
       integer keyens,keyfce,keyres,keytrj,kmax1,kmax2,kmax3,multt
@@ -113,22 +113,22 @@ c     set up the communications
 c     determine processor identities
       
       call machine(idnode,mxnode)
-      
-c     open main printing file
-      
-      if(idnode.eq.0)open(nrite,file='OUTPUT')
-      if(idnode.eq.0) write (nrite,
-     x  "(/,20x,'DL_POLY Classic 1.2',
-     x  /,/,30x,'Running on ',i4,' nodes',/,/)") mxnode
-      
+            
 c     activate for limited-life executable
       
 CBOMB      call bomb(idnode,2008,6,30)
       
       allocate (tbuffer(10),stat=memr)
       
-      call parset(idnode,mxnode,tbuffer)
+      call parset(redirect,idnode,mxnode,tbuffer)
       
+c     open main printing file
+      
+      if(.not.redirect.and.idnode.eq.0)open(nrite,file='OUTPUT')
+      if(idnode.eq.0) write (nrite,
+     x  "(/,20x,'DL_POLY Classic 1.2',
+     x  /,/,30x,'Running on ',i4,' nodes',/,/)") mxnode
+
 c     allocate arrays for each function
       
       call alloc_ang_arrays(idnode)

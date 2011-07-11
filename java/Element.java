@@ -56,7 +56,7 @@ author    - w.smith 2000
 		    {
 			znum=1;
 			zmas=1.00797;
-			zrad=0.37;
+			zrad=0.32;
 			zcol=Color.white;
 		    }
 		else if(zsym.indexOf("He") == 0)
@@ -255,7 +255,7 @@ author    - w.smith 2000
 		    {
 			znum=8;
 			zmas=15.9994;
-			zrad=0.74;
+			zrad=0.64;
 			zcol=Color.red;
 		    }
 		else if(zsym.indexOf("Os") == 0)
