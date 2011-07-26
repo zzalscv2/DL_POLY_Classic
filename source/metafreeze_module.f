@@ -610,7 +610,7 @@ c     Allocate the driven list. Modifications elsewhere in DLPOLY always
 c     check if sites are driven (for accumulation of local PE) and hence
 c     this should be allocated if this is a metadynamics run or not.
       
-      allocate(driven(1:size(sitnam)),stat=ierr(1))
+      allocate(driven(1:size(unqatm)),stat=ierr(1))
       if (ierr(1)/=0) call Mfrz_Error(2505,0.d0)
       driven = .false.
       
@@ -631,8 +631,8 @@ cc$$$    if (onroot) write(0,'("================================")')
 cc$$$    if (onroot) write(0,'("Available sites from site module")')
 cc$$$    if (onroot) write(0,'("================================")')
 cc$$$    if (onroot) then
-cc$$$       do isite = 1,size(sitnam)
-cc$$$          write(0,'("Site index ",i4,": ",a8)')isite,sitnam(isite)
+cc$$$       do isite = 1,size(unqatm)
+cc$$$          write(0,'("Site index ",i4,": ",a8)')isite,unqatm(isite)
 cc$$$       end do
 cc$$$    end if
     
@@ -749,15 +749,15 @@ c     Open STEINHARDT file and process
 c     Create array indicating which site-site connections use
 c     which set of q4 cut-offs, scaling factors and num neighbours.
        
-       allocate(q4site(1:size(sitnam),1:size(sitnam)),stat=ierr(1))
+       allocate(q4site(1:size(unqatm),1:size(unqatm)),stat=ierr(1))
        if (ierr(1)/=0) call Mfrz_Error(2517,0.d0)
        q4site(:,:) = 0
        
-       do isite = 1,size(sitnam)
-         do jsite = isite,size(sitnam)
+       do isite = 1,size(unqatm)
+         do jsite = isite,size(unqatm)
            do iq = 1,nq4
-             if ((q4label(1,iq)==sitnam(isite)).and.
-     x         q4label(2,iq)==sitnam(jsite)) then
+             if ((q4label(1,iq)==unqatm(isite)).and.
+     x         q4label(2,iq)==unqatm(jsite)) then
                q4site(jsite,isite) = iq
                q4site(isite,jsite) = iq
                driven(jsite) = .true.
@@ -767,14 +767,14 @@ c     which set of q4 cut-offs, scaling factors and num neighbours.
          end do
        end do
        
-       allocate(q6site(1:size(sitnam),1:size(sitnam)),stat=ierr(1))
+       allocate(q6site(1:size(unqatm),1:size(unqatm)),stat=ierr(1))
        if (ierr(1)/=0) call Mfrz_Error(2518,0.d0)
        q6site(:,:) = 0
-       do isite = 1,size(sitnam)
-         do jsite = isite,size(sitnam)
+       do isite = 1,size(unqatm)
+         do jsite = isite,size(unqatm)
            do iq = 1,nq6
-             if ((q6label(1,iq)==sitnam(isite)).and.
-     x         q6label(2,iq)==sitnam(jsite)) then
+             if ((q6label(1,iq)==unqatm(isite)).and.
+     x         q6label(2,iq)==unqatm(jsite)) then
                q6site(jsite,isite) = iq
                q6site(isite,jsite) = iq
                driven(jsite) = .true.
@@ -797,10 +797,10 @@ c     Count number of included sites
          isite = ltype(iatm)
          
          do iq = 1,nq4
-           if (sitnam(isite)==q4label(1,iq)) q4ninc(iq) = q4ninc(iq) + 1
+           if (unqatm(isite)==q4label(1,iq)) q4ninc(iq) = q4ninc(iq) + 1
          end do
          do iq = 1,nq6
-           if (sitnam(isite)==q6label(1,iq)) q6ninc(iq) = q6ninc(iq) + 1
+           if (unqatm(isite)==q6label(1,iq)) q6ninc(iq) = q6ninc(iq) + 1
          end do
          
        end do
@@ -870,13 +870,13 @@ c     Open ZETA file and process
 c     Create array indicating which site-site connections use
 c     which set of q4 cut-offs, scaling factors and num neighbours.
         
-        allocate(zetasite(1:size(sitnam)),stat=ierr(1))
+        allocate(zetasite(1:size(unqatm)),stat=ierr(1))
         if (ierr(1)/=0) call Mfrz_Error(2524,0.d0)
         zetasite(:) = 0
         
-        do isite = 1,size(sitnam)
+        do isite = 1,size(unqatm)
           do iq = 1,ntet
-            if (zetalabel(iq)==sitnam(isite)) then
+            if (zetalabel(iq)==unqatm(isite)) then
               zetasite(isite) = iq
               driven(isite) = .true.
             end if
@@ -895,7 +895,7 @@ c     Count number of included sites
           isite = ltype(iatm)
           
           do iq = 1,ntet
-            if (sitnam(isite)==zetalabel(iq)) 
+            if (unqatm(isite)==zetalabel(iq)) 
      x        zetaninc(iq) = zetaninc(iq) + 1
           end do
         end do
