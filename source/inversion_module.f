@@ -337,7 +337,7 @@ c     calculate vector normal to plane
           uux=yac*zad-zac*yad
           uuy=zac*xad-xac*zad
           uuz=xac*yad-yac*xad
-          uun=1.d0/sqrt(ubx**2+uby**2+ubz**2)
+          uun=1.d0/sqrt(uux**2+uuy**2+uuz**2)
           uux=uun*uux
           uuy=uun*uuy
           uuz=uun*uuz
