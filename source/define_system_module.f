@@ -592,7 +592,8 @@ c     activate temperature accelerated dynamics option
           call solvation_option
      x      (directive,lsolva,idnode,nsolva,isolva)
           
-        elseif(findstring('metafreeze',directive,idum))then
+        elseif(findstring('metafreeze',directive,idum).or.
+     x      findstring('metadyn',directive,idum))then
           
 c     activate metadynamics option - d. quigley
           
