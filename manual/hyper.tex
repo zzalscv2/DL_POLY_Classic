@@ -425,8 +425,8 @@ CONFIG structure for the BPD simulation.
        e.g. \newline {\bf neb\_spring} 1000.0 (for DL\_POLY units).
        This parameter is not required if the {\bf noneb} flag has been set.
 \item Select a minimisation option.  e.g. 
-      \newline {\bf force} {\em key tol}.\newline 
-      Where {\em key} is one of {\em force, energy, position} and {\em
+      \newline {\bf keyword} {\em tol}.\newline 
+      Where {\bf keyword} is one of {\bf force, energy, position} and {\em
       tol} is the convergence tolerance.
       (The recommended choice is {\em force} with a tolerance 
       of 1.0 in DL\_POLY units.)
@@ -1338,14 +1338,14 @@ chosen energy units per Angstrom.
 \item Next set the NEB spring constant (in specified energy units per $\AA^2$). 
 e.g. \newline {\bf neb\_spring} 1000.0 (in DL\_POLY units).
 \item Select a minimisation option.  e.g. 
-\newline {\bf force} {\em key tol}.\newline 
-Where {\em key} is one of {\em force, energy, position} and {\em
+\newline {\bf keyword} {\em tol}.\newline 
+Where {\bf keyword} is one of {\bf force, energy, position} and {\em
 tol} is the convergence tolerance.
 \item Close the NEB definition with the directive \newline
 {\bf endneb}
 \end{enumerate}
 
-\subsection{Things to Aware of when Running a NEB Calculation}
+\subsection{Things to be Aware of when Running a NEB Calculation}
 
 \begin{enumerate}
 \item Note that the NEB calculation assumes that the basin files for
