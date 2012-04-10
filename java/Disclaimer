@@ -1,7 +1,9 @@
-None of the authors, nor any of the organisations STFC, EPSRC,
-CCP5 nor any contributor to the DL_POLY Classic package or its
-derivatives guarantee that the software and associated
-documentation is free from error.  Neither do they accept
-responsibility for any loss or damage that results from its
-use. The responsibility for ensuring that the software is fit for
-purpose lies entirely with the user. 
+None of the organisations STFC, EPSRC, NERC, CCP5 nor any of the
+authors of the DL_POLY package or any of its derivatives guarantee
+that the package is free from error.  Neither do they accept any
+responsibility for any loss or damage that results from its use.  Use
+of these packages without charge is confined to academic research
+only.  Commercial use is only permissible following negotiation with
+Daresbury Laboratory.  Users are not entitled to redistribute any of
+the DL_POLY software to third parties without the expressed permission
+of Daresbury Laboratory.
