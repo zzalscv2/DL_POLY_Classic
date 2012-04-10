@@ -21,7 +21,7 @@ c
 c     authors: w.smith and t.r.forester 1995
 c     copyright daresbury laboratory 1995
 c     
-c                       DL_POLY CLASSIC VERSION 1.8
+c                       DL_POLY CLASSIC VERSION 1.9
 c
 c***********************************************************************
       
@@ -126,7 +126,7 @@ c     open main printing file
       
       if(.not.redirect.and.idnode.eq.0)open(nrite,file='OUTPUT')
       if(idnode.eq.0) write (nrite,
-     x  "(/,20x,'DL_POLY Classic 1.8',
+     x  "(/,20x,'DL_POLY Classic 1.9',
      x  /,/,30x,'Running on ',i4,' nodes',/,/)") mxnode
 
 c     allocate arrays for each function
