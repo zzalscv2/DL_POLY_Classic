@@ -13,15 +13,22 @@ import java.util.*;
 abstract class Basic extends JFrame {
         /*
 *********************************************************************
-         
+
 main dl_poly/java GUI super class
-         
+
 copyright - daresbury laboratory
 author    - w.smith 2006
-         
+
 *********************************************************************
          */
-    
+
+/* Set DLPC=true to enable DLPC features such as
+   Bias Potential Hyper-Dynamics, Temperature Accelerated Dynamics,
+   Nudged Elastic band, Solvation tools and Meta-Dynamics
+   
+   Set DLP4=true to enable DLP4 features such as
+   Radiation Damage */
+
     public static final boolean DLPC=true;
     public static final boolean DLP4=true;
     public static final int TILEX=500;
@@ -124,17 +131,17 @@ author    - w.smith 2006
     public static String fname=null;
     public GuiFileFilter mf;
     public JFileChooser fc;
-    
+
     void fix(Component cmp,GridBagLayout grd,GridBagConstraints gbc,
     int gx,int gy,int gw,int gh,int wx,int wy) {
         /*
 *********************************************************************
-         
+
 dl_poly/java GUI routine
-         
+
 copyright - daresbury laboratory
 author    - w.smith 2000
-         
+
 *********************************************************************
          */
         gbc.gridx=gx;
@@ -148,17 +155,17 @@ author    - w.smith 2000
         grd.setConstraints(cmp,gbc);
         getContentPane().add(cmp);
     }
-    
+
     void fix(Component cmp,GridBagLayout grd,GridBagConstraints gbc,int gx, int gy,
     int gw, int gh) {
         /*
 *********************************************************************
-         
+
 dl_poly/java GUI routine
-         
+
 copyright - daresbury laboratory
 author    - w.smith 2000
-         
+
 *********************************************************************
          */
         gbc.gridx=gx;
@@ -170,20 +177,20 @@ author    - w.smith 2000
         gbc.ipady=2;
         getContentPane().add(cmp);
     }
-    
+
     boolean copyFile(String aname,String bname) {
         /*
 *********************************************************************
-         
+
 dl_poly/java routine to copy formatted DL_POLY files
-         
+
 copyright - daresbury laboratory
 author    - w.smith february 2001
-         
+
 *********************************************************************
          */
         String record="";
-        
+
         try {
             LineNumberReader lnr = new LineNumberReader(new FileReader(aname));
             DataOutputStream out = new DataOutputStream(new FileOutputStream(bname));
@@ -207,16 +214,16 @@ author    - w.smith february 2001
         }
         return true;
     }
-    
+
     boolean copyData(String aname,String bname) {
         /*
 *********************************************************************
-         
+
 dl_poly/java routine to copy unformatted DL_POLY files
-         
+
 copyright - daresbury laboratory
 author    - w.smith february 2001
-         
+
 *********************************************************************
          */
         DataInputStream fdi=null;
@@ -241,16 +248,16 @@ author    - w.smith february 2001
         }
         return true;
     }
-    
+
     int putXY(String fname,String header[],int nhead,int npnts,double xx[],double yy[]) {
         /*
 *********************************************************************
-         
+
 dl_poly/java routine to write a simple XY file
-         
+
 copyright - daresbury laboratory
 author    - w.smith february 2001
-         
+
 *********************************************************************
          */
         try {
@@ -268,30 +275,30 @@ author    - w.smith february 2001
         }
         return 0;
     }
-    
+
     void clearScreen() {
         /*
 *********************************************************************
-         
+
 dl_poly/java GUI routine
-         
+
 copyright - daresbury laboratory
 author    - w.smith 2000
-         
+
 *********************************************************************
          */
         board.setText("");
     }
-    
+
     static void println(String s) {
         /*
 *********************************************************************
-         
+
 dl_poly/java GUI routine
-         
+
 copyright - daresbury laboratory
 author    - w.smith 2000
-         
+
 *********************************************************************
          */
         try {
@@ -302,16 +309,16 @@ author    - w.smith 2000
             System.out.println(s);
         }
     }
-    
+
     static void print(String s) {
         /*
 *********************************************************************
-         
+
 dl_poly/java GUI routine
-         
+
 copyright - daresbury laboratory
 author    - w.smith 2000
-         
+
 *********************************************************************
          */
         try {
@@ -321,7 +328,7 @@ author    - w.smith 2000
             System.out.println(s);
         }
     }
-    
+
     void draggedResponse(int a,int b){}
     JMenu MyMenu(String s) {
         JMenu  mine = new JMenu(s);
@@ -338,21 +345,21 @@ author    - w.smith 2000
         mine.setBackground(art.back);
         return mine;
     }
-    
+
     void getViewFile(GUI home) {
         /*
 *********************************************************************
-         
+
 dl_poly/java GUI routine
-         
+
 copyright - daresbury laboratory
 author    - w.smith 2000
-         
+
 *********************************************************************
          */
-        
+
         // View a text file
-        
+
         JFileChooser fc = new JFileChooser(new File("./"));
         fc.setDialogTitle("Select file for viewing");
         fc.setForeground(art.fore);
@@ -369,16 +376,16 @@ author    - w.smith 2000
             println("Error - file viewer failure");
         }
     }
-    
+
     static String selectFileNameBegins(GUI home,String filter) {
         /*
 *********************************************************************
-         
+
 dl_poly/java GUI routine
-         
+
 copyright - daresbury laboratory
 author    - w.smith 2003
-         
+
 *********************************************************************
          */
         String filename=null;
@@ -400,16 +407,16 @@ author    - w.smith 2003
         }
         return filename;
     }
-    
+
     static String selectFileNameContains(GUI home,String filter) {
         /*
 *********************************************************************
-         
+
 dl_poly/java GUI routine
-         
+
 copyright - daresbury laboratory
 author    - w.smith 2003
-         
+
 *********************************************************************
          */
         String filename=null;
@@ -431,16 +438,16 @@ author    - w.smith 2003
         }
         return filename;
     }
-    
+
     static String selectFileNameEnds(GUI home,String filter) {
         /*
 *********************************************************************
-         
+
 dl_poly/java GUI routine
-         
+
 copyright - daresbury laboratory
 author    - w.smith 2003
-         
+
 *********************************************************************
          */
         String filename=null;
@@ -462,20 +469,20 @@ author    - w.smith 2003
         }
         return filename;
     }
-    
+
     void viewResource(String fileName) {
         /*
 *********************************************************************
-         
+
 dl_poly/java routine to display a Jar resource file
-         
+
 copyright - daresbury laboratory
 author    - w.smith may 2005
-         
+
 *********************************************************************
          */
         clearScreen();
-        
+
         try {
             String text="";
             InputStream instream = this.getClass().getResourceAsStream(fileName);
@@ -490,41 +497,41 @@ author    - w.smith may 2005
             println("Error: reading file " + fileName);
         }
     }
-    
+
     String dateToday() {
         /*
 *********************************************************************
-         
+
 dl_poly/java routine to display current date as a text string
-         
+
 copyright - daresbury laboratory
 author    - w.smith 2011
-         
+
 *********************************************************************
          */
         String today;
         int mnth;
 
         Calendar datum=Calendar.getInstance();
-        
+
         mnth=datum.get(Calendar.MONTH)+1;
         today=datum.get(Calendar.YEAR)+"/"+mnth+
             "/"+datum.get(Calendar.DAY_OF_MONTH)+"/"
             +datum.get(Calendar.HOUR_OF_DAY)+":"
             +datum.get(Calendar.MINUTE);
-        
+
         return today;
     }
 
     void viewFile(String fileName) {
         /*
 *********************************************************************
-         
+
 dl_poly/java routine to display a text file
-         
+
 copyright - daresbury laboratory
 author    - w.smith october 2000
-         
+
 *********************************************************************
          */
         String text = "";
@@ -544,21 +551,21 @@ author    - w.smith october 2000
             println("Error: reading file " + fileName);
         }
     }
-    
+
     void zappFile(GUI home) {
         /*
 *********************************************************************
-         
+
 dl_poly/java GUI routine
-         
+
 copyright - daresbury laboratory
 author    - w.smith 2000
-         
+
 *********************************************************************
          */
-        
+
         // Delete a file selected from browser
-        
+
         JFileChooser fc = new JFileChooser(new File("./"));
         fc.setDialogTitle("Select file for deletion");
         fc.setForeground(art.fore);
@@ -583,18 +590,18 @@ author    - w.smith 2000
             println("Error - file deletion failure");
         }
     }
-    
+
     LineNumberReader hread(String fname,String name[],LineNumberReader lnr,
     double info[],double cell[],double chge[],double weight[],
     double xyz[][],double vel[][],double frc[][]) {
         /*
 ***********************************************************************
-         
+
 dl_poly/java routine for reading the formatted history file
-         
+
 copyright - daresbury laboratory
 author    - w. smith february 2001
-         
+
 Notes:
 info[0] - 0 to open file, 1 to continue, -1 to close file
 info[1] - mxatms - maximum number of atoms in configuration
@@ -612,21 +619,21 @@ info[6] - nstep - current time step number
 info[7] - natms - actual number of atoms in configuration
 info[8] - tstep - time between HISTORY configurations (ps)
 info[9] - nstep0 - first time step in HISTORY file
-         
+
 ***********************************************************************
          */
         String record,step;
         double tstep;
         int begin,mxatms,keytrj,ktrj,imcon,nstep,natms;
-        
+
         begin=BML.nint(info[0]);
         mxatms=BML.nint(info[1]);
         keytrj=BML.nint(info[2]);
         ktrj=BML.nint(info[4]);
         imcon=BML.nint(info[5]);
-        
+
         // open the HISTORY file
-        
+
         try {
             if(begin==0) {
                 info[0]=1.0;
@@ -662,9 +669,9 @@ info[9] - nstep0 - first time step in HISTORY file
                 lnr.close();
                 return null;
             }
-            
+
             // Configuration header
-            
+
             record=lnr.readLine();
             if(record==null) {
                 info[3]=-1.0;
@@ -758,15 +765,15 @@ double bbb[][]=new double[2][ndiv];
 double wfft[][]=new double[2][ndiv];
 
 ***********************************************************************
-*/      
+*/
         boolean check;
         int nt,nu,iii,jjj,kkk,jj2,np2,k12,nu1,kd2;
         double tpn,arg,tt0,tt1;
-        
+
         safe=true;
-        
+
         //check that radix 2 rule applies
-        
+
         nu=0;
         nt=1;
         check=true;
@@ -777,17 +784,17 @@ double wfft[][]=new double[2][ndiv];
                 nu=i;
             }
         }
-        
+
         if(check){
             println("Error - number of points not a power of two");
             safe=false;
             return;
         }
-        
+
         if(ind > 0){
-            
+
             //set reverse bit address array
-            
+
             for(kkk=0;kkk<ndiv;kkk++){
                 iii=0;
                 jjj=kkk;
@@ -798,9 +805,9 @@ double wfft[][]=new double[2][ndiv];
                 }
                 key[kkk]=iii;
             }
-            
+
             //initialise complex exponential factors
-            
+
             arg=0;
             np2=ndiv/2;
             tpn=2*Math.PI/ndiv;
@@ -815,23 +822,23 @@ double wfft[][]=new double[2][ndiv];
             }
             return;
         }
-        
+
         //take conjugate of exponentials if required
-        
+
         if(isw < 0){
             for(int i=1;i<ndiv;i++)
                 wfft[1][i]=-wfft[1][i];
         }
-        
+
         //make copy of input array
-        
+
         for(int i=0;i<ndiv;i++){
             bbb[0][i]=aaa[0][i];
             bbb[1][i]=aaa[1][i];
         }
-        
+
         //perform fourier transform
-        
+
         kkk=0;
         nu1=nu-1;
         np2=ndiv/2;
@@ -855,9 +862,9 @@ double wfft[][]=new double[2][ndiv];
             np2/=2;
             nu1--;
         }
-        
+
         //unscramble the fft using bit address array
-        
+
         for(kkk=0;kkk<ndiv;kkk++){
             iii=key[kkk];
             if(iii > kkk){
@@ -869,19 +876,19 @@ double wfft[][]=new double[2][ndiv];
                 bbb[1][iii]=tt1;
             }
         }
-        
+
         //restore exponentials to unconjugated values if necessary
-        
+
         if(isw < 0){
             for(int i=1;i<ndiv;i++)
                 wfft[1][i]=-wfft[1][i];
         }
-        
+
         return;
     }
 
     static void saveText(GUI home) {
-        
+
 /*
 **********************************************************************
 
@@ -895,38 +902,38 @@ Write the contents of the GUI text area into a file
         FileWriter writer;
 
         if(board.getText().length() > 0) {
-            
+
             try{
-                
+
                 // default file name is "TEXTSAVE.txt"
-                
+
                 output = new File("TEXTSAVE.txt");
-                
+
                 // create a file chooser
-                
+
                 selector = new JFileChooser(new File("./"));
                 selector.setSelectedFile(output);
-                
+
                 // display the dialog
-                
+
                 if (selector.showSaveDialog(home) == JFileChooser.APPROVE_OPTION) {
-                    
+
                     // get the selected file
-                    
+
                     output=selector.getSelectedFile();
-                    
+
                     // create a file writer
-                    
+
                     writer = new FileWriter(output);
-                    
+
                     // write the contents of the text area into file
-                    
+
                     writer.append(board.getText());
-                    
+
                     // close the file writer
-                    
+
                     writer.close();
-                    
+
                     println("Output text file successfully saved");
                 }
             }catch(IOException e){
@@ -938,12 +945,12 @@ Write the contents of the GUI text area into a file
     static Config getConfig(GUI here,String ftype) {
         /*
 *********************************************************************
-         
+
 dl_poly/java method for reading CONFIG files
-         
+
 copyright - daresbury laboratory
 author    - w.smith june 2001
-         
+
 *********************************************************************
          */
 
@@ -1034,12 +1041,12 @@ author    - w.smith june 2001
     static Config copyConfig(Config cfg) {
         /*
 *********************************************************************
-         
+
 dl_poly/java GUI routine
-         
+
 copyright - daresbury laboratory
 author    - w.smith 2011
-         
+
 *********************************************************************
          */
         Config cfgcpy=new Config();
@@ -1068,7 +1075,7 @@ author    - w.smith 2011
             cfgcpy.xyz[2][i]=cfg.xyz[2][i];
         }
         cfgcpy.structure=new Structure(cfgcpy);
-            
+
         return cfgcpy;
     }
 
