@@ -23,7 +23,7 @@ author    - w.smith 2006
          */
     
     public static final boolean DLPC=true;
-    public static final boolean DLP4=false;
+    public static final boolean DLP4=true;
     public static final int TILEX=500;
     public static final int TILEY=500;
     public static final int SCREENX=600;
