@@ -51,7 +51,7 @@ author    - w.smith 2006
     public static final int MXATMS=100;
     public static final int MXJOIN=100;
     public static String ftype=null;
-    public static String defaultexecutable="DLPOLY.Z";
+    public static String defaultexecutable="DLPOLY.X";
     public static String executable=null;
     public static Font fontMain;
     public static boolean perspective=true;
