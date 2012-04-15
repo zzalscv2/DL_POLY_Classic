@@ -197,7 +197,7 @@ author    - w.smith 2001
         bot=-3.0;
         lslab=false;
         lfetch=false;
-        solventfile="WATER300K";
+        solventfile="../java/WATER300K";
         sfil.setText(solventfile);
         slab.setSelected(lslab);
         wsd.setText(String.valueOf(dws));
