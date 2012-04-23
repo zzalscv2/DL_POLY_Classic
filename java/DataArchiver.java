@@ -184,7 +184,7 @@ author    - w.smith 2000
         
         String arg = (String)e.getActionCommand();
         if (arg.equals("Select")) {
-            dname=test.getSelectedItem().toString()+"/VV";
+            dname=test.getSelectedItem().toString()+"/LF";
             println("About to overwrite current DL_POLY I/O files");
             danger=new WarningBox(home,"Warning!",true);
             danger.setVisible(true);
