@@ -226,9 +226,16 @@ c     read thermodynamic and structural data from restart file
       
 c     metadynamics by d. quigley
       
-      if(lmetadyn)
-     x  call define_metadynamics(idnode,mxnode,natms,temp)
-      
+      if(lmetadyn) then
+
+c        make copy of excluded atom list for use by metadynamics
+         call exclude_copy_mtd(idnode)
+
+c        initialise metadynamics, read order parameter definitions etc.
+         call define_metadynamics(idnode,mxnode,natms,ntpatm,temp)   
+
+      end if
+
 c     synchronise LRC, SIC and system charge terms for switching
       
       llswitch=.false.

@@ -52,6 +52,7 @@ c***********************************************************************
       allocate (lexatm(msatms,mxexcl),stat=fail(1))
       allocate (nexatm(msatms),stat=fail(2))
       allocate (noxatm(msatms),stat=fail(3))
+
       do i=1,nnn
         if(fail(i).gt.0)call error(idnode,1012)
       enddo
@@ -73,7 +74,7 @@ c
 c     rigid body exclusions added : t.forester nov 1993
 c     check on 1..4 scale factors : t.forester feb 1994
 c     inversion terms added       : w.smith    jul 1996
-c     
+c
 c***********************************************************************
       
       implicit none
@@ -949,6 +950,7 @@ c     (there shouldn't be any!)
         nexsit(i)=nlast
         
       enddo
+
       
       return
       end subroutine exclude
@@ -965,7 +967,6 @@ c     copyright - daresbury laboratory     1994
 c     author    - t. forester        march 1994
 c     
 c***********************************************************************
-      
       implicit none
 
       logical lchk
@@ -1222,7 +1223,7 @@ c     copyright - daresbury laboratory 1992
 c     author    - w. smith        june 1992
 c     
 c***********************************************************************
-            
+
       implicit none
 
       integer idnode,mxnode,natms,ntpmls,iatom,jatom,lsite
@@ -1325,6 +1326,43 @@ c     final sort into brode-ahlrichs ordering
       
       return
       end subroutine exclude_atom
+
+      subroutine exclude_copy_mtd(idnode)
+
+c***********************************************************************
+c     
+c     dl_poly subroutine for copying excluded atom arrays into 
+c     the metadynamics module for use in computing order parameters
+c
+c     author    - d. quigley    April 2012
+c     
+c***********************************************************************
+      use metafreeze_module, only : mtd_lexatm,mtd_nexatm
+      implicit none
+      integer, parameter :: nnn=2
+
+      integer i,fail,idnode
+      dimension fail(nnn)
+
+      do i=1,nnn
+        fail(i)=0
+      enddo
+
+c     data needed by metadynamics module
+      allocate (mtd_lexatm(msatms,mxexcl),stat=fail(1))
+      allocate (mtd_nexatm(msatms)       ,stat=fail(2))
+
+      do i=1,nnn
+        if(fail(i).gt.0) call error(idnode,1012)
+      enddo
+
+
+c     copy exclude list into metafreeze module
+      mtd_nexatm = nexatm
+      mtd_lexatm = lexatm
+
+      return
+      end subroutine exclude_copy_mtd
       
       end module exclude_module
 

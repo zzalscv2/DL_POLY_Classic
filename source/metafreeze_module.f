@@ -33,6 +33,11 @@ c---------------------------------------------------------------------
       public :: meta_step_int,globpe_scale,locpe_scale,ref_W_aug
       public :: h_aug,wt_Dt
 
+c     Local copies of exluded atom arrays note that these are
+c     not indexed by atom number, but by an index which loops
+c     over the atoms handles by each MPI rank.
+      public :: mtd_nexatm,mtd_lexatm
+
 c------------------------------------
 c     Populated from CONTROL file   
 c------------------------------------
@@ -56,6 +61,14 @@ c----------------------------------------------------------------------
       real(8),dimension(9),save              :: stress_loc
       real(8),allocatable,dimension(:),save  :: fxx_loc,fyy_loc,fzz_loc
       
+c----------------------------------------------------------------------
+c     Arrays holding information on excluded interactions. Replicated 
+c     here to avoid a compilation dependency loop which would occur
+c     if simply using the arrays already in exclude_module.f
+c----------------------------------------------------------------------
+      integer,allocatable,dimension(:),save   :: mtd_nexatm
+      integer,allocatable,dimension(:,:),save :: mtd_lexatm
+
 c---------------------------------------------------------------------
 c     P r i v a t e   V a r i a b l e s 
 c---------------------------------------------------------------------
@@ -438,6 +451,8 @@ c     global reduction of virord
       if ( commsize > 1 ) call gdsum(virord,1,buff1)
       
       engord = meta_energy
+
+c     write(0,'("DEBUG : engord = ",F12.6)')engord/(temp*boltz)
       
       return
       
@@ -565,13 +580,15 @@ c     Zero accumulators of derivative w.r.t. each order parameter
         k = k + 1
       end do
 
+c     write(0,'("DEBUG : CV derivs = ",6F15.6)')dcolvar
+
       deallocate(buff1,buff2,stat=ierr(1))
       
       return
       
       end Subroutine Compute_Bias_Potential
       
-      Subroutine Define_Metadynamics(tm,ts,natms,temp)
+      Subroutine Define_Metadynamics(tm,ts,natms,ntpatm,temp)
       
 c---------------------------------------------------------------------
 c     Processes the metadynamics input file. This is done in several 
@@ -597,7 +614,7 @@ c---------------------------------------------------------------------
       
       implicit none
       
-      integer,intent(in) :: tm,ts,natms
+      integer,intent(in) :: tm,ts,natms,ntpatm
       real(8),intent(in) :: temp
       
 c     Local variables
@@ -613,18 +630,17 @@ c     this should be allocated if this is a metadynamics run or not.
       allocate(driven(1:size(unqatm)),stat=ierr(1))
       if (ierr(1)/=0) call Mfrz_Error(2505,0.d0)
       driven = .false.
-      
+
 c     Do nothing else if the metafreeze flag has not been set in CONTROL
       
       if (.not.lmetadyn) then
         return
       end if
       
-c     Make local copy of rank and communicator size and set onroot flag
-      
       myrank=tm 
       commsize = ts
       onroot = (myrank==0)
+
     
 c$$$     DEBUG
 cc$$$    if (onroot) write(0,'("================================")')
@@ -753,11 +769,11 @@ c     which set of q4 cut-offs, scaling factors and num neighbours.
        if (ierr(1)/=0) call Mfrz_Error(2517,0.d0)
        q4site(:,:) = 0
        
-       do isite = 1,size(unqatm)
-         do jsite = isite,size(unqatm)
+       do isite = 1,ntpatm
+         do jsite = isite,ntpatm
            do iq = 1,nq4
              if ((q4label(1,iq)==unqatm(isite)).and.
-     x         q4label(2,iq)==unqatm(jsite)) then
+     x         (q4label(2,iq)==unqatm(jsite))) then
                q4site(jsite,isite) = iq
                q4site(isite,jsite) = iq
                driven(jsite) = .true.
@@ -766,12 +782,12 @@ c     which set of q4 cut-offs, scaling factors and num neighbours.
            end do
          end do
        end do
-       
+
        allocate(q6site(1:size(unqatm),1:size(unqatm)),stat=ierr(1))
        if (ierr(1)/=0) call Mfrz_Error(2518,0.d0)
        q6site(:,:) = 0
-       do isite = 1,size(unqatm)
-         do jsite = isite,size(unqatm)
+       do isite = 1,ntpatm
+         do jsite = isite,ntpatm
            do iq = 1,nq6
              if ((q6label(1,iq)==unqatm(isite)).and.
      x         q6label(2,iq)==unqatm(jsite)) then
@@ -842,8 +858,6 @@ c     Open ZETA file and process
           call getrec(safe,myrank,zta) ! Ignore comment line
           ilin = ilin + 1
           do i = 1,ntet
-            read(unit=zta,fmt=*,iostat=ierr(ilin))
-     x        zetalabel(i),zetacutoff(:,i),zetascale(i),zetann(i)
             call getrec(safe,myrank,zta)
             if (safe) then
               call getword(zetalabel(i),record,8,lenrec)
@@ -909,7 +923,7 @@ c$$$          write(0,'("Number of sites for zeta type ",I5," : ",I5)')
 c$$$     x      iq,zetaninc(iq)
 c$$$        end do
         
-        mxninc = max(100,2*maxval(zetaninc)/commsize)
+        mxninc = max(100,4*maxval(zetaninc)/commsize)
         allocate(nflist(1:mxninc),stat=ierr(1))
         allocate(flist(1:mxflist,1:mxninc),stat=ierr(2))
         if (any(ierr/=0)) call Mfrz_Error(2525,0.d0)
@@ -952,7 +966,10 @@ c     populate colvar_scale
         k = k + 1
       end if
       
-      
+c     write(0,*)lglobpe,llocpe
+c     write(0,'("DEBUG : CV Scaling factors : ",6F15.6)')colvar_scale(:)
+
+
 c     Convert into internal units
       
       wt_Dt = wt_Dt*temp*boltz
@@ -1201,6 +1218,11 @@ c     separation vectors and powers thereof
       real(8) :: x4,y4,z4,x5,y5,z5
       real(8) :: x6,y6,z6
       real(8) :: invrc,invrs
+
+c     list of separation vectors
+      integer :: numdst
+      integer,allocatable,dimension(:) :: dstlst
+
       
 c     Comms buffers
       
@@ -1220,27 +1242,35 @@ c     Loop counters
 
       ierr = 0                  ! Error flags
       
-      allocate(xdf(1:mxlist),stat=ierr(1))
-      allocate(ydf(1:mxlist),stat=ierr(2))
-      allocate(zdf(1:mxlist),stat=ierr(3))
+
+c     DQ - modified 10/12/11, arrays now big enough
+c     to hold maximum number of neighbours plus
+c     maximum number of excluded atoms.
+      allocate(xdf(1:mxlist+mxexcl),stat=ierr(1))
+      allocate(ydf(1:mxlist+mxexcl),stat=ierr(2))
+      allocate(zdf(1:mxlist+mxexcl),stat=ierr(3))
+
+c     DQ - modified 10/12/11, array to hold a list of
+c     all atom entries in the above three arrays
+      allocate(dstlst(1:mxlist+mxexcl),stat=ierr(4))
       
-      allocate(solvx4(1:maxneigh),stat=ierr(4))
-      allocate(solvy4(1:maxneigh),stat=ierr(5))
-      allocate(solvz4(1:maxneigh),stat=ierr(6))
-      allocate(solvrmag4(1:maxneigh),stat=ierr(7))
-      allocate(solvimag4(1:maxneigh),stat=ierr(8))
-      allocate(solvrsq4 (1:maxneigh),stat=ierr(9))
-      allocate(solvlist4(1:maxneigh),stat=ierr(10)) 
-      allocate(solvtype4(1:maxneigh),stat=ierr(11))
+      allocate(solvx4(1:maxneigh),stat=ierr(5))
+      allocate(solvy4(1:maxneigh),stat=ierr(6))
+      allocate(solvz4(1:maxneigh),stat=ierr(7))
+      allocate(solvrmag4(1:maxneigh),stat=ierr(8))
+      allocate(solvimag4(1:maxneigh),stat=ierr(9))
+      allocate(solvrsq4 (1:maxneigh),stat=ierr(10))
+      allocate(solvlist4(1:maxneigh),stat=ierr(11)) 
+      allocate(solvtype4(1:maxneigh),stat=ierr(12))
       
-      allocate(solvx6(1:maxneigh),stat=ierr(12))
-      allocate(solvy6(1:maxneigh),stat=ierr(13))
-      allocate(solvz6(1:maxneigh),stat=ierr(14))
-      allocate(solvrmag6(1:maxneigh),stat=ierr(15))
-      allocate(solvimag6(1:maxneigh),stat=ierr(16))
-      allocate(solvrsq6 (1:maxneigh),stat=ierr(17))
-      allocate(solvlist6(1:maxneigh),stat=ierr(18)) 
-      allocate(solvtype6(1:maxneigh),stat=ierr(19))
+      allocate(solvx6(1:maxneigh),stat=ierr(13))
+      allocate(solvy6(1:maxneigh),stat=ierr(14))
+      allocate(solvz6(1:maxneigh),stat=ierr(15))
+      allocate(solvrmag6(1:maxneigh),stat=ierr(16))
+      allocate(solvimag6(1:maxneigh),stat=ierr(17))
+      allocate(solvrsq6 (1:maxneigh),stat=ierr(18))
+      allocate(solvlist6(1:maxneigh),stat=ierr(19)) 
+      allocate(solvtype6(1:maxneigh),stat=ierr(20))
       if (any(ierr/=0)) call Mfrz_Error(2533,0.d0) 
       
       allocate(buff1(1:18*nq4+26*nq6),stat=ierr(1))
@@ -1266,9 +1296,7 @@ c     Set atoms looped over by current rank
 c --------------------------------------------------------------
 c     Build a list of the required connections to iatm. This  
 c     differs depending on the version of DLPOLY we are using.
-c     Note that excluded pairs will NOT have connections
-c     computed and are therefore not included in computation
-c     of these order parameters.
+c     First we loop over atoms in the neighbour list of iatm.
 c---------------------------------------------------------------
       
       ii = ii + 1
@@ -1283,21 +1311,59 @@ c---------------------------------------------------------------
         if ( q4site(jsite,isite)+q6site(jsite,isite)==0 ) cycle
         
         nn = nn + 1
+
+        dstlst(nn) = jatm
         
         xdf(nn)=xxx(jatm)-xxx(iatm)
         ydf(nn)=yyy(jatm)-yyy(iatm)
         zdf(nn)=zzz(jatm)-zzz(iatm) 
         
       end do
-      
+
+c --------------------------------------------------------------
+c     Next we loop over the excluded atom list of iatm and add 
+c     and pairs needed for computation of the current OP.
+c---------------------------------------------------------------
+
+ccc   DEBUG
+ccc      write(0,'("atom ",I5," has ",I5," excluded interactions")')
+ccc     x iatm,mtd_nexatm(iatm)
+
+      do k = 1,mtd_nexatm(ii)
+
+         jatm  = mtd_lexatm(ii,k)
+         jsite = ltype(jatm)
+
+ccc   DEBUG
+ccc         write(0,'("Interaction with atom ",I5," is excluded. ")')jatm
+
+         if ( q4site(jsite,isite)+q6site(jsite,isite)==0 ) cycle
+        
+         nn = nn + 1
+        
+         dstlst(nn) = jatm
+
+         xdf(nn)=xxx(jatm)-xxx(iatm)
+         ydf(nn)=yyy(jatm)-yyy(iatm)
+         zdf(nn)=zzz(jatm)-zzz(iatm) 
+
+      end do
+
+ccc   DEBUG
+ccc      write(0,'("Num neighbours to consider for atom ",I5," : ",I5)')
+ccc     x iatm,nn
+
+      numdst = nn
+
       call images(imcon,0,1,nn,cell,xdf,ydf,zdf)
       nn = 0
       isolvmax4 = 0
       isolvmax6 = 0
       isolv4 = 0
       isolv6 = 0
-      do k = 1,limit
-        jatm  = list(ii,k)
+
+      do k = 1,numdst
+        jatm  = dstlst(k)
         jsite = ltype(jatm)
         
         if ( q4site(jsite,isite)+q6site(jsite,isite)==0 ) cycle
@@ -1348,6 +1414,10 @@ c     Add to solvation lists if within cut-off
      x    call Mfrz_Error(2535,0.d0)
         
       end do                    ! end loop over k
+
+ccc      write(0,'("Num in range for OPs on atom ",I5," : ",I5)')
+ccc     x iatm,isolvmax4
+
       
 c---------------------------------------------------------
 c     Compute Q4 Steinhardt order parameters              
@@ -1391,7 +1461,7 @@ c---------------------------------------------------------
           z6 = z4*z2
           
 c----------------------------------------------------------
-c     Real and imaginary contribution to Q4bar(-4)
+c     Real and imaginary contribution to Q4bar(-4/+4)
 c----------------------------------------------------------
           
           ReYlm = ypre4m4*invrs*(x4-6.d0*x2*y2+y4)
@@ -1399,9 +1469,12 @@ c----------------------------------------------------------
           
           ReQ4bar(-4,itype) = ReQ4bar(-4,itype) + f_ij*ReYlm
           ImQ4bar(-4,itype) = ImQ4bar(-4,itype) + f_ij*ImYlm
+
+          ReQ4bar(+4,itype) = ReQ4bar(+4,itype) + f_ij*ReYlm
+          ImQ4bar(+4,itype) = ImQ4bar(+4,itype) - f_ij*ImYlm
           
 c----------------------------------------------------------
-c     Real and imaginary contribution to Q4bar(-3)
+c     Real and imaginary contribution to Q4bar(-3/+3)
 c----------------------------------------------------------
           
           ReYlm = ypre4m3*invrs*z*(x3-3.d0*x*y2)
@@ -1409,9 +1482,12 @@ c----------------------------------------------------------
           
           ReQ4bar(-3,itype) = ReQ4bar(-3,itype) + f_ij*ReYlm
           ImQ4bar(-3,itype) = ImQ4bar(-3,itype) + f_ij*ImYlm
+
+          ReQ4bar(+3,itype) = ReQ4bar(+3,itype) - f_ij*ReYlm
+          ImQ4bar(+3,itype) = ImQ4bar(+3,itype) + f_ij*ImYlm
           
 c----------------------------------------------------------
-c     Real and imaginary contribution to Q4bar(-2)
+c     Real and imaginary contribution to Q4bar(-2/+2)
 c----------------------------------------------------------
           
           ReYlm = -ypre4m2*invrs*(x2-y2)*(-6.d0*z2+x2+y2)
@@ -1419,9 +1495,12 @@ c----------------------------------------------------------
           
           ReQ4bar(-2,itype) = ReQ4bar(-2,itype) + f_ij*ReYlm
           ImQ4bar(-2,itype) = ImQ4bar(-2,itype) + f_ij*ImYlm
+
+          ReQ4bar(+2,itype) = ReQ4bar(+2,itype) + f_ij*ReYlm
+          ImQ4bar(+2,itype) = ImQ4bar(+2,itype) - f_ij*ImYlm
           
 c----------------------------------------------------------
-c     Real and imaginary contribution to Q4bar(-1)
+c     Real and imaginary contribution to Q4bar(-1/+1)
 c----------------------------------------------------------
           
           ReYlm = -ypre4m1*invrs*z*(-4.d0*z2+3.d0*x2+3.d0*y2)*x
@@ -1429,6 +1508,9 @@ c----------------------------------------------------------
           
           ReQ4bar(-1,itype) = ReQ4bar(-1,itype) + f_ij*ReYlm
           ImQ4bar(-1,itype) = ImQ4bar(-1,itype) + f_ij*ImYlm
+
+          ReQ4bar(+1,itype) = ReQ4bar(+1,itype) - f_ij*ReYlm
+          ImQ4bar(+1,itype) = ImQ4bar(+1,itype) + f_ij*ImYlm
           
 c----------------------------------------------------------
 c     Real and imaginary contribution to Q4bar(0)
@@ -1438,46 +1520,6 @@ c----------------------------------------------------------
      x      3.d0*x4+6.d0*x2*y2+3.d0*y4)
           
           ReQ4bar(0,itype)  = ReQ4bar(0,itype) + f_ij*ReYlm
-          
-c----------------------------------------------------------
-c     Real and imaginary contribution to Q4bar(1)
-c----------------------------------------------------------
-          
-          ReYlm = -ypre4p1*invrs*z*(-4.d0*z2+3.d0*x2+3.0d0*y2)*x
-          ImYlm = -ypre4p1*invrs*z*(-4.d0*z2+3.d0*x2+3.0d0*y2)*y
-          
-          ReQ4bar(+1,itype) = ReQ4bar(+1,itype) + f_ij*ReYlm
-          ImQ4bar(+1,itype) = ImQ4bar(+1,itype) + f_ij*ImYlm
-          
-c----------------------------------------------------------
-c     Real and imaginary contribution to Q4bar(2)
-c----------------------------------------------------------
-          
-          ReYlm = -ypre4p2*invrs*(x2-y2)*(-6.d0*z2+x2+y2)
-          ImYlm = -ypre4p2*invrs*2.d0*(-6.d0*z2+x2+y2)*x*y
-          
-          ReQ4bar(+2,itype) = ReQ4bar(+2,itype) + f_ij*ReYlm
-          ImQ4bar(+2,itype) = ImQ4bar(+2,itype) + f_ij*ImYlm
-          
-c----------------------------------------------------------
-c     Real and imaginary contribution to Q4bar(3)
-c----------------------------------------------------------
-
-          ReYlm = ypre4p3*invrs*z*(x3-3.d0*x*y2)
-          ImYlm = ypre4p3*invrs*z*(3.d0*x2*y-y3)
-          
-          ReQ4bar(+3,itype) = ReQ4bar(+3,itype) + f_ij*ReYlm
-          ImQ4bar(+3,itype) = ImQ4bar(+3,itype) + f_ij*ImYlm
-          
-c----------------------------------------------------------
-c     Real and imaginary contribution to Q4bar(4)
-c----------------------------------------------------------
-          
-          ReYlm = ypre4p4*invrs*(x4-6.d0*x2*y2+y4)
-          ImYlm = ypre4p4*invrs*(4.d0*x3*y-4.d0*x*y3)
-          
-          ReQ4bar(+4,itype) = ReQ4bar(+4,itype) + f_ij*ReYlm
-          ImQ4bar(+4,itype) = ImQ4bar(+4,itype) + f_ij*ImYlm
           
         end do                  ! end loop over connection list for iatm
         
@@ -1525,7 +1567,7 @@ c------------------------------------------------
           z6 = z4*z2
           
 c----------------------------------------------------------
-c     Real and imaginary conribution to Q6bar(-6)
+c     Real and imaginary conribution to Q6bar(-6/+6)
 c----------------------------------------------------------
           
           ReYlm = ypre6m6*invrc*(x6-15.0d0*x4*y2+15.0d0*x2*y4-y6)
@@ -1533,9 +1575,12 @@ c----------------------------------------------------------
           
           ReQ6bar(-6,itype) = ReQ6bar(-6,itype) + f_ij*ReYlm
           ImQ6bar(-6,itype) = ImQ6bar(-6,itype) + f_ij*ImYlm
+
+          ReQ6bar(+6,itype) = ReQ6bar(+6,itype) + f_ij*ReYlm
+          ImQ6bar(+6,itype) = ImQ6bar(+6,itype) - f_ij*ImYlm
           
 c----------------------------------------------------------
-c     Real and imaginary conribution to Q6bar(-5)
+c     Real and imaginary conribution to Q6bar(-5/+5)
 c----------------------------------------------------------
           
           ReYlm = -ypre6m5*invrc*z*(-x5+10.0d0*x3*y2-5.0d0*x*y4)
@@ -1543,20 +1588,26 @@ c----------------------------------------------------------
           
           ReQ6bar(-5,itype) = ReQ6bar(-5,itype) + f_ij*ReYlm
           ImQ6bar(-5,itype) = ImQ6bar(-5,itype) + f_ij*ImYlm
+
+          ReQ6bar(+5,itype) = ReQ6bar(+5,itype) - f_ij*ReYlm
+          ImQ6bar(+5,itype) = ImQ6bar(+5,itype) + f_ij*ImYlm
           
 c----------------------------------------------------------
-c     Real and imaginary conribution to Q6bar(-4)
+c     Real and imaginary conribution to Q6bar(-4/+4)
 c----------------------------------------------------------
           
           ReYlm = ypre6m4*invrc*(10.0d0*z2-x2-y2)*(x4-6.0d0*x2*y2+y4)
-          ImYlm = ypre6m4*invrc*(10.0d0*z2-x2-y2)*(-4.0d0*x3*y-
+          ImYlm = ypre6m4*invrc*(10.0d0*z2-x2-y2)*(-4.0d0*x3*y+
      x            4.0d0*x*y3)
           
           ReQ6bar(-4,itype) = ReQ6bar(-4,itype) + f_ij*ReYlm
           ImQ6bar(-4,itype) = ImQ6bar(-4,itype) + f_ij*ImYlm
+
+          ReQ6bar(+4,itype) = ReQ6bar(+4,itype) + f_ij*ReYlm
+          ImQ6bar(+4,itype) = ImQ6bar(+4,itype) - f_ij*ImYlm
           
 c----------------------------------------------------------
-c     Real and imaginary conribution to Q6bar(-3)
+c     Real and imaginary conribution to Q6bar(-3/+3)
 c----------------------------------------------------------
           
           ReYlm = -ypre6m3*invrc*z*(8.0d0*z2-3.0d0*x2-3.0d0*y2)*
@@ -1566,9 +1617,12 @@ c----------------------------------------------------------
           
           ReQ6bar(-3,itype) = ReQ6bar(-3,itype) + f_ij*ReYlm
           ImQ6bar(-3,itype) = ImQ6bar(-3,itype) + f_ij*ImYlm
+
+          ReQ6bar(+3,itype) = ReQ6bar(+3,itype) - f_ij*ReYlm
+          ImQ6bar(+3,itype) = ImQ6bar(+3,itype) + f_ij*ImYlm
           
 c----------------------------------------------------------
-c     Real and imaginary conribution to Q6bar(-2)
+c     Real and imaginary conribution to Q6bar(-2/+2)
 c----------------------------------------------------------
 
           ReYlm =  ypre6m2*invrc*(16.0d0*z4-16.0d0*z2*x2-16.0d0*z2*y2+
@@ -1578,9 +1632,12 @@ c----------------------------------------------------------
           
           ReQ6bar(-2,itype) = ReQ6bar(-2,itype) + f_ij*ReYlm
           ImQ6bar(-2,itype) = ImQ6bar(-2,itype) + f_ij*ImYlm
+
+          ReQ6bar(+2,itype) = ReQ6bar(+2,itype) + f_ij*ReYlm
+          ImQ6bar(+2,itype) = ImQ6bar(+2,itype) - f_ij*ImYlm
           
 c----------------------------------------------------------
-c     Real and imaginary conribution to Q6bar(-1)
+c     Real and imaginary conribution to Q6bar(-1/+1)
 c----------------------------------------------------------
           
           ReYlm =  ypre6m1*z*invrc*(8.0d0*z4-20.0d0*z2*x2-20.0d0*z2*y2+
@@ -1590,6 +1647,9 @@ c----------------------------------------------------------
           
           ReQ6bar(-1,itype) = ReQ6bar(-1,itype) + f_ij*ReYlm
           ImQ6bar(-1,itype) = ImQ6bar(-1,itype) + f_ij*ImYlm
+
+          ReQ6bar(+1,itype) = ReQ6bar(+1,itype) - f_ij*ReYlm
+          ImQ6bar(+1,itype) = ImQ6bar(+1,itype) + f_ij*ImYlm
           
 c----------------------------------------------------------
 c     Real and imaginary conribution to Q6bar(0)
@@ -1600,72 +1660,6 @@ c----------------------------------------------------------
      x             *x6-15.0d0*x4*y2-15.0d0*x2*y4-5.0d0*y6)
           
           ReQ6bar(0,itype) = ReQ6bar(0,itype) + f_ij*ReYlm
-          
-c----------------------------------------------------------
-c     Real and imaginary conribution to Q6bar(1)
-c----------------------------------------------------------
-          
-          ReYlm = ypre6p1*invrc*z*(8.0d0*z4-20.0d0*z2*x2-20.0d0*z2*y2+
-     x            5.0d0*x4+10.0d0*x2*y2+5.0d0*y4)*x
-          ImYlm = ypre6p1*invrc*z*(8.0d0*z4-20.0d0*z2*x2-20.0d0*z2*y2+
-     x            5.0d0*x4+10.0d0*x2*y2+5.0d0*y4)*y 
-          
-          ReQ6bar(1,itype) = ReQ6bar(1,itype) + f_ij*ReYlm
-          ImQ6bar(1,itype) = ImQ6bar(1,itype) + f_ij*ImYlm
-          
-c----------------------------------------------------------
-c     Real and imaginary conribution to Q6bar(2)
-c----------------------------------------------------------
-          
-          ReYlm =      ypre6p2*invrc*(16.d0*z4-16.d0*z2*x2-16.d0*z2*y2+
-     x            x4+2.d0*x2*y2+y4)*(x2-y2)
-          ImYlm = 2.d0*ypre6p2*invrc*(16.d0*z4-16.d0*z2*x2-16.d0*z2*y2+
-     x            x4+2.d0*x2*y2+y4)*x*y
-          
-          ReQ6bar(2,itype) = ReQ6bar(2,itype) + f_ij*ReYlm
-          ImQ6bar(2,itype) = ImQ6bar(2,itype) + f_ij*ImYlm
-          
-c----------------------------------------------------------
-c     Real and imaginary conribution to Q6bar(3)
-c----------------------------------------------------------
-          
-          ReYlm = ypre6p3*invrc*z*(8.d0*z2-3.d0*x2-3.d0*y2)*
-     x            (x3-3.d0*x*y2)
-          ImYlm = ypre6p3*invrc*z*(8.d0*z2-3.d0*x2-3.d0*y2)*
-     x            (3.d0*x2*y-y3)
-          
-          ReQ6bar(3,itype) = ReQ6bar(3,itype) + f_ij*ReYlm
-          ImQ6bar(3,itype) = ImQ6bar(3,itype) + f_ij*ImYlm
-          
-c----------------------------------------------------------
-c     Real and imaginary conribution to Q6bar(4)
-c----------------------------------------------------------
-         
-          ReYlm = ypre6p4*invrc*(10.d0*z2-x2-y2)*(x4-6.d0*x2*y2+y4)
-          ImYlm = ypre6p4*invrc*(10.d0*z2-x2-y2)*(4.d0*x3*y-4.d0*x*y3)
-          
-          ReQ6bar(4,itype) = ReQ6bar(4,itype) + f_ij*ReYlm
-          ImQ6bar(4,itype) = ImQ6bar(4,itype) + f_ij*ImYlm
-          
-c----------------------------------------------------------
-c     Real and imaginary conribution to Q6bar(5)
-c----------------------------------------------------------
-          
-          ReYlm = ypre6p5*invrc*z*(x5-10.d0*x3*y2+5.d0*x*y4)
-          ImYlm = ypre6p5*invrc*z*(5.d0*x4*y-10.d0*x2*y3+y5)
-          
-          ReQ6bar(5,itype) = ReQ6bar(5,itype) + f_ij*ReYlm
-          ImQ6bar(5,itype) = ImQ6bar(5,itype) + f_ij*ImYlm
-          
-c----------------------------------------------------------
-c     Real and imaginary conribution to Q6bar(6)
-c----------------------------------------------------------
-          
-          ReYlm = ypre6p6*invrc*(x6-15.d0*x4*y2+15.d0*x2*y4-y6)
-          ImYlm = ypre6p6*invrc*(6.d0*x5*y-20.d0*x3*y3+6.d0*x*y5)
-          
-          ReQ6bar(6,itype) = ReQ6bar(6,itype) + f_ij*ReYlm
-          ImQ6bar(6,itype) = ImQ6bar(6,itype) + f_ij*ImYlm
           
         end do                  ! end loop over connection list for iatm
         
@@ -1753,30 +1747,32 @@ c     Tidy up
       deallocate(xdf,stat=ierr(1))
       deallocate(ydf,stat=ierr(2))
       deallocate(zdf,stat=ierr(3))
+
+      deallocate(dstlst,stat=ierr(4))
       
-      deallocate(solvx4,stat=ierr(4))
-      deallocate(solvy4,stat=ierr(5))
-      deallocate(solvz4,stat=ierr(6))
-      deallocate(solvrmag4,stat=ierr(7))
-      deallocate(solvimag4,stat=ierr(8))
-      deallocate(solvrsq4 ,stat=ierr(9))
-      deallocate(solvlist4,stat=ierr(10)) 
-      deallocate(solvtype4,stat=ierr(11))
+      deallocate(solvx4,stat=ierr(5))
+      deallocate(solvy4,stat=ierr(6))
+      deallocate(solvz4,stat=ierr(7))
+      deallocate(solvrmag4,stat=ierr(8))
+      deallocate(solvimag4,stat=ierr(9))
+      deallocate(solvrsq4 ,stat=ierr(10))
+      deallocate(solvlist4,stat=ierr(11)) 
+      deallocate(solvtype4,stat=ierr(12))
       
-      deallocate(solvx6,stat=ierr(12))
-      deallocate(solvy6,stat=ierr(13))
-      deallocate(solvz6,stat=ierr(14))
-      deallocate(solvrmag6,stat=ierr(15))
-      deallocate(solvimag6,stat=ierr(16))
-      deallocate(solvrsq6 ,stat=ierr(17))
-      deallocate(solvlist6,stat=ierr(18)) 
-      deallocate(solvtype6,stat=ierr(19))
+      deallocate(solvx6,stat=ierr(13))
+      deallocate(solvy6,stat=ierr(14))
+      deallocate(solvz6,stat=ierr(15))
+      deallocate(solvrmag6,stat=ierr(16))
+      deallocate(solvimag6,stat=ierr(17))
+      deallocate(solvrsq6 ,stat=ierr(18))
+      deallocate(solvlist6,stat=ierr(19)) 
+      deallocate(solvtype6,stat=ierr(20))
       if (any(ierr/=0)) call Mfrz_Error(2536,0.d0) 
       
       deallocate(buff1,stat=ierr(1))
       deallocate(buff2,stat=ierr(2))    
       if (any(ierr/=0)) call Mfrz_Error(2537,0.d0)
-      
+
       return
       
       end Subroutine Compute_Steinhardt
@@ -1868,6 +1864,10 @@ c     Separation vectors and powers thereof
       real(8) :: x4,y4,z4,x5,y5,z5
       real(8) :: x6,y6,z6
       real(8) :: invrc,invrs,invrq
+
+c     list of separation vectors
+      integer :: numdst
+      integer,allocatable,dimension(:) :: dstlst
       
 c     Comms buffers
       
@@ -1887,27 +1887,34 @@ c     Temporaries
       
       ierr = 0               ! Error flags
       
-      allocate(xdf(1:mxlist),stat=ierr(1))
-      allocate(ydf(1:mxlist),stat=ierr(2))
-      allocate(zdf(1:mxlist),stat=ierr(3))
+c     DQ - modified 10/12/11, arrays now big enough
+c     to hold maximum number of neighbours plus
+c     maximum number of excluded atoms.
+      allocate(xdf(1:mxlist+mxexcl),stat=ierr(1))
+      allocate(ydf(1:mxlist+mxexcl),stat=ierr(2))
+      allocate(zdf(1:mxlist+mxexcl),stat=ierr(3))
+
+c     DQ - modified 10/12/11, array to hold a list of
+c     all atom entries in the above three arrays
+      allocate(dstlst(1:mxlist+mxexcl),stat=ierr(4))
       
-      allocate(solvx4(1:maxneigh),stat=ierr(4))
-      allocate(solvy4(1:maxneigh),stat=ierr(5))
-      allocate(solvz4(1:maxneigh),stat=ierr(6))
-      allocate(solvrmag4(1:maxneigh),stat=ierr(7))
-      allocate(solvimag4(1:maxneigh),stat=ierr(8))
-      allocate(solvrsq4 (1:maxneigh),stat=ierr(9))
-      allocate(solvlist4(1:maxneigh),stat=ierr(10)) 
-      allocate(solvtype4(1:maxneigh),stat=ierr(11))
+      allocate(solvx4(1:maxneigh),stat=ierr(5))
+      allocate(solvy4(1:maxneigh),stat=ierr(6))
+      allocate(solvz4(1:maxneigh),stat=ierr(7))
+      allocate(solvrmag4(1:maxneigh),stat=ierr(8))
+      allocate(solvimag4(1:maxneigh),stat=ierr(9))
+      allocate(solvrsq4 (1:maxneigh),stat=ierr(10))
+      allocate(solvlist4(1:maxneigh),stat=ierr(11)) 
+      allocate(solvtype4(1:maxneigh),stat=ierr(12))
       
-      allocate(solvx6(1:maxneigh),stat=ierr(12))
-      allocate(solvy6(1:maxneigh),stat=ierr(13))
-      allocate(solvz6(1:maxneigh),stat=ierr(14))
-      allocate(solvrmag6(1:maxneigh),stat=ierr(15))
-      allocate(solvimag6(1:maxneigh),stat=ierr(16))
-      allocate(solvrsq6 (1:maxneigh),stat=ierr(17))
-      allocate(solvlist6(1:maxneigh),stat=ierr(18)) 
-      allocate(solvtype6(1:maxneigh),stat=ierr(19))
+      allocate(solvx6(1:maxneigh),stat=ierr(13))
+      allocate(solvy6(1:maxneigh),stat=ierr(14))
+      allocate(solvz6(1:maxneigh),stat=ierr(15))
+      allocate(solvrmag6(1:maxneigh),stat=ierr(16))
+      allocate(solvimag6(1:maxneigh),stat=ierr(17))
+      allocate(solvrsq6 (1:maxneigh),stat=ierr(18))
+      allocate(solvlist6(1:maxneigh),stat=ierr(19)) 
+      allocate(solvtype6(1:maxneigh),stat=ierr(20))
       if (any(ierr/=0)) call Mfrz_Error(2538,0.d0)
       
       allocate(buff1(1:18*nq4+26*nq6),stat=ierr(1))
@@ -1936,6 +1943,8 @@ c     Compute the prefactors associated from dV_aug/d_q6
      x                    Q6_global(iq)
         k = k + 1
       end do
+
+c     write(0,'("DEBUG : q4prefactors = ",5F15.6)')q4prefactor
       
 c     Set atoms looper over by current rank
       
@@ -1956,11 +1965,10 @@ c     Set atoms looper over by current rank
       ii = 0
       do iatm = iatm0,iatm1,istrd
         
-c---------------------------------------------------------------
-c     Build a list of the required connections to iatm. This
+c --------------------------------------------------------------
+c     Build a list of the required connections to iatm. This  
 c     differs depending on the version of DLPOLY we are using.
-c     Note that excluded pairs will NOT have connections
-c     computed.
+c     First we loop over atoms in the neighbour list of iatm.
 c---------------------------------------------------------------
         
         ii = ii + 1
@@ -1976,12 +1984,48 @@ c---------------------------------------------------------------
           if ( q4site(jsite,isite)+q6site(jsite,isite)==0 ) cycle
           
           nn = nn + 1
+
+          dstlst(nn) = jatm
           
           xdf(nn)=xxx(jatm)-xxx(iatm)
           ydf(nn)=yyy(jatm)-yyy(iatm)
           zdf(nn)=zzz(jatm)-zzz(iatm) 
           
         end do
+
+c --------------------------------------------------------------
+c     Next we loop over the excluded atom list of iatm and add 
+c     and pairs needed for computation of the current OP.
+c---------------------------------------------------------------
+
+ccc   DEBUG
+ccc        write(0,'("atom ",I5," has ",I5," excluded interactions")')
+ccc     x       iatm,mtd_nexatm(iatm)
+
+        do k = 1,mtd_nexatm(ii)
+           
+           jatm  = mtd_lexatm(ii,k)
+           jsite = ltype(jatm)
+           
+ccc   DEBUG
+ccc           write(0,'("Interaction with atom ",I5," is excluded. ")')jatm
+           
+           if ( q4site(jsite,isite)+q6site(jsite,isite)==0 ) cycle
+        
+           nn = nn + 1
+           
+           dstlst(nn) = jatm
+           
+           xdf(nn)=xxx(jatm)-xxx(iatm)
+           ydf(nn)=yyy(jatm)-yyy(iatm)
+           zdf(nn)=zzz(jatm)-zzz(iatm) 
+           
+        end do
+        
+ccc   DEBUG
+ccc        write(0,*)
+        
+        numdst = nn
         
         call images(imcon,0,1,nn,cell,xdf,ydf,zdf)
         
@@ -1990,8 +2034,8 @@ c---------------------------------------------------------------
         isolvmax6 = 0
         isolv4 = 0
         isolv6 = 0
-        do k = 1,limit
-          jatm  = list(ii,k)
+        do k = 1,numdst
+          jatm  = dstlst(k)
           jsite = ltype(jatm)
           
           if ( q4site(jsite,isite)+q6site(jsite,isite)==0 ) cycle
@@ -2111,7 +2155,7 @@ c--------------------------------------------------
 c     Force contributions from m = -4 (real part)
 c--------------------------------------------------
             
-            prefactor2 = q4prefactor(itype)*ReQ4bar(-4,itype)
+            prefactor2 = 2.0d0*q4prefactor(itype)*ReQ4bar(-4,itype)
             
 c--------------------------------------------
 c     Gradient of Re(Y_{4,-4}) w.r.t r_{j}
@@ -2131,7 +2175,7 @@ c--------------------------------------------------------
 c     Force contributions from m = -4 (imaginary part) 
 c--------------------------------------------------------
             
-            prefactor2 = q4prefactor(itype)*ImQ4bar(-4,itype)
+            prefactor2 = 2.0d0*q4prefactor(itype)*ImQ4bar(-4,itype)
             
 c----------------------------------------------
 c     Gradient of Im(Y_{4,-4}) w.r.t r_{j}
@@ -2143,9 +2187,9 @@ c----------------------------------------------
      x             3.d0*z2*y2)
             fz1 =  invrc*ypre4m4*16.d0*x*y*z*(x2-y2)
             
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ReYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ReYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ReYlm)
+            fx = fx + prefactor2*(f_ij*fx1 + fx2*ImYlm)
+            fy = fy + prefactor2*(f_ij*fy1 + fy2*ImYlm)
+            fz = fz + prefactor2*(f_ij*fz1 + fz2*ImYlm)
             
 c--------------------------------------------------------
 c     Real and imaginary spherical harmonics for m = -3  
@@ -2158,7 +2202,7 @@ c--------------------------------------------------
 c     Force contributions from m = -3 (real part)  
 c--------------------------------------------------
             
-            prefactor2 = q4prefactor(itype)*ReQ4bar(-3,itype)
+            prefactor2 = 2.0d0*q4prefactor(itype)*ReQ4bar(-3,itype)
             
 c---------------------------------------------
 c     Gradient of Re(Y_{4,-3}) w.r.t r_{j}
@@ -2178,7 +2222,7 @@ c-------------------------------------------------------
 c     Force contributions from m = -3 (imaginary part) 
 c-------------------------------------------------------
 
-            prefactor2 = q4prefactor(itype)*ImQ4bar(-3,itype)
+            prefactor2 = 2.0d0*q4prefactor(itype)*ImQ4bar(-3,itype)
             
 c--------------------------------------------------
 c     Gradient of Im(Y_{4,-3}) w.r.t r_{j}
@@ -2189,9 +2233,9 @@ c--------------------------------------------------
      x            -3.d0*z2*y2)
             fz1 = -invrc*ypre4m3*y*(3.d0*x2-y2)*(x2+y2-3.d0*z2)
             
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ReYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ReYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ReYlm)
+            fx = fx + prefactor2*(f_ij*fx1 + fx2*ImYlm)
+            fy = fy + prefactor2*(f_ij*fy1 + fy2*ImYlm)
+            fz = fz + prefactor2*(f_ij*fz1 + fz2*ImYlm)
             
 c--------------------------------------------------------
 c     Real and imaginary spherical harmonics for m = -2  
@@ -2204,7 +2248,7 @@ c--------------------------------------------------
 c     Force contributions from m = -2 (real part)  
 c--------------------------------------------------
             
-            prefactor2 = q4prefactor(itype)*ReQ4bar(-2,itype)
+            prefactor2 = 2.0d0*q4prefactor(itype)*ReQ4bar(-2,itype)
             
 c---------------------------------------------
 c     Gradient of Re(Y_{4,-2}) w.r.t r_{j}
@@ -2225,7 +2269,7 @@ c-------------------------------------------------------
 c     Force contributions from m = -2 (imaginary part) 
 c-------------------------------------------------------
             
-            prefactor2 = q4prefactor(itype)*ImQ4bar(-2,itype)
+            prefactor2 = 2.0d0*q4prefactor(itype)*ImQ4bar(-2,itype)
             
 c-----------------------------------------
 c Gradient of Im(Y_{4,-2}) w.r.t r_{j}
@@ -2237,9 +2281,9 @@ c-----------------------------------------
      x            -6.d0*z4+x4)
             fz1 = -invrc*ypre4m2*8.d0*z*x*y*(4.d0*x2+4.d0*y2-3.d0*z2)
             
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ReYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ReYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ReYlm)
+            fx = fx + prefactor2*(f_ij*fx1 + fx2*ImYlm)
+            fy = fy + prefactor2*(f_ij*fy1 + fy2*ImYlm)
+            fz = fz + prefactor2*(f_ij*fz1 + fz2*ImYlm)
             
 c--------------------------------------------------------
 c     Real and imaginary spherical harmonics for m = -1
@@ -2252,7 +2296,7 @@ c--------------------------------------------------
 c     Force contributions from m = -1 (real part)  
 c--------------------------------------------------
             
-            prefactor2 = q4prefactor(itype)*ReQ4bar(-1,itype)
+            prefactor2 = 2.0d0*q4prefactor(itype)*ReQ4bar(-1,itype)
             
 c----------------------------------------
 c Gradient of Re(Y_{4,-1}) w.r.t r_{j}
@@ -2272,7 +2316,7 @@ c-------------------------------------------------------
 c     Force contributions from m = -1 (imaginary part) 
 c-------------------------------------------------------
             
-            prefactor2 = q4prefactor(itype)*ImQ4bar(-1,itype)
+            prefactor2 = 2.0d0*q4prefactor(itype)*ImQ4bar(-1,itype)
             
 c--------------------------------------------
 c     Gradient of Im(Y_{4,-1}) w.r.t r_{j}
@@ -2284,9 +2328,9 @@ c--------------------------------------------
             fz1 =  invrc*ypre4m1*y*(-21.d0*z2*x2-21.d0*z2*y2+4.d0*z4+
      x             3.d0*x4+6.d0*x2*y2+3.d0*y4)
             
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ReYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ReYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ReYlm)
+            fx = fx + prefactor2*(f_ij*fx1 + fx2*ImYlm)
+            fy = fy + prefactor2*(f_ij*fy1 + fy2*ImYlm)
+            fz = fz + prefactor2*(f_ij*fz1 + fz2*ImYlm)
             
 c--------------------------------------------------------
 c     Real spherical harmonics for m = 0                 
@@ -2309,193 +2353,6 @@ c-------------------------------------------
             fy1 =  20.d0*ypre4m0*invrc*z2*(-4.d0*z2+3.d0*x2+3.d0*y2)*y
             fz1 = -20.d0*ypre4m0*invrc*z*(-4.d0*z2*x2-4.d0*z2*y2+3.d0*
      x             x4+6.d0*x2*y2+3.d0*y4)
-            
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ReYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ReYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ReYlm)
-
-c--------------------------------------------------------
-c     Real and imaginary spherical harmonics for m = +1  
-c--------------------------------------------------------
-            
-            ReYlm = ypre4m1*invrs*z*(-4.d0*z2+3.d0*x2+3.d0*y2)*x
-            ImYlm = -ypre4m1*invrs*z*(-4.d0*z2+3.d0*x2+3.d0*y2)*y
-            
-c--------------------------------------------------
-c     Force contributions from m = +1 (real part)  
-c--------------------------------------------------
-            
-            prefactor2 = q4prefactor(itype)*ReQ4bar(+1,itype)
-            
-c-------------------------------------------
-c     Gradient of Re(Y_{4,+1}) w.r.t r_{j}
-c-------------------------------------------
-            
-            fx1 =  invrc*ypre4p1*z*(3.d0*x4-21.d0*z2*x2+z2*y2+4.d0*z4-
-     x             3.d0*y4)
-            fy1 =  invrc*ypre4p1*2.d0*z*x*y*(3.d0*x2+3.d0*y2-11.d0*z2)
-            fz1 = -invrc*ypre4p1*x*(-21.d0*x2*z2-21.d0*z2*y2+4.d0*z4+
-     x             3.d0*x4+6.d0*x2*y2+3.d0*y4)
-            
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ReYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ReYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ReYlm)
-            
-c------------------------------------------------------
-c     Force contributions from m = +1 (imaginary part) 
-c------------------------------------------------------
-            
-            prefactor2 = q4prefactor(itype)*ImQ4bar(+1,itype)
-            
-c--------------------------------------------
-c     Gradient of Im(Y_{4,+1}) w.r.t r_{j}
-c--------------------------------------------
-            
-            fx1 =  invrc*ypre4p1*2.d0*z*x*y*(3.d0*x2+3.d0*y2-11.d0*z2)
-            fy1 = -invrc*ypre4p1*z*(-3.d0*y4+21.d0*z2*y2-z2*x2-4.d0*z4
-     x             +3.d0*x4)
-            fz1 = -invrc*ypre4p1*y*(-21.d0*z2*x2-21.d0*z2*y2+4.d0*z4+
-     x             3.d0*x4+6.d0*x2*y2+3.d0*y4)
-            
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ReYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ReYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ReYlm)
-            
-c--------------------------------------------------------
-c     Real and imaginary spherical harmonics for m =  2  
-c--------------------------------------------------------
-
-            ReYlm = -ypre4p2*invrs*(x2-y2)*(-6.d0*z2+x2+y2)
-            ImYlm = -ypre4p2*invrs*2.d0*(-6.d0*z2+x2+y2)*x*y
-            
-c--------------------------------------------------
-c     Force contributions from m =  2 (real part)  
-c--------------------------------------------------
-
-            prefactor2 = q4prefactor(itype)*ReQ4bar(+2,itype)
-            
-c--------------------------------------------
-c     Gradient of Re(Y_{4,+2}) w.r.t r_{j}
-c--------------------------------------------
-            
-            fx1 = -invrc*ypre4p2*4.d0*x*(4.d0*z2*x2+y4-9.d0*z2*y2-
-     x             3.d0*z4+x2*y2)
-            fy1 =  invrc*ypre4p2*4.d0*y*(x4-9.d0*z2*x2+4.d0*z2*y2-
-     x             3.d0*z4+x2*y2)
-            fz1 =  invrc*ypre4p2*4.d0*z*(x2-y2)*(4.d0*x2+4.d0*y2-
-     x             3.d0*z2)
-            
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ReYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ReYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ReYlm)
-            
-c-------------------------------------------------------
-c     Force contributions from m =  2 (imaginary part) 
-c-------------------------------------------------------
-
-            prefactor2 = q4prefactor(itype)*ImQ4bar(+2,itype)
-            
-c--------------------------------------------
-c     Gradient of Im(Y_{4,+2}) w.r.t r_{j}
-c--------------------------------------------
-
-            fx1 =  invrc*ypre4p2*2.d0*y*(x4-21.d0*z2*x2+5.d0*z2*y2+
-     x             6.d0*z4-y4)
-            fy1 = -invrc*ypre4p2*2.d0*x*(-y4+21.d0*z2*y2-5.d0*z2*x2
-     x            -6.d0*z4+x4)
-            fz1 =  invrc*ypre4p2*8.d0*z*x*y*(4.d0*x2+4.d0*y2-3.d0*z2)
-            
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ReYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ReYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ReYlm)
-            
-c--------------------------------------------------------
-c     Real and imaginary spherical harmonics for m =  3  
-c--------------------------------------------------------
-
-            ReYlm =  ypre4p3*invrs*z*(x3-3.d0*x*y2)
-            ImYlm = -ypre4p3*invrs*z*(-3.d0*x2*y+y3)
-            
-c--------------------------------------------------
-c     Force contributions from m = +3 (real part)  
-c--------------------------------------------------
-            
-            prefactor2 = q4prefactor(itype)*ReQ4bar(+3,itype)
-            
-c--------------------------------------------
-c     Gradient of Re(Y_{4,+3}) w.r.t r_{j}
-c--------------------------------------------
-
-            fx1 = -invrc*ypre4p3*z*(x4-12.d0*x2*y2-3.d0*z2*x2+3.d0*y4
-     x            +3.d0*z2*y2)
-            fy1 = -invrc*ypre4p3*2.d0*z*x*y*(5.0d0*x2-3.d0*y2+3.d0*z2)
-            fz1 =  invrc*ypre4p3*x*(x2-3.d0*y2)*(x2+y2-3.d0*z2)
-            
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ReYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ReYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ReYlm)
-            
-c-------------------------------------------------------
-c     Force contributions from m = +3 (imaginary part) 
-c-------------------------------------------------------
-            
-            prefactor2 = q4prefactor(itype)*ImQ4bar(+3,itype)
-            
-c--------------------------------------------
-c     Gradient of Im(Y_{4,+3}) w.r.t r_{j}
-c--------------------------------------------
-            
-            fx1 = -invrc*ypre4p3*2.d0*z*x*y*(3.d0*x2-5.d0*y2-3.0d0*z2)
-            fy1 =  invrc*ypre4p3*z*(-12.d0*x2*y2+y4+3.d0*x4+3.d0*z2*x2
-     x            -3.d0*z2*y2)
-            fz1 =  invrc*ypre4p3*y*(3.d0*x2-y2)*(x2+y2-3.d0*z2)
-            
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ReYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ReYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ReYlm)
-            
-c-------------------------------------------------------------
-c     Real and imaginary spherical harmonics for m = +4      
-c-------------------------------------------------------------
-            
-            ReYlm =  ypre4p4*invrs*(x4-6.d0*x2*y2+y4)
-            ImYlm = -ypre4p4*invrs*(-4.d0*x3*y+4.d0*x*y3)
-            
-c-------------------------------------------------------
-c     Force contributions from m = +4 (real part)      
-c-------------------------------------------------------
-
-            prefactor2 = q4prefactor(itype)*ReQ4bar(+4,itype)
-            
-c--------------------------------------------
-c     Gradient of Re(Y_{4,-4}) w.r.t r_{j}
-c--------------------------------------------
-            
-            fx1 =  invrc*ypre4p4*4.d0*x*(4.d0*x2*y2-4.d0*y4+z2*x2-
-     x             3.d0*z2*y2)
-            fy1 = -invrc*ypre4p4*4.d0*y*(4.d0*x4-4.d0*x2*y2+3.d0*
-     x             z2*x2-z2*y2)
-            fz1 = -invrc*ypre4p4*4.d0*z*(x4-6.d0*x2*y2+y4)
-            
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ReYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ReYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ReYlm)
-            
-c-------------------------------------------------------
-c     Force contributions from m = -4 (imaginary part) 
-c-------------------------------------------------------
-            
-            prefactor2 = q4prefactor(itype)*ImQ4bar(+4,itype)
-            
-c--------------------------------------------
-c     Gradient of Im(Y_{4,-4}) w.r.t r_{j}
-c--------------------------------------------
-            
-            fx1 = -invrc*ypre4p4*4.d0*y*(x4-6.d0*x2*y2-3.d0*z2*x2+
-     x             y4+z2*y2)
-            fy1 =  invrc*ypre4p4*4.d0*x*(-6.d0*x2*y2+y4+x4+z2*x2-
-     x             3.d0*z2*y2)
-            fz1 = -invrc*ypre4p4*16.d0*x*y*z*(x2-y2)
             
             fx = fx + prefactor2*(f_ij*fx1 + fx2*ReYlm)
             fy = fy + prefactor2*(f_ij*fy1 + fy2*ReYlm)
@@ -2597,7 +2454,7 @@ c-----------------------------------------------------
 c     Force contributions from m = -6 (real part)     
 c-----------------------------------------------------
             
-            prefactor2 = q6prefactor(itype)*ReQ6bar(-6,itype)
+            prefactor2 = 2.0d0*q6prefactor(itype)*ReQ6bar(-6,itype)
             
 c--------------------------------------------
 c     Gradient of Re(Y_{6,-6}) w.r.t r_{j}
@@ -2606,7 +2463,7 @@ c--------------------------------------------
             fx1 =  invrq*ypre6m6*6.0d0*x*(6.0d0*x4*y2-20.0d0*x2*y4+
      x             6.0d0*y6+z2*x4-10.0d0*z2*x2*y2+5.0d0*z2*y4)
             fy1 = -invrq*ypre6m6*6.0d0*y*(6.0d0*x6-20.0d0*x4*y2+6.0d0
-     x             *x2*y4+5.0d0*z2*x4-10.0d0*z2*x2*y2-z2*y4)
+     x             *x2*y4+5.0d0*z2*x4-10.0d0*z2*x2*y2+z2*y4)
             fz1 = -invrq*ypre6m6*6.0d0*z*(x6-15.0d0*x4*y2+15.0d0*x2*
      x             y4-y6)
             
@@ -2618,7 +2475,7 @@ c----------------------------------------------------------
 c     Force contributions from m = -6 (Imaginary part)     
 c----------------------------------------------------------
             
-            prefactor2 = q6prefactor(itype)*ImQ6bar(-6,itype)
+            prefactor2 = 2.0d0*q6prefactor(itype)*ImQ6bar(-6,itype)
             
 c--------------------------------------------
 c     Gradient of Im(Y_{6,-6}) w.r.t r_{j}
@@ -2646,7 +2503,7 @@ c--------------------------------------------------
 c     Force contributions from m = -5 (real part)  
 c--------------------------------------------------
             
-            prefactor2 = q6prefactor(itype)*ReQ6bar(-5,itype)
+            prefactor2 = 2.0d0*q6prefactor(itype)*ReQ6bar(-5,itype)
             
 c--------------------------------------------
 c     Gradient of Re(Y_{6,-5}) w.r.t r_{j}
@@ -2667,7 +2524,7 @@ c--------------------------------------------------------
 c     Force contributions from m = -5 (Imaginary part)   
 c--------------------------------------------------------
 
-            prefactor2 = q6prefactor(itype)*ImQ6bar(-5,itype)
+            prefactor2 = 2.0d0*q6prefactor(itype)*ImQ6bar(-5,itype)
             
 c--------------------------------------------
 c     Gradient of Im(Y_{6,-5}) w.r.t r_{j}
@@ -2689,14 +2546,14 @@ c     Real and imaginary spherical harmonics for m = -4
 c--------------------------------------------------------
             
             ReYlm = ypre6m4*invrc*(10.0d0*z2-x2-y2)*(x4-6.0d0*x2*y2+y4)
-            ImYlm = ypre6m4*invrc*(10.0d0*z2-x2-y2)*(-4.0d0*x3*y-4.0d0*
+            ImYlm = ypre6m4*invrc*(10.0d0*z2-x2-y2)*(-4.0d0*x3*y+4.0d0*
      x              x*y3)
             
 c--------------------------------------------------
 c     Force contributions from m = -4 (real part)  
 c--------------------------------------------------
             
-            prefactor2 = q6prefactor(itype)*ReQ6bar(-4,itype)
+            prefactor2 = 2.0d0*q6prefactor(itype)*ReQ6bar(-4,itype)
             
 c--------------------------------------------
 c     Gradient of Re(Y_{6,-4}) w.r.t r_{j}
@@ -2719,14 +2576,15 @@ c--------------------------------------------------------
 c     Force contributions from m = -4 (Imaginary part)   
 c--------------------------------------------------------
             
-            prefactor2 = q6prefactor(itype)*ImQ6bar(-4,itype)
+            prefactor2 = 2.0d0*q6prefactor(itype)*ImQ6bar(-4,itype)
             
 c--------------------------------------------
 c     Gradient of Im(Y_{6,-4}) w.r.t r_{j}
 c--------------------------------------------
             
-            fx1 = -2.0d0*ypre6m4*invrq*y*(x4-6.0d0*x2*y2+y4)*(-13.0d0
-     x            *x2-13.0d0*y2+20.0d0*z2)
+            fx1 = -4.0d0*ypre6m4*invrq*y*(x6-35.0d0*z2*x4-5.0d0*x2*y4
+     x             +80.0d0*z2*x2*y2+30*z4*x2-9.0d0*z2*y4-10*z4*y2-5.0d0
+     x             *x4*y2+y6)
             fy1 = -4.0d0*ypre6m4*invrq*x*(5.0d0*x4*y2-80.0d0*z2*x2*y2
      x            -y6+35.0d0*z2*y4+9.0d0*z2*x4+10.0d0*z4*x2-30.0d0*z4
      x            *y2-x6+5.0d0*x2*y4)
@@ -2750,7 +2608,7 @@ c--------------------------------------------------
 c     Force contributions from m = -3 (real part)  
 c--------------------------------------------------
             
-            prefactor2 = q6prefactor(itype)*ReQ6bar(-3,itype)
+            prefactor2 = 2.0d0*q6prefactor(itype)*ReQ6bar(-3,itype)
             
 c--------------------------------------------
 c     Gradient of Re(Y_{6,-3}) w.r.t r_{j}
@@ -2772,7 +2630,7 @@ c--------------------------------------------------------
 c     Force contributions from m = -3 (Imaginary part)   
 c--------------------------------------------------------
             
-            prefactor2 = q6prefactor(itype)*ImQ6bar(-3,itype)
+            prefactor2 = 2.0d0*q6prefactor(itype)*ImQ6bar(-3,itype)
             
 c--------------------------------------------
 c     Gradient of Im(Y_{6,-3}) w.r.t r_{j}
@@ -2783,7 +2641,7 @@ c--------------------------------------------
             fy1 = -3.d0*ypre6m3*invrq*z*(9.d0*x4*y2+11.d0*x2*y4-54.d0
      x            *z2*x2*y2-y6+13.d0*z2*y4+5.d0*z2*x4+8.d0*z4*x2-8.d0
      x            *z4*y2-3.d0*x6)
-            fz1 =  3.d0*ypre6m3*invrq*z*(3.d0*x2-y2)*(-13.d0*z2*x2-
+            fz1 =  3.d0*ypre6m3*invrq*y*(3.d0*x2-y2)*(-13.d0*z2*x2-
      x             13.d0*z2*y2+8.d0*z4+x4+2.d0*x2*y2+y4)
             
             fx = fx + prefactor2*(f_ij*fx1 + fx2*ImYlm)
@@ -2803,7 +2661,7 @@ c--------------------------------------------------
 c     Force contributions from m = -2 (real part)  
 c--------------------------------------------------
             
-            prefactor2 = q6prefactor(itype)*ReQ6bar(-2,itype)
+            prefactor2 = 2.0d0*q6prefactor(itype)*ReQ6bar(-2,itype)
             
 c--------------------------------------------
 c     Gradient of Re(Y_{6,-2}) w.r.t r_{j}
@@ -2826,7 +2684,7 @@ c--------------------------------------------------------
 c     Force contributions from m = -2 (Imaginary part)   
 c--------------------------------------------------------
             
-            prefactor2 = q6prefactor(itype)*ImQ6bar(-2,itype)
+            prefactor2 = 2.0d0*q6prefactor(itype)*ImQ6bar(-2,itype)
             
 c--------------------------------------------
 c     Gradient of Im(Y_{6,-2}) w.r.t r_{j}
@@ -2858,13 +2716,13 @@ c--------------------------------------------------
 c     Force contributions from m = -1 (real part)  
 c--------------------------------------------------
             
-            prefactor2 = q6prefactor(itype)*ReQ6bar(-1,itype)
+            prefactor2 = 2.0d0*q6prefactor(itype)*ReQ6bar(-1,itype)
             
 c--------------------------------------------
 c     Gradient of Re(Y_{6,-1}) w.r.t r_{j}
 c--------------------------------------------
             
-            fx1 =       ypre6m1*invrq*z*(85.d0*x2*x4+70.d0*z2*x2*y2
+            fx1 =       ypre6m1*invrq*z*(85.d0*z2*x4+70.d0*z2*x2*y2
      x            -100.d0*z4*x2-5.d0*x6-5.d0*x4*y2+5.d0*x2*y4-12.d0
      x            *z4*y2+8.d0*z6-15.d0*z2*y4+5.d0*y6)
             fy1 = -2.d0*ypre6m1*invrq*z*x*y*(-50.d0*z2*x2-50.d0*z2*
@@ -2881,7 +2739,7 @@ c--------------------------------------------------------
 c     Force contributions from m = -1 (Imaginary part)   
 c--------------------------------------------------------
             
-            prefactor2 = q6prefactor(itype)*ImQ6bar(-1,itype)
+            prefactor2 = 2.0d0*q6prefactor(itype)*ImQ6bar(-1,itype)
             
 c--------------------------------------------
 c     Gradient of Im(Y_{6,-1}) w.r.t r_{j}
@@ -2921,7 +2779,7 @@ c--------------------------------------------
             fx1 = -42.d0*ypre6m0*invrq*z2*(8.d0*z4-20.d0*z2*x2-20.d0
      x            *z2*y2+5.d0*x4+10.d0*x2*y2+5.d0*y4)*x
             fy1 = -42.d0*ypre6m0*invrq*z2*(8.d0*z4-20.d0*z2*x2-20.d0
-     x            *z2*y2+5.d0*x4+10.d0*x2*y2+5.d0*y2)*y
+     x            *z2*y2+5.d0*x4+10.d0*x2*y2+5.d0*y4)*y
             fz1 =  42.d0*ypre6m0*invrq*z*(8.d0*z4*x2+8.d0*z4*y2-20.d0
      x            *z2*x4-40.d0*z2*x2*y2-20.d0*z2*y4+5.d0*x6+15.d0*x4*
      x             y2+15.d0*x2*y4+5.d0*y6)
@@ -2930,317 +2788,6 @@ c--------------------------------------------
             fy = fy + prefactor2*(f_ij*fy1 + fy2*ReYlm)
             fz = fz + prefactor2*(f_ij*fz1 + fz2*ReYlm)
             
-c--------------------------------------------------------
-c     Real and imaginary spherical harmonics for m = +1  
-c--------------------------------------------------------
-            
-            ReYlm = ypre6p1*invrc*z*(8.0d0*z4-20.0d0*z2*x2-20.0d0
-     x             *z2*y2+5.0d0*x4+10.0d0*x2*y2+5.0d0*y4)*x
-            ImYlm = ypre6p1*invrc*z*(8.0d0*z4-20.0d0*z2*x2-20.0d0
-     x             *z2*y2+5.0d0*x4+10.0d0*x2*y2+5.0d0*y4)*y 
-            
-c--------------------------------------------------
-c     Force contributions from m = +1 (real part)  
-c--------------------------------------------------
-            
-            prefactor2 = q6prefactor(itype)*ReQ6bar(1,itype)
-            
-c--------------------------------------------
-c     Gradient of Re(Y_{6,1}) w.r.t r_{j}
-c--------------------------------------------
-            
-            fx1 =       ypre6p1*invrq*z*(85.d0*x2*x4+70.d0*z2*x2*y2-
-     x             100.d0*z4*x2-5.d0*x6-5.d0*x4*y2+5.d0*x2*y4-12.d0*
-     x             z4*y2+8.d0*z6-15.d0*z2*y4+5.d0*y6)
-            fy1 = -2.d0*ypre6p1*invrq*z*x*y*(-50.d0*z2*x2-50.d0*z2*y2
-     x            +44.d0*z4+5.d0*x4+10.d0*x2*y2+5.d0*y4)
-            fz1 =      -ypre6p1*invrq*x*(-100.d0*z4*x2-100.d0*z4*y2+
-     x              8.d0*z6+85.d0*z2*x4+170.d0*z2*x2*y2+85.d0*z2*y4-
-     x              5.d0*x6-15.d0*x4*y2-15.d0*x2*y4-5.d0*y6)
-            
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ReYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ReYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ReYlm)
-            
-c--------------------------------------------------------
-c     Force contributions from m = 1 (Imaginary part)    
-c--------------------------------------------------------
-            
-            prefactor2 = q6prefactor(itype)*ImQ6bar(1,itype)
-            
-c--------------------------------------------
-c     Gradient of Im(Y_{6,1}) w.r.t r_{j}
-c--------------------------------------------
-            
-            fx1 = -2.d0*ypre6m1*invrq*z*x*y*(-50.d0*z2*x2-50.d0*z2*y2+
-     x             44.d0*z4+5.d0*x4+10.d0*x2*y2+5.d0*y4)
-            fy1 =       ypre6m1*invrq*z*(70.d0*z2*x2*y2+85.d0*z2*y4-
-     x             100.d0*z4*y2+5.d0*x4*y2-5.d0*x2*y4-5.d0*y6-12.d0*z4
-     x            *x2+8.d0*z6-15.d0*z2*x4+5.d0*x6)
-            fz1 =      -ypre6m1*invrq*y*(-100.d0*z4*x2-100.d0*z4*y2+
-     x             8.d0*z6+85.d0*z2*x4+170.d0*z2*x2*y2+85.d0*z2*y4-
-     x             5.d0*x6-15.d0*x4*y2-15.d0*x2*y4-5.d0*y6)
-            
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ImYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ImYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ImYlm)
-            
-c--------------------------------------------------------
-c     Real and imaginary spherical harmonics for m = +2  
-c--------------------------------------------------------
-            
-            ReYlm =      ypre6p2*invrc*(16.d0*z4-16.d0*z2*x2-16.d0*
-     x               z2*y2+x4+2.d0*x2*y2+y4)*(x2-y2)
-            ImYlm = 2.d0*ypre6p2*invrc*(16.d0*z4-16.d0*z2*x2-16.d0*
-     x               z2*y2+x4+2.d0*x2*y2+y4)*x*y
-            
-c--------------------------------------------------
-c     Force contributions from m = +2 (real part)  
-c--------------------------------------------------
-            
-            prefactor2 = q6prefactor(itype)*ReQ6bar(2,itype)
-            
-c--------------------------------------------
-c     Gradient of Re(Y_{6,2}) w.r.t r_{j}
-c--------------------------------------------
-            
-            fx1 =  2.d0*ypre6p2*invrq*x*( 19.d0*z2*x4-64.d0*z4*x2-
-     x             49.d0*z2*y4+64.d0*z4*y2+2.d0*x4*y2+4.d0*x2*y4+
-     x             2.d0*y6+16.d0*z6-30.d0*z2*x2*y2)
-            fy1 = -2.d0*ypre6p2*invrq*y*(-49.d0*z2*x4+64.d0*z4*x2+
-     x             19.d0*z2*y4-64.d0*z4*y2+2.d0*x6+4.d0*x4*y2+2.d0
-     x            *x2*y4+16.d0*z6-30.d0*z2*x2*y2)
-            fz1 = -2.d0*ypre6p2*invrq*z*(x2-y2)*(-64.d0*z2*x2-64.d0
-     x            *z2*y2+16.d0*z4+19.d0*x4+38.d0*x2*y2+19.d0*y4)
-            
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ReYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ReYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ReYlm)
-            
-c--------------------------------------------------------
-c     Force contributions from m = 2 (Imaginary part)    
-c--------------------------------------------------------
-            
-            prefactor2 = q6prefactor(itype)*ImQ6bar(2,itype)
-            
-c--------------------------------------------
-c     Gradient of Im(Y_{6,2}) w.r.t r_{j}
-c--------------------------------------------
-            
-            fx1 =  2.d0*ypre6p2*invrq*y*(53.d0*z2*x4+38.d0*z2*x2*y2-
-     x             128.d0*z4*x2-x6-x4*y2+x2*y4+16.d0*z6-15.d0*z2*y4+y6)
-            fy1 =  2.d0*ypre6p2*invrq*x*(38.d0*z2*x2*y2+53.d0*z2*y4-
-     x             128.d0*z4*y2+x4*y2-x2*y4-y6+16.d0*z6-15.d0*z2*x4+x6)
-            fz1 = -4.d0*ypre6p2*invrq*z*x*y*(-64.d0*z2*x2-64.d0*z2*y2+
-     x             16.d0*z4+19.d0*x4+38.d0*x2*y2+19.d0*y4)
-            
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ImYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ImYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ImYlm)
-            
-c--------------------------------------------------------
-c     Real and imaginary spherical harmonics for m = +3  
-c--------------------------------------------------------
-            
-            ReYlm = ypre6p3*invrc*z*(8.d0*z2-3.d0*x2-3.d0*y2)*
-     x        (x3-3.d0*x*y2)
-            ImYlm = ypre6p3*invrc*z*(8.d0*z2-3.d0*x2-3.d0*y2)*
-     x        (3.d0*x2*y-y3)
-            
-c--------------------------------------------------
-c     Force contributions from m = +3 (real part)  
-c--------------------------------------------------
-            
-            prefactor2 = q6prefactor(itype)*ReQ6bar(3,itype)
-            
-c--------------------------------------------
-c     Gradient of Re(Y_{6,3}) w.r.t r_{j}
-c--------------------------------------------
-            
-            fx1 =  3.d0*ypre6p3*invrq*z*(x6-11.d0*x4*y2-13.d0*z2*x4-
-     x             9.d0*x2*y4+54.d0*z2*x2*y2+8.d0*z4*x2-5.d0*z2*y4-
-     x             8.d0*z4*y2+3.d0*y6)
-            fy1 = -6.d0*ypre6p3*invrq*z*x*y*(-5.d0*x4-2.d0*x2*y2+
-     x             14.d0*z2*x2+3.d0*y4-22.d0*z2*y2+8.d0*z4)
-            fz1 = -3.d0*ypre6p3*invrq*x*(x2-3.d0*y2)*(-13.d0*z2*x2-
-     x             13.d0*z2*y2+8.d0*z4+x4+2.d0*x2*y2+y4)
-            
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ReYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ReYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ReYlm)
-            
-c--------------------------------------------------------
-c     Force contributions from m = 3 (Imaginary part )   
-c--------------------------------------------------------
-            
-            prefactor2 = q6prefactor(itype)*ImQ6bar(3,itype)
-            
-c--------------------------------------------
-c     Gradient of Im(Y_{6,3}) w.r.t r_{j}
-c--------------------------------------------
-            
-            fx1 =  6.d0*ypre6p3*invrq*z*x*y*(3.d0*x4-2.d0*x2*y2-22.d0
-     x            *z2*x2-5.d0*y4+14.d0*z2*y2+8.d0*z4)
-            fy1 =  3.d0*ypre6p3*invrq*z*(9.d0*x4*y2+11.d0*x2*y4-54.d0
-     x            *z2*x2*y2-y6+13.d0*z2*y4+5.d0*z2*x4+8.d0*z4*x2-8.d0
-     x            *z4*y2-3.d0*x6)
-            fz1 = -3.d0*ypre6p3*invrq*z*(3.d0*x2-y2)*(-13.d0*z2*x2-
-     x             13.d0*z2*y2+8.d0*z4+x4+2.d0*x2*y2+y4)
-            
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ImYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ImYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ImYlm)
-            
-c--------------------------------------------------------
-c     Real and imaginary spherical harmonics for m = +4  
-c--------------------------------------------------------
-            
-            ReYlm = ypre6p4*invrc*(10.d0*z2-x2-y2)*(x4-6.d0*x2*y2+y4)
-            ImYlm = ypre6p4*invrc*(10.d0*z2-x2-y2)*(4.d0*x3*y-4.d0*
-     x              x*y3)
-            
-c--------------------------------------------------
-c     Force contributions from m = +4 (real part)  
-c--------------------------------------------------
-            
-            prefactor2 = q6prefactor(itype)*ReQ6bar(4,itype)
-            
-c--------------------------------------------
-c     Gradient of Re(Y_{6,4}) w.r.t r_{j}
-c--------------------------------------------
-            
-            fx1 = 2.0d0*ypre6p4*invrq*x*(-8.0d0*x4*y2-13.0d0*z2*x4+
-     x            150.0d0*z2*x2*y2+8.0d0*y6-85.0d0*z2*y4+20.0d0*z4*x2
-     x           -60.0d0*z4*y2)
-            fy1 =-2.0d0*ypre6p4*invrq*y*(-8.0d0*x6+85.0d0*z2*x4+8.0d0
-     x           *x2*y4-150.0d0*z2*x2*y2+13.0d0*z2*y4+60.0d0*z4*x2-
-     x            20.0d0*z4*y2)
-            fz1 =-2.0d0*ypre6p4*invrq*z*(x4-6.0d0*x2*y2+y4)*(-13.0d0*
-     x            x2-13.0d0*y2+20.0d0*z2)
-            
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ReYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ReYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ReYlm)
-            
-c--------------------------------------------------------
-c     Force contributions from m = 4 (Imaginary part)    
-c--------------------------------------------------------
-            
-            prefactor2 = q6prefactor(itype)*ImQ6bar(4,itype)
-            
-c--------------------------------------------
-c     Gradient of Im(Y_{6,4}) w.r.t r_{j}
-c--------------------------------------------
-            
-            fx1 =  2.0d0*ypre6p4*invrq*y*(x4-6.0d0*x2*y2+y4)*(-13.0d0
-     x            *x2-13.0d0*y2+20.0d0*z2)
-            fy1 =  4.0d0*ypre6p4*invrq*x*(5.0d0*x4*y2-80.0d0*z2*x2*y2
-     x            -y6+35.0d0*z2*y4+9.0d0*z2*x4+10.0d0*z4*x2-30.0d0*z4
-     x            *y2-x6+5.0d0*x2*y4)
-            fz1 = -8.0d0*ypre6p4*invrq*z*x*y*(x2-y2)*(-13.0d0*x2-
-     x             13.0d0*y2+20.0d0*z2)
-            
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ImYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ImYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ImYlm)
-            
-c--------------------------------------------------------
-c     Real and imaginary spherical harmonics for m = +5  
-c--------------------------------------------------------
-            
-            ReYlm = ypre6p5*invrc*z*(x5-10.d0*x3*y2+5.d0*x*y4)
-            ImYlm = ypre6p5*invrc*z*(5.d0*x4*y-10.d0*x2*y3+y5)
-            
-c--------------------------------------------------
-c     Force contributions from m = +5 (real part)  
-c--------------------------------------------------
-            
-            prefactor2 = q6prefactor(itype)*ReQ6bar(5,itype)
-            
-c--------------------------------------------
-c     Gradient of Re(Y_{6,5}) w.r.t r_{j}
-c--------------------------------------------
-            
-            fx1 =        ypre6p5*invrq*z*(-x6+35.0d0*x4*y2-55*x2*y4
-     x            +5.0d0*z2*x4-30.0d0*z2*x2*y2+5.0d0*y6+5.0d0*z2*y4)
-            fy1 = -2.0d0*ypre6p5*invrq*x*y*z*(13.0d0*x4-30.0d0*x2*y2
-     x            +5.0d0*y4+10.0d0*z2*x2-10.0d0*z2*y2) 
-            fz1 =       -ypre6p5*invrq*x*(x4-10.0d0*x2*y2+5.0d0*y4)*
-     x        (-x2-y2+5.0d0*z2)
-            
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ReYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ReYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ReYlm)
-            
-c--------------------------------------------------------
-c     Force contributions from m = 5 (Imaginary part)    
-c--------------------------------------------------------
-            
-            prefactor2 = q6prefactor(itype)*ImQ6bar(5,itype)
-            
-c--------------------------------------------
-c     Gradient of Im(Y_{6,5}) w.r.t r_{j}
-c--------------------------------------------
-            
-            fx1 =  2.0d0*ypre6p5*invrq*x*y*z*(-5.0d0*x4+30.0d0*x2*y2-
-     x             13.0d0*y4+10.0d0*z2*x2-10.0d0*z2*y2)
-            fy1 =       +ypre6p5*invrq*z*(-55.0d0*x4*y2+35.0d0*x2*y4-
-     x             y6+5.0d0*x6+5.0d0*z2*x4-30.0d0*z2*x2*y2+5.0d0*z2*y4)
-            fz1 =       -ypre6p5*invrq*y*(5.0d0*x4-10.0d0*x2*y2+y4)*
-     x             (-x2-y2+5.0d0*z2)
-            
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ImYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ImYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ImYlm)
-            
-c--------------------------------------------------------
-c     Real and imaginary spherical harmonics for m = +6  
-c--------------------------------------------------------
-            
-            ReYlm = ypre6p6*invrc*(x6-15.d0*x4*y2+15.d0*x2*y4-y6)
-            ImYlm = ypre6p6*invrc*(6.d0*x5*y-20.d0*x3*y3+6.d0*x*y5)
-            
-c--------------------------------------------------
-c     Force contributions from m = +6 (real part)  
-c--------------------------------------------------
-            
-            prefactor2 = q6prefactor(itype)*ReQ6bar(6,itype)
-            
-c--------------------------------------------
-c     Gradient of Re(Y_{6,6}) w.r.t r_{j}
-c--------------------------------------------
-            
-            fx1 =  invrq*ypre6p6*6.0d0*x*(6.0d0*x4*y2-20.0d0*x2*y4+
-     x             6.0d0*y6+z2*x4-10.0d0*z2*x2*y2+5.0d0*z2*y4)
-            fy1 = -invrq*ypre6p6*6.0d0*y*(6.0d0*x6-20.0d0*x4*y2+
-     x             6.0d0*x2*y4+5.0d0*z2*x4-10.0d0*z2*x2*y2-z2*y4)
-            fz1 = -invrq*ypre6p6*6.0d0*z*(x6-15.0d0*x4*y2+15.0d0*x2
-     x            *y4-y6)
-            
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ReYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ReYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ReYlm)
-            
-c--------------------------------------------------------
-c     Force contributions from m = 6 (Imaginary part)    
-c--------------------------------------------------------
-            
-            prefactor2 = q6prefactor(itype)*ImQ6bar(6,itype)
-            
-c--------------------------------------------
-c     Gradient of Im(Y_{6,6}) w.r.t r_{j}
-c--------------------------------------------
-            
-            fx1 =  invrq*ypre6p6*6.0d0*y*(-x6+15.0d0*x4*y2-15.0d0*
-     x             x2*y4+5.0d0*z2*x4-10.0d0*z2*x2*y2+y6+z2*y4)
-            fy1 =  invrq*ypre6p6*6.0d0*x*(-15.0d0*x4*y2+15.0d0*x2*
-     x             y4-y6+x6+z2*x4-10.0d0*z2*x2*y2+5.0d0*z2*y4)
-            fz1 = -invrq*ypre6p6*12.0d0*x*y*z*(3.0d0*x4-10.0d0*x2*
-     x             y2+3.0d0*y4)
-            
-            fx = fx + prefactor2*(f_ij*fx1 + fx2*ImYlm)
-            fy = fy + prefactor2*(f_ij*fy1 + fy2*ImYlm)
-            fz = fz + prefactor2*(f_ij*fz1 + fz2*ImYlm)
             
 c     Add into global force and stress arrays
             
@@ -3290,24 +2837,26 @@ c     tidy up
       deallocate(xdf,stat=ierr(1))
       deallocate(ydf,stat=ierr(2))
       deallocate(zdf,stat=ierr(3))
+
+      deallocate(dstlst,stat=ierr(4))
       
-      deallocate(solvx4,stat=ierr(4))
-      deallocate(solvy4,stat=ierr(5))
-      deallocate(solvz4,stat=ierr(6))
-      deallocate(solvrmag4,stat=ierr(7))
-      deallocate(solvimag4,stat=ierr(8))
-      deallocate(solvrsq4 ,stat=ierr(9))
-      deallocate(solvlist4,stat=ierr(10)) 
-      deallocate(solvtype4,stat=ierr(11))
+      deallocate(solvx4,stat=ierr(5))
+      deallocate(solvy4,stat=ierr(6))
+      deallocate(solvz4,stat=ierr(7))
+      deallocate(solvrmag4,stat=ierr(8))
+      deallocate(solvimag4,stat=ierr(9))
+      deallocate(solvrsq4 ,stat=ierr(10))
+      deallocate(solvlist4,stat=ierr(11)) 
+      deallocate(solvtype4,stat=ierr(12))
       
-      deallocate(solvx6,stat=ierr(12))
-      deallocate(solvy6,stat=ierr(13))
-      deallocate(solvz6,stat=ierr(14))
-      deallocate(solvrmag6,stat=ierr(15))
-      deallocate(solvimag6,stat=ierr(16))
-      deallocate(solvrsq6 ,stat=ierr(17))
-      deallocate(solvlist6,stat=ierr(18)) 
-      deallocate(solvtype6,stat=ierr(19))
+      deallocate(solvx6,stat=ierr(13))
+      deallocate(solvy6,stat=ierr(14))
+      deallocate(solvz6,stat=ierr(15))
+      deallocate(solvrmag6,stat=ierr(16))
+      deallocate(solvimag6,stat=ierr(17))
+      deallocate(solvrsq6 ,stat=ierr(18))
+      deallocate(solvlist6,stat=ierr(19)) 
+      deallocate(solvtype6,stat=ierr(20))
       if (any(ierr/=0)) call Mfrz_Error(2536,0.d0)
       
       deallocate(buff1,stat=ierr(1))
