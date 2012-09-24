@@ -826,7 +826,7 @@ java version january 2001 author w.smith
         return 0;
     }
     
-    static void ShellSort(int n,int lst[], int iii[]) {
+    static void ShellSort0(int n,int lst[], int iii[]) {
         /*
 *********************************************************************
          
@@ -859,6 +859,43 @@ author    - w.smith 2000
             }
         }
     }
+
+    static void ShellSort1(int n, int lst[], int iii[]) {
+        /*
+         *********************************************************************
+         *
+         * dl_poly/java routine to sort list of integers into ascending order
+         * using the shell method
+         *
+         * copyright - daresbury laboratory author - w.smith 2000
+         *
+         *********************************************************************
+         */
+        int i, j, k, l, m;
+
+        m = n;
+        while (m > 0) {
+            m = m / 2;
+            for (j = 0; j < n - m; j++) {
+                i = j;
+                while (i >= 0) {
+                    l = i + m;
+                    if (iii[l] < iii[i]) {
+                        k = lst[i];
+                        lst[i] = lst[l];
+                        lst[l] = k;
+			k = iii[i];
+			iii[i] = iii[l];
+			iii[l] = k;
+                        i = i - m;
+                    } else {
+                        i = -1;
+                    }
+                }
+            }
+        }
+    }
+
     static double ArcTan2(double x,double y) {
         /*
 *********************************************************************
