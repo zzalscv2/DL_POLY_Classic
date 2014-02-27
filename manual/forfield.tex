@@ -1914,8 +1914,11 @@ an {\em external} force field\index{force field}. Examples of field available in
 \item Harmonic repulsive wall in z-direction: ({\bf zbnd})
 \begin{equation} \vek{F}=A(z_{o}-z)~~~~~~~~~~~~: z>z_{o} \end{equation}
 \item Harmonic restraint zone in z-direction: ({\bf zres})
-\begin{equation} \vek{F}=A(z_{max}-z_{com})~~~~~~~: z_{com}>z_{max} \end{equation}
-\begin{equation} \vek{F}=A(z_{min}-z_{com})~~~~~~~: z_{com}<z_{min}
+\begin{equation}
+\vek{F}_{z} = \left\{ \begin{array} {l@{\qquad:\qquad}l}
+A~(z_{com}-z_{max}) & z_{com} > z_{max} \\
+A~(z_{min}-z_{com}) & z_{com} < z_{min}
+\end{array} \right.
 \end{equation}
 where $z_{com}$ is the chosen molecule centre of mass.
 \end{enumerate}

@@ -304,7 +304,7 @@ c     if centre of mass is below z-min, activate restraining force
           do i=istart,ifinish
             
             fzz(i)=fzz(i)-prmfld(3)*(weight(i)/totwgt)*
-     x        (com(3)-prmfld(4))
+     x        (com(3)-prmfld(4))/mxnode
             
           enddo
           
@@ -315,7 +315,7 @@ c     if centre of mass if above z-max, activate restraining force
           do i=istart,ifinish
             
             fzz(i)=fzz(i)-prmfld(3)*(weight(i)/totwgt)*
-     x        (com(3)-prmfld(5))
+     x        (com(3)-prmfld(5))/mxnode
             
           enddo
           

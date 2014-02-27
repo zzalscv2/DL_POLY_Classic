@@ -460,11 +460,11 @@ c     apply truncation of potential
         if(rcsq.gt.rsq)then
 
           rrr=sqrt(rsq)
-          ll=int(rrr*rdelr+0.999999d0)
+          ll=Min(1+Int(rrr*rdelr),mxrdf)
 
 c     accumulate statistics
 
-          if(ll.le.mxrdf)rdf(ll,k)=rdf(ll,k)+1.d0
+          rdf(ll,k)=rdf(ll,k)+1.d0
 
         endif
         
