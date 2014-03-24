@@ -54,7 +54,8 @@ all:
 
 #======== Windows XP/Cygwin/MinGW GNU Fortran ========================
 gfortran:
-	$(MAKE) LD="gfortran" LDFLAGS= FC=gfortran FFLAGS="-c -O2 -ffast-math" \
+	$(MAKE) LD="gfortran -o" LDFLAGS="" FC=gfortran \
+	FFLAGS="-c -O2 -ffast-math" \
 	EX=$(EX) BINROOT=$(BINROOT) $(TYPE)
 
 #======== Windows XP/Cygwin/G95 ======================================
@@ -72,9 +73,9 @@ win: check $(OBJ_MOD) $(OBJ_PAR) $(OBJ_SRC)
 #=====================================================================
 # Check that a machine has been specified
 check:
-	@if test $(FC) = "undefined"; \
+	@if test $(FC) = "undefined";\
 	then echo "You must specify a target machine!"; \
-	exit 99; \
+	exit 99;\
 	fi
 
 #=====================================================================
