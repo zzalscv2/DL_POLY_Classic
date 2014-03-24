@@ -13,7 +13,7 @@ c*********************************************************************
       implicit none
       
       integer i,k,l,m,n,ll,mm,nn,kk,fail,nmin,mmin,natms,kmax,kmax3
-      real(8) twopi,peak,stx,sty,stz,det
+      real(8) twopi,peak,stx,sty,stz,det,ckcs,ckss
       real(8) cell(9),xxx(natms),yyy(natms),zzz(natms),rcell(9)
       
       real(8), allocatable :: ckc(:),cks(:),clm(:),slm(:)
@@ -23,12 +23,16 @@ c*********************************************************************
       
       data twopi/6.2831853072d0/
       
-      kmax3=((kmax+1)**3)/2
+      kmax3=((2*kmax+1)**3)/2
       allocate(ckc(natms),cks(natms),clm(natms),slm(natms),stat=fail)
       allocate(emc(natms,0:kmax),enc(natms,0:kmax),stat=fail)
       allocate(els(natms,0:kmax),ems(natms,0:kmax),stat=fail)
       allocate(ens(natms,0:kmax),elc(natms,0:kmax),stat=fail)
       allocate(strk(kmax3),stat=fail)
+      if(fail.gt.0)then
+        write(*,*)'error - failed array allocation in bragg'
+        call exit(0)
+      endif
       
       write(*,"(1x,'bragg plane projection',//,
      x  1x,' l m n   str.fac')")
@@ -85,7 +89,8 @@ c     loop over all k vectors  k=2pi(ll/cl,mm/cl,nn/cl)
       mmin=0
       nmin=1
       
-      do l=0,klim
+      do l=0,kmax
+        ll=l
         do mm=mmin,kmax
           m=iabs(mm)
           if(mm.ge.0)then
@@ -101,7 +106,7 @@ c     loop over all k vectors  k=2pi(ll/cl,mm/cl,nn/cl)
           endif
           
           do nn=nmin,kmax
-            n=iabs(nn)+1
+            n=iabs(nn)
             
             if(nn.ge.0)then
               do i=1,natms
@@ -117,7 +122,7 @@ c     loop over all k vectors  k=2pi(ll/cl,mm/cl,nn/cl)
             
             ckcs=0.0d0
             ckss=0.0d0
-            do i=1,natm
+            do i=1,natms
               ckcs=ckcs+ckc(i)
               ckss=ckss+cks(i)
             enddo
