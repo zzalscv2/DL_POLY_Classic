@@ -59,6 +59,7 @@ author    - w.smith 2000
         solkey = new JComboBox<String>();
         solkey.setForeground(art.scrf);
         solkey.setBackground(art.scrn);
+        solkey.addItem("None");
         solkey.addItem("Decompose");
         solkey.addItem("Free Energy");
         solkey.addItem("Excitation");

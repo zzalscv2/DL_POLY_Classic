@@ -61,6 +61,7 @@ author    - w.smith 2000
         hypopt = new JComboBox<String>();
         hypopt.setForeground(art.scrf);
         hypopt.setBackground(art.scrn);
+        hypopt.addItem("None");
         hypopt.addItem("BPD");
         hypopt.addItem("TAD");
         hypopt.addItem("NEB");

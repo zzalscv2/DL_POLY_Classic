@@ -728,102 +728,103 @@ author    - w. smith december 2000
                 }
                 outStream.writeBytes("\n");
             }
-            
-            if(hyp_key == 0){
-                outStream.writeBytes("# Bias potential dynamics  controls\n");
-                if(bpdpath)outStream.writeBytes("bpd path\n");
-            }
-            if(hyp_key == 1){
-                outStream.writeBytes("# Temperature accelerated dynamics  controls\n");
-                outStream.writeBytes("tad\n");
-            }
-            if(hyp_key==2){
-                outStream.writeBytes("# Nudged elastic band controls\n");
-                outStream.writeBytes("neb "+BML.fmt(num_neb,8)+"\n");
-                outStream.writeBytes("basin_1 "+basin_1+"\n");
-                outStream.writeBytes("basin_2 "+basin_2+"\n");
-            }
-            if(hyp_key > 0 || (hyp_key == 0 && bpdpath)) {
-                switch (hyp_units_key) {
-                case 1:
-                    outStream.writeBytes("units eV\n");
-                    break;
-                case 2:
-                    outStream.writeBytes("units kcal\n");
-                    break;
-                case 3:
-                    outStream.writeBytes("units kJ\n");
-                    break;
-                case 4:
-                    outStream.writeBytes("units K\n");
-                    break;
-                default:
-                    outStream.writeBytes("units dl_poly\n");
+            if(lhyp & (hyp_key > 0)){
+                if(hyp_key == 1){
+                    outStream.writeBytes("# Bias potential dynamics  controls\n");
+                    if(bpdpath)outStream.writeBytes("bpd path\n");
+                }
+                if(hyp_key == 2){
+                    outStream.writeBytes("# Temperature accelerated dynamics  controls\n");
+                    outStream.writeBytes("tad\n");
+                }
+                if(hyp_key == 3){
+                    outStream.writeBytes("# Nudged elastic band controls\n");
+                    outStream.writeBytes("neb "+BML.fmt(num_neb,8)+"\n");
+                    outStream.writeBytes("basin_1 "+basin_1+"\n");
+                    outStream.writeBytes("basin_2 "+basin_2+"\n");
+                }
+                if(hyp_key > 1 || (hyp_key == 1 && bpdpath)) {
+                    switch (hyp_units_key) {
+                    case 1:
+                        outStream.writeBytes("units eV\n");
+                        break;
+                    case 2:
+                        outStream.writeBytes("units kcal\n");
+                        break;
+                    case 3:
+                        outStream.writeBytes("units kJ\n");
+                        break;
+                    case 4:
+                        outStream.writeBytes("units K\n");
+                        break;
+                    default:
+                        outStream.writeBytes("units dl_poly\n");
+                    }
+                }
+                if(hyp_key == 1 && bpdpath) {
+                    outStream.writeBytes("ebias "+ebias+"\n");
+                    outStream.writeBytes("vmin "+vmin+"\n");
+                    if(!goneb)outStream.writeBytes("noneb\n");
+                    if(!hyp_target.equals("None"))
+                        outStream.writeBytes("target "+hyp_target+"\n");
+                }
+                if(hyp_key == 2 || (hyp_key == 1 && bpdpath)) {
+                    outStream.writeBytes("num_block "+num_block+"\n");
+                    outStream.writeBytes("num_track "+num_track+"\n");
+                }
+                if(hyp_key == 2){
+                    outStream.writeBytes("blackout "+num_black+"\n");
+                    outStream.writeBytes("deltad "+deltad+"\n");
+                    outStream.writeBytes("low_temp "+low_temp+"\n");
+                }
+                if(hyp_key > 1 || (hyp_key == 1 && bpdpath)) {
+                    if(hyp_key < 3)outStream.writeBytes("catch_radius "+catch_radius+"\n");
+                    if(hyp_key > 1 ||(hyp_key == 1 && goneb))
+                        outStream.writeBytes("neb_spring "+neb_spring+"\n");
+                    switch (hyp_opt_key) {
+                    case 1:
+                        outStream.writeBytes("energy "+hyp_opt_tol+"\n");
+                        break;
+                    case 2:
+                        outStream.writeBytes("position "+hyp_opt_tol+"\n");
+                        break;
+                    default:
+                        outStream.writeBytes("force "+hyp_opt_tol+"\n");
+                    }
+                    
+                    if(hyp_key == 1)
+                        outStream.writeBytes("endbpd\n");
+                    else if(hyp_key == 2)
+                        outStream.writeBytes("endtad\n");
+                    else if(hyp_key == 3)
+                        outStream.writeBytes("endneb\n");
+                    outStream.writeBytes("\n");
+                }
+                if(hyp_key == 1 && !bpdpath){
+                    outStream.writeBytes("bpd dynamics");
+                    outStream.writeBytes(" "+ebias);
+                    outStream.writeBytes(" "+vmin);
+                    switch (hyp_units_key) {
+                    case 1:
+                        outStream.writeBytes(" units eV\n");
+                        break;
+                    case 2:
+                        outStream.writeBytes(" units kcal\n");
+                        break;
+                    case 3:
+                        outStream.writeBytes(" units kJ\n");
+                        break;
+                    case 4:
+                        outStream.writeBytes(" units K\n");
+                        break;
+                    default:
+                        outStream.writeBytes(" units dl_poly\n");
+                    }
+                    outStream.writeBytes("\n");
                 }
             }
-            if(hyp_key == 0 && bpdpath) {
-                outStream.writeBytes("ebias "+ebias+"\n");
-                outStream.writeBytes("vmin "+vmin+"\n");
-                if(!goneb)outStream.writeBytes("noneb\n");
-                if(!hyp_target.equals("None"))
-                    outStream.writeBytes("target "+hyp_target+"\n");
-            }
-            if(hyp_key == 1 || (hyp_key == 0 && bpdpath)) {
-                outStream.writeBytes("num_block "+num_block+"\n");
-                outStream.writeBytes("num_track "+num_track+"\n");
-            }
-            if(hyp_key == 1){
-                outStream.writeBytes("blackout "+num_black+"\n");
-                outStream.writeBytes("deltad "+deltad+"\n");
-                outStream.writeBytes("low_temp "+low_temp+"\n");
-            }
-            if(hyp_key > 0 || (hyp_key == 0 && bpdpath)) {
-                if(hyp_key < 2)outStream.writeBytes("catch_radius "+catch_radius+"\n");
-                if(hyp_key > 0 ||(hyp_key == 0 && goneb))
-                    outStream.writeBytes("neb_spring "+neb_spring+"\n");
-                switch (hyp_opt_key) {
-                case 1:
-                    outStream.writeBytes("energy "+hyp_opt_tol+"\n");
-                    break;
-                case 2:
-                    outStream.writeBytes("position "+hyp_opt_tol+"\n");
-                    break;
-                default:
-                    outStream.writeBytes("force "+hyp_opt_tol+"\n");
-                }
-                
-                if(hyp_key == 0)
-                    outStream.writeBytes("endbpd\n");
-                else if(hyp_key == 1)
-                    outStream.writeBytes("endtad\n");
-                else if(hyp_key == 2)
-                    outStream.writeBytes("endneb\n");
-                outStream.writeBytes("\n");
-            }
-            if(hyp_key == 0 && !bpdpath){
-                outStream.writeBytes("bpd dynamics");
-                outStream.writeBytes(" "+ebias);
-                outStream.writeBytes(" "+vmin);
-                switch (hyp_units_key) {
-                case 1:
-                    outStream.writeBytes(" units eV\n");
-                    break;
-                case 2:
-                    outStream.writeBytes(" units kcal\n");
-                    break;
-                case 3:
-                    outStream.writeBytes(" units kJ\n");
-                    break;
-                case 4:
-                    outStream.writeBytes(" units K\n");
-                    break;
-                default:
-                    outStream.writeBytes(" units dl_poly\n");
-                }
-                outStream.writeBytes("\n");
-            }
-            
-            if(lmetd) {
+
+            if(lmetd & (ncolvar > 0)) {
                 outStream.writeBytes("# Metadynamics controls\n");
                 outStream.writeBytes("metadynamics\n");
                 outStream.writeBytes("ncolvar "+ncolvar+"\n");
@@ -853,44 +854,45 @@ author    - w. smith december 2000
                 outStream.writeBytes("\n");
                 
             }
-            if(lsol){
-                if(sol_key == 0) {
+
+            if(lsol & (sol_key > 0)){
+                if(sol_key == 1) {
                     outStream.writeBytes("# Energy decomposition controls\n");
                     outStream.writeBytes("decompose\n");
                 }
-                else if (sol_key == 1) {
+                else if (sol_key == 2) {
                     outStream.writeBytes("# Free energy controls\n");
                     outStream.writeBytes("free\n");
                 }
-                else if (sol_key == 2) {
+                else if (sol_key == 3) {
                     outStream.writeBytes("# Solvent induced shift controls\n");
                     outStream.writeBytes("excite\n");
                 }
-                else if (sol_key == 3) {
+                else if (sol_key == 4) {
                     outStream.writeBytes("# Solvent relaxation controls\n");
                     outStream.writeBytes("switch\n");
                 }
                 outStream.writeBytes("start    "+num_start+"\n");
                 outStream.writeBytes("interval "+num_intvl+"\n");
-                if(sol_key == 3)outStream.writeBytes("period "+num_swtch+"\n");
-                if(sol_key == 1){
+                if(sol_key == 4)outStream.writeBytes("period "+num_swtch+"\n");
+                if(sol_key == 2){
                     outStream.writeBytes("lambda "+lambda+"\n");
                     outStream.writeBytes("mix "+mix_key+"\n");
                     if(mix_key == 2 || mix_key == 5)
                         outStream.writeBytes("expo "+non_lin_exp+"\n");
                     if(lremass)outStream.writeBytes("reset_mass\n");
                 }
-                if(sol_key > 0){
+                if(sol_key > 1){
                     outStream.writeBytes("system_a "+system_a+"\n");
                     outStream.writeBytes("system_b "+system_b+"\n");
                 }
-                if(sol_key == 0)
+                if(sol_key == 1)
                     outStream.writeBytes("enddec\n");
-                else if(sol_key == 1)
-                    outStream.writeBytes("endfre\n");
                 else if(sol_key == 2)
-                    outStream.writeBytes("endexc\n");
+                    outStream.writeBytes("endfre\n");
                 else if(sol_key == 3)
+                    outStream.writeBytes("endexc\n");
+                else if(sol_key == 4)
                     outStream.writeBytes("endswi\n");
                 outStream.writeBytes("\n");
             }
@@ -939,6 +941,7 @@ author    - w. smith december 2000
             println("Reading file: "+fname);
             title=lnr.readLine();
             println("File header record: "+title);
+            ttitle.setText(title);
             pass++;
             
             // scan through the CONTROL file
@@ -1301,7 +1304,7 @@ author    - w. smith december 2000
                         lpseudo=true;
                     }
                     else if(word.indexOf("bpd")==0) {
-                        hyp_key=0;
+                        hyp_key=1;
                         word=BML.giveWord(record,2).toLowerCase();
                         if(word.indexOf("dyn")==0) {
                             bpdpath=false;
@@ -1323,13 +1326,13 @@ author    - w. smith december 2000
                         }
                     }
                     else if(word.indexOf("tad")==0) {
-                        hyp_key=1;
+                        hyp_key=2;
                     }
                     else if(word.indexOf("neb_spring")==0) {
                         neb_spring=BML.giveDouble(record,n);
                     }
                     else if(word.indexOf("neb")==0) {
-                        hyp_key=2;
+                        hyp_key=3;
                         num_neb=BML.giveInteger(record,n);
                     }
                     else if(word.indexOf("units")==0) {
@@ -1445,7 +1448,7 @@ author    - w. smith december 2000
                     }
                     else if(word.indexOf("decom")==0) {
                         lsol=true;
-                        sol_key=0;
+                        sol_key=1;
                         if(n > 1) {
                             num_start=BML.giveInteger(record,n-1);
                             num_intvl=BML.giveInteger(record,n);
@@ -1453,7 +1456,7 @@ author    - w. smith december 2000
                     }
                     else if(word.indexOf("solvate")==0) {
                         lsol=true;
-                        sol_key=0;
+                        sol_key=1;
                         if(n > 1) {
                             num_start=BML.giveInteger(record,n-1);
                             num_intvl=BML.giveInteger(record,n);
@@ -1461,15 +1464,15 @@ author    - w. smith december 2000
                     }
                     else if(word.indexOf("free")==0) {
                         lsol=true;
-                        sol_key=1;
+                        sol_key=2;
                     }
                     else if(word.indexOf("excite")==0) {
                         lsol=true;
-                        sol_key=2;
+                        sol_key=3;
                     }
                     else if(word.indexOf("switch")==0) {
                         lsol=true;
-                        sol_key=3;
+                        sol_key=4;
                     }
                     else if(word.indexOf("start")==0) {
                         num_start=BML.giveInteger(record,n);

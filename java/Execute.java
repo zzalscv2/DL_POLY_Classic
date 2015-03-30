@@ -215,8 +215,12 @@ author    - w.smith 2000
         else if (arg.equals("CONTROL")) {
             println("Select required CONTROL file");
             if((fname=selectFileNameBegins(home,"CNT"))!=null) {
-                if(copyFile(fname,"CONTROL"))
-                    println("Control file selected");
+                if(!fname.endsWith("CONTROL")){
+                    if(copyFile(fname,"CONTROL"))
+                        println("Control file selected");
+                } else {
+                    println("CONTROL file already selected");
+                }            
             }
             else
                 println("No file selected");
@@ -224,8 +228,12 @@ author    - w.smith 2000
         else if (arg.equals("CONFIG")) {
             println("Select required CONFIG file");
             if((fname=selectFileNameBegins(home,"CFG"))!=null) {
-                if(copyFile(fname,"CONFIG"))
-                    println("CONFIG file selected");
+                if(!fname.endsWith("CONFIG")){
+                    if(copyFile(fname,"CONFIG"))
+                        println("CONFIG file selected");
+                } else {
+                    println("CONFIG file already selected");
+                }
             }
             else
                 println("No file selected");
@@ -233,8 +241,12 @@ author    - w.smith 2000
         else if (arg.equals("FIELD")) {
             println("Select required FIELD file");
             if((fname=selectFileNameBegins(home,"FLD"))!=null) {
-                if(copyFile(fname,"FIELD"))
-                    println("FIELD file selected");
+                if(!fname.endsWith("FIELD")){
+                    if(copyFile(fname,"FIELD"))
+                        println("FIELD file selected");
+                } else {
+                    println("FIELD file already selected");
+                }
             }
             else
                 println("No file selected");
@@ -242,8 +254,12 @@ author    - w.smith 2000
         else if (arg.equals("TABLE")) {
             println("Select required TABLE file");
             if((fname=selectFileNameBegins(home,"TAB"))!=null) {
-                if(copyFile(fname,"TABLE"))
-                    println("TABLE file selected");
+                if(!fname.endsWith("TABLE")){
+                    if(copyFile(fname,"TABLE"))
+                        println("TABLE file selected");
+                } else {
+                    println("TABLE file already selected");
+                }
             }
             else
                 println("No file selected");
