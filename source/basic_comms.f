@@ -310,14 +310,14 @@ c***********************************************************************
       implicit none
 
       logical check
-      integer i,idum
+      integer i(1),j(1)
 
-      i = 0
-      if(.not.check) i = 1
+      i(1) = 0
+      if(.not.check) i(1) = 1
 
-      call gisum(i,1,idum)
+      call gisum(i,1,j)
       
-      check = (i.eq.0)
+      check = (i(1).eq.0)
 
       return
       end
