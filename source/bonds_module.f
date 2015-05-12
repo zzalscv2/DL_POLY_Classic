@@ -99,6 +99,7 @@ c***********************************************************************
         call copystring(record,message,80)
         call lowcase(record,4)
         call getword(keyword,record,4,lenrec)
+        call strip(keyword,4)
         iatm1=intstr(record,lenrec,idum)
         iatm2=intstr(record,lenrec,idum)
         
@@ -150,6 +151,10 @@ c     test for frozen atom pairs
             keybnd(nbonds)=8
           elseif(keyword(1:4).eq.'-cou')then
             keybnd(nbonds)=-8
+          elseif(keyword(1:2).eq.'lj')then
+            keybnd(nbonds)=9
+          elseif(keyword(1:3).eq.'-lj')then
+            keybnd(nbonds)=-9
           else
             if(idnode.eq.0)write(nrite,*)message
             call error(idnode,444)
@@ -385,6 +390,15 @@ c     coulomb bond potential
           
           omega=prmbnd(kk,1)*prmbnd(kk,2)*rrab*r4pie0/epsq
           gamma=-omega*rrab*rrab
+          
+        else if(keyb.eq.9)then
+          
+c     lennard-jones potential
+          
+          omega=4.d0*prmbnd(kk,1)*(prmbnd(kk,2)/rab)**6*
+     x      ((prmbnd(kk,2)/rab)**6-1.d0)
+          gamma=-24.d0*prmbnd(kk,1)*(prmbnd(kk,2)/rab)**6*
+     x      (2.d0*(prmbnd(kk,2)/rab)**6-1.d0)/rab**2
           
         else
           
