@@ -10,11 +10,13 @@ distribution data, Z-density data, a statistical history, and the
 configuration with the lowest configurational energy. Some of these
 files are optional and appear only when certain options are used.
 
-{\bf Note:} In addition to the files described in this chapter, users of the
-hyperdynamics features of \D{} should see Chapter \ref{hyperdynamics}, where
-additional files specific to that purpose are described. Similarly, the output
-files specific to the solvation features of \D{} are descrived in Chapter
-\ref{solvation}.
+{\bf Note:} In addition to the files described in this chapter, users
+of the hyperdynamics features of \D{} should see Chapter
+\ref{hyperdynamics}, where additional files specific to that purpose
+are described. Similarly, the output files specific to the solvation
+features of \D{} are described in Chapter \ref{solvation}. The output
+files specific to the path integral (PIMD) option are described in
+Chapter \ref{pimd}.
 
 \subsection{The HISTORY File}
 \label{historyfile}
@@ -35,9 +37,9 @@ precision, you should use the unformatted version.
 The HISTORY file can become {\em very} large, especially if it is
 formatted. For serious simulation work it is recommended that the file
 be written to a scratch disk capable of accommodating a large data
-file.  Alternatively the file may be written as unformatted (below),
+file.  Alternatively the file may be written as unformatted (see below),
 which has the additional advantage of speed. However, writing an
-unformatted file has the disadvantage that the file may not be readily
+unformatted file has the disadvantage that the file may not be
 readable except by the machine on which it was created. This is
 particularly important if graphical processing of the data is
 required.
@@ -261,19 +263,6 @@ virial\\
 the virial\\
 \> {\tt vir\_con} \> constraint bond\index{constraints!bond} contribution to the virial\\
 \> {\tt vir\_tet} \> tethering potential\index{potential!tethered} contribution to the virial\\
-{\bf line 3}\\
-\> {\tt cpu time} \> elapsed cpu time (s,m,h,d) since the beginning of the job\\
-\> {\tt volume} \> system volume\\
-\> {\tt temp\_shl} \> core-shell  temperature\\
-\> {\tt eng\_shl} \> configurational energy due to core-shell
-potentials\\
-\> {\tt vir\_shl} \> core-shell potential contribution to the virial\\
-\> {\tt alpha } \> angle between $b$ and $c$ cell vectors\\
-\> {\tt beta } \> angle between $c$ and $a$ cell vectors\\
-\> {\tt gamma } \> angle between $a$ and $b$ cell vectors\\
-\> {\tt vir\_pmf} \> Potential of mean force constraint contribution
-to the virial\\
-\> {\tt press} \> pressure\\
 \end{tabbing}
 
 {\bf Note:} The total internal energy of the system (variable {\tt
@@ -282,6 +271,20 @@ system extensions due to thermostats etc.) It is nominally the {\em
 conserved variable} of the system, and is not to be confused with
 conventional system energy, which is a sum of the kinetic and
 configuration energies.
+
+In cases where the PIMD option is active, and additional data line
+appears :
+\begin{tabbing}
+X\=XXXXXXXXXX\=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\=\kill
+{\bf line 4}\\
+\> {\tt eng\_qpi} \> energy of the quantum system (standard energy estimator)\\
+\> {\tt eng\_qvr} \> energy of the quantum system (virial energy estimator)\\
+\> {\tt eng\_rng} \> energy contribution due to the quantum rings\\
+\> {\tt vir\_rng} \> virial contribution due to the quantum rings\\
+\> {\tt qms\_rgr} \> mean-square radius of gyration of the quantum rings\\
+\> {\tt qms\_bnd } \> mean-square bondlength of the quantum rings\\
+\> {\tt eng\_the } \> total energy of the quantum ring thermostats\\
+\end{tabbing}
 
 The interval for printing out these data is determined by the
 directive {\bf print} in the CONTROL file.  At each time-step that
@@ -326,6 +329,17 @@ HISTORY file (see chapter \ref{utility}).
 If an NPT or N$\mat{\sigma}$T simulation is performed the OUTPUT file
 also provides the mean stress (pressure) tensor and mean simulation
 cell vectors.
+
+Since version 1.10 of \D{} this section also includes a record of the
+even gaussian moments of the momentum (up to moment 10) expressed the
+ratio of the simulated and theoretical values (see equation
+\ref{nmom}). These are intended to show the degree to which the
+simulation distribution function is properly represented as a Gaussian
+function i.e. that it complies with Boltzmann's distribution. It is
+importnat to note however, that the underlying theory of this is valid
+only for atoms undergoing unrestricted motion; atoms that are linked
+by constraint bonds or are embedded in rigid bodies will not behave in
+the right way for this test to be valid.
 
 \subsubsection{Sample of Final Configuration}
 

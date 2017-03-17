@@ -4,8 +4,8 @@
 
 \begin{figure}[ht]
 \begin{center}
-\centerline{\psfig{file=dlpoly.files.ps,height=12cm}}
-\caption{\D{}  input and output files}. 
+  \centerline{\includegraphics[height=12cm]{dlpoly.files.ps}}
+\caption{\D{}  standard input and output files}. 
 \end{center}
 Input files appear on the left and output files on the right. Files
 marked with an asterisk are non-mandatory. File CFGMIN (not shown)
@@ -128,12 +128,16 @@ directives may be inserted. These are described below.
 
 \subsubsection{The CONTROL File Directives}
 
-Users of the hyperdynamics features of \D{} (including nudged elastic band
-calculations) should also consult Chapter\ref{hyperdynamics}, where
-additional CONTROL directives specific to this function are described.
-Similarly, users of the solvation features (energy decomposition, free energy
-and solvation induced spectral shifts) should consult Chapter \ref{solvation}.
-The directives available for other functions are as follows.
+{\bf Note:} Users of the special features of \D{} such as hyperdynamics
+(Chapter \ref{hyperdynamics}) (including nudged elastic band
+calculations), or solvation features (Chapter \ref{solvation})
+(including energy decomposition, free energy and solvation induced
+spectral shifts), metadynamics (Chapter \ref{metadynamics}), or path
+integral molecular dynamics (PIMD) (Chapter \ref{pimd}) should consult
+the relevant chapters of this manual, where additional CONTROL
+directives specific to these functions are described.
+
+The directives required for standard use of \DD are as follows.
 
 \begin{tabbing}
 X\=XXXXXXXXXXXXX\=XXXXXXXXXXXXXXXXXX\=\kill
@@ -451,7 +455,7 @@ only}).
       of the recoil (i.e. three components of a unit vector specifying the
       direction).
 \item The directive {\bf no fic} activates and option that tries to prevent
-  the occurrence of the \"flying ice cube\" that sometimes arises in long time
+  the occurrence of the `flying ice cube' that sometimes arises in long time
   simulations using the Berendsen method for thermostating. This arises
   through accumulated numerical round-off, which gradually transfers momentum
   from the system kinetic energy to the centre-of-mass momentum, resulting in
@@ -2040,9 +2044,9 @@ X\=XXXXXXXX\=XXXXXXXX\=\kill
 \> {\tt atom 1}  \> a8      \> first atom type \\
 \> {\tt atom 2}  \> a8      \> second atom type - only specified for {\bf pair} potential functions \\
 \> {\tt ngrid}   \> integer \> number of function data points to read in \\
-\> {\tt limit 1} \> real    \> lower interpolation limit in \AA for {\bf dens} and {\bf pair} \\
+\> {\tt limit 1} \> real    \> lower interpolation limit in \AA{} for {\bf dens} and {\bf pair} \\
 \>               \>         \> or in density units for {\bf embe}d \\
-\> {\tt limit 2} \> real    \> upper interpolation limit in \AA for {\bf dens} and {\bf pair} \\
+\> {\tt limit 2} \> real    \> upper interpolation limit in \AA{} for {\bf dens} and {\bf pair} \\
 \>               \>         \> or in density units for {\bf embe}d \\
 {\bf function data records:} ({\em number of data records} $=$ {\tt Int}(({\tt ngrid}+3)/4)) \\
 \> {\tt data 1}  \> real    \> data item 1 \\

@@ -179,7 +179,7 @@ outlined.
 
 \begin{figure}[ht]
 \begin{center}
-\centerline{\psfig{figure=bond.eps,height=2cm}}
+\includegraphics[height=2cm]{bond.eps}
 \caption{The interatomic bond vector.}
 \end{center}
 \end{figure}
@@ -302,7 +302,7 @@ In \D{} distance restraints\index{distance restraints} are handled by the routin
 
 \begin{figure}[ht]
 \begin{center}
-\centerline{\psfig{figure=angle.eps,height=4cm}}
+\includegraphics[height=4cm]{angle.eps}
 \caption{The valence angle and associated vectors}
 \end{center}
 \end{figure}
@@ -489,7 +489,7 @@ In \D{} angular restraints\index{angular restraints} are handled by the routine 
 
 \begin{figure}[ht]
 \begin{center}
-\centerline{\psfig{figure=dihed.eps,height=4cm}}
+\includegraphics[height=4cm]{dihed.eps}
 \caption{The dihedral angle and associated vectors}
 \end{center}
 \end{figure}
@@ -712,7 +712,7 @@ in the order 1-2-3-4.
 
 \begin{figure}[ht]
 \begin{center}
-\centerline{\psfig{figure=isomers.eps,height=8cm}}
+\includegraphics[height=8cm]{isomers.eps}
 \caption{The L and D enantiomers and defining vectors}
 \end{center}
 \end{figure}
@@ -724,7 +724,7 @@ In \D{} improper dihedral forces\index{potential!dihedral} are handled by the ro
 
 \begin{figure}[ht]
 \begin{center}
-\centerline{\psfig{figure=invers.eps,height=4cm}}
+\includegraphics[height=4cm]{invers.eps}
 \caption{The inversion angle and associated vectors}
 \end{center}
 \end{figure}
@@ -880,7 +880,7 @@ In \D{} inversion\index{potential!inversion} forces are handled by the routine {
 \label{calcite}
 \begin{figure}[ht]
 \begin{center}
-\centerline{\psfig{figure=calcite.eps,height=4cm}}
+\includegraphics[height=4cm]{calcite.eps}
 \caption{The vectors of the calcite potential}
 \label{calcfig}
 \end{center}
@@ -1564,7 +1564,9 @@ V_{ij}(r_{ij}) &=& A \exp \left(-p \frac{r_{ij}-r_{0}}{r_{0}}\right) \nonumber \
 \rho_{ij}(r_{ij}) &=& \exp \left(-2 q_{ij} \frac{r_{ij}-r_{0}}{r_{0}}\right) \\
 F(\rho_{i}) &=& -B \sqrt{\rho_{i}}~~, \nonumber
 \end{eqnarray}
-with parameters: $A$, $r_{0}$, $p$, $B$, $q_{ij}$.
+with parameters: $A$, $r_{0}$, $p$, $B$, $q_{ij}$. {\bf Note the
+definition of $A$ differs from the literature form by a factor of 2, to
+comply with the general equation (\ref{um})}.
 \end{enumerate}
 
 All of these metal potentials can be decomposed into pair
@@ -2147,10 +2149,10 @@ The corresponding force is given by
 
 \begin{eqnarray}
 \vek{f}_{j}&=&\frac{q_{i}q_{j}}{4\pi\epsilon_{0}}
-\left[\frac{erfc(\alpha r_{ij})}{r_{ij}^{3}}+\frac{2\alpha}{\pi^{1/2}}\frac{exp(-\alpha^{2} r_{ij}^{2})}{r_{ij}^{2}}-
- \left(\frac{erfc(\alpha r_{cut})}{r_{cut}^{2}}+\frac{2\alpha}{\pi^{1/2}}
-\frac{exp(-\alpha^{2}r_{cut}^{2})}{r_{cut}}\right )\frac{\vek{r}_{ij}}{r_{ij}}
-\right] \cdots \nonumber \\
+\left[\frac{erfc(\alpha r_{ij})}{r_{ij}^{2}}+\frac{2\alpha}{\pi^{1/2}}\frac{exp(-\alpha^{2} r_{ij}^{2})}{r_{ij}}-
+ \frac{erfc(\alpha r_{cut})}{r_{cut}^{2}}-\frac{2\alpha}{\pi^{1/2}}
+\frac{exp(-\alpha^{2}r_{cut}^{2})}{r_{cut}}\right ]\frac{\vek{r}_{ij}}{r_{ij}}
+ \cdots \nonumber \\
  & & \cdots \cdots \cdots \cdots \cdots \cdots \cdots \cdots \cdots 
 \cdots \cdots \cdots \cdots \cdots \cdots \cdots \cdots \cdots 
 (r_{ij}\le r_{cut})
@@ -2265,8 +2267,8 @@ sum these are simply omitted. In reciprocal space however, the effects
 of individual gaussian\index{constraints!Gaussian} charges cannot easily be extracted, and the
 correction is made in real space.  It amounts to removing terms
 corresponding to the potential energy of an ion $\ell$ due to the
-gaussian\index{constraints!Gaussian} charge on a neighbouring charge $m$ (or {\em vice versa}).
-This correction appears as the final term in the full Ewald\index{Ewald!summation} formula
+gaussian\index{constraints!Gaussian} charge on a neighbouring ion $m$ (or {\em vice versa}).
+This correction appears as the third term in the full Ewald\index{Ewald!summation} formula
 below.  The distinction between the error function $erf$ and the more
 usual complementary error function $erfc$ found in the real space sum,
 should be noted.
@@ -2283,13 +2285,13 @@ erfc(\alpha r_{nj}) \nonumber\\
 \sum_{molecules}\sum_{\ell\le m}^{M^{*}}q_{\ell}q_{m}\left\{\delta_{\ell m}
 \frac{\alpha}{\surd \pi}+\frac{erf(\alpha r_{\ell m})}{r_{\ell
 m}^{1-\delta_{\ell m}}}\right \}
--\frac{1}{4\pi\epsilon}\frac{1}{V_{o}\alpha^{2}} \left
+-\frac{1}{8\epsilon}\frac{1}{V_{o}\alpha^{2}} \left
     \{\sum_{j}^{N}q_{j}\right \}^{2},
 \end{eqnarray}
 where $N$ is the number of ions in the system and $N^{*}$ the same
 number discounting any excluded (intramolecular) interactions.
 $M^{*}$ represents the number of excluded atoms in a given molecule
-and includes the atomic self correction. The final term on the right is the
+and includes the atomic self correction. The last term on the right is the
 Fuchs correction for charged systems \cite{fuchs-35a}.
 $V_{o}$ is the simulation cell volume and $\vek{k}$ is a reciprocal
 lattice vector defined by

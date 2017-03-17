@@ -1,5 +1,5 @@
 \section{The DL\_POLY Java Graphical User Interface}
-\index{Java GUI}\label{javagui} The DL\_POLY Java GUI II is an upgrade of the
+\index{Java GUI}  The DL\_POLY Java GUI II is an upgrade of the
 original (Mark I) version of the GUI and incorporates several new features.
 First among these is the Graphical Molecular Editor, which allows the user to
 build complex organic structures and replicate them to create systems for
@@ -90,14 +90,14 @@ CERAMICS MINIDREI  MINIOPLS WATER.300K TestInfo Licence Disclaimer}
 \vspace{0.25cm}
 
 \noindent
-the jar command thus works somewhat like the UNIX tar command. Note
+the {\em jar} command thus works somewhat like the linux {\em tar} command. Note
 particularly the requirement to incorporate the file ``manifesto'', which is
 one of the files in the java subdirectory. The contents of this file inform
 the java program which of the incorporated classes represents the entry point
 at execution. (It follows that this file should never be deleted!) The files
 listed after the *.class inclusion are information the GUI requires to operate
 properly. Note that both the javac and jar commands have been combined in the
-unix script `build’, which you will find in the java directory.  Invoke this
+linux script `build’, which you will find in the java directory.  Invoke this
 by typing the command
 
 \vspace{0.25cm}
@@ -134,7 +134,7 @@ command window type the command:
 \vspace{0.25cm}
 
 \noindent
-Unix users may alternatively use the gui script in the execute subdirectory,
+Linux users may alternatively use the gui script in the execute subdirectory,
 which incorporates the syntax of this command. After a minute or two, the GUI
 Graphics Window and the Monitor Window (figure 1) will open onscreen. Both of
 these windows may be handled in the usual X manner, e.g. moved with the mouse,
@@ -146,7 +146,7 @@ has been disabled for the Monitor Window. The GUI opens in the View mode.
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=javagui.ps,height=11.5cm}}
+\centerline{\includegraphics[height=11.5cm]{javagui.ps}}
 \centerline{Figure 1: The Java GUI and Monitor window}
 \vskip 5mm
 
@@ -288,7 +288,7 @@ to be enlarged for a convenient viewing).
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=browser.ps,height=4.5cm}}
+\centerline{\includegraphics[height=4.5cm]{browser.ps}}
 \centerline{Figure 2: A typical file browser}
 \vskip 5mm
 
@@ -316,7 +316,7 @@ opens the Change Defaults panel (figure 3).
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=defaults.ps,height=3.0cm}}
+\centerline{\includegraphics[height=3.0cm]{defaults.ps}}
 \centerline{Figure 3: The Change Defaults Panel}
 \vskip 5mm
 
@@ -383,7 +383,7 @@ for details.
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=control.ps,width=17cm}}
+\centerline{\includegraphics[width=17cm]{control.ps}}
 \centerline{Figure 4: The CONTROL file panels}
 \vskip 5mm
 
@@ -430,7 +430,7 @@ later.)
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=lattice.ps,height=7cm}}
+\centerline{\includegraphics[height=7cm]{lattice.ps}}
 \centerline{Figure 5: The Make Lattice Panel}
 \vskip 5mm
 
@@ -479,7 +479,7 @@ the \DD{} and Dreiding conventions.
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=chain.ps,height=5cm}}
+\centerline{\includegraphics[height=5cm]{chain.ps}}
 \centerline{Figure 6: The Make Chain Panel}
 \vskip 5mm
 
@@ -501,7 +501,7 @@ avoiding random walk.
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=polymer.ps,height=7cm}}
+\centerline{\includegraphics[height=7cm]{polymer.ps}}
 \centerline{Figure 7: The Make Polymer Panel}
 \vskip 5mm
 
@@ -546,7 +546,7 @@ buckminsterfullerene (C60) molecule or a nanotube.
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=bucky.ps,height=5cm}}
+\centerline{\includegraphics[height=5cm]{bucky.ps}}
 \centerline{Figure 8: The Make Fullerene Panel}
 \vskip 5mm
 
@@ -588,7 +588,7 @@ force field parameters.
  ~
 
 \vskip 5mm
-\centerline{\psfig{figure=blank.ps,height=5cm}}
+\centerline{\includegraphics[height=5cm]{blank.ps}}
 \centerline{Figure 9: The Blank Field Panel}
 \vskip 5mm
 
@@ -618,7 +618,7 @@ the Information menu described below), the panel for this option
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=dreiding.ps,height=7cm}}
+\centerline{\includegraphics[height=7cm]{dreiding.ps}}
 \centerline{Figure 10: The Dreiding FIELD Maker Panel}
 \vskip 5mm
 
@@ -658,7 +658,7 @@ The Close button deletes the OPLS FIELD Maker panel.
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=opls.ps,height=5cm}}
+\centerline{\includegraphics[height=5cm]{opls.ps}}
 \centerline{Figure 11: The OPLS FIELD Maker Panel}
 \vskip 5mm
 
@@ -675,7 +675,7 @@ Information menu described below), the panel for this option (figure
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=ceramic.ps,height=5cm}}
+\centerline{\includegraphics[height=5cm]{ceramic.ps}}
 \centerline{Figure 12: The Ceramics FIELD Maker Panel}
 \vskip 5mm
 
@@ -709,7 +709,7 @@ for making such files.
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=table.ps,height=7cm}}
+\centerline{\includegraphics[height=7cm]{table.ps}}
 \centerline{Figure 13: The Make TABLE File Panel}
 \vskip 5mm
 
@@ -774,7 +774,7 @@ layer.
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=nfold.ps,height=4cm}}
+\centerline{\includegraphics[height=4cm]{nfold.ps}}
 \centerline{Figure 14: The N\_fold Panel}
 \vskip 5mm
 
@@ -810,7 +810,7 @@ The {\bf Close} button deletes the `Set Bondlengths' panel.
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=bondlength.ps,height=8cm}}
+\centerline{\includegraphics[height=8cm]{bondlength.ps}}
 \centerline{Figure 15: The Set Bondlengths Panel}
 \vskip 5mm
 
@@ -845,7 +845,7 @@ simulation cell.
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=addwater.ps,height=5cm}}
+\centerline{\includegraphics[height=5cm]{addwater.ps}}
 \centerline{Figure 16: The Add Water Panel}
 \vskip 5mm
 
@@ -878,7 +878,7 @@ input file for a \DD{} run. It is assumed that all of these files are
 present in the {\em execute} subdirectory and are the products of the
 GUI. Thus all potential CONTROL files will begin with the letters
 CNTROL, all potential FIELD files with FLD, all potential CONFIG files
-with CFG and all potential TABLE files (if any) with TAB. On unix
+with CFG and all potential TABLE files (if any) with TAB. On linux
 systems, the file browser will list files on this basis, but Windows
 file browsers (to date) are not discriminating. It is the
 responsibility of the user to select a consistent set of input
@@ -896,7 +896,7 @@ the GUI running however.
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=execute.ps,height=6cm}}
+\centerline{\includegraphics[height=6cm]{execute.ps}}
 \centerline{Figure 17: The Run DL\_POLY Panel}
 \vskip 5mm
 
@@ -961,7 +961,7 @@ message appears in the Monitor window and no action is taken.
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=archive.ps,height=6cm}}
+\centerline{\includegraphics[height=6cm]{archive.ps}}
 \centerline{Figure 18: The Data Archive Panel}
 \vskip 5mm
 
@@ -1000,7 +1000,7 @@ system variables, using information stored ion the \DD{} STATIS file.
 ~
 
 \begin{center}
-\centerline{\psfig{file=stats.ps,height=4cm}}
+\centerline{\includegraphics[height=4cm]{stats.ps}}
 \centerline{Figure 19: The Statistics Panel}
 \end{center}
 
@@ -1046,7 +1046,7 @@ by the GUI Graph Plotter (see section \ref{grafplot}).
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=rdfplot.ps,height=4cm}}
+\centerline{\includegraphics[height=4cm]{rdfplot.ps}}
 \centerline{Figure 20: The RDF Plot Panel}
 \vskip 5mm
 
@@ -1071,7 +1071,7 @@ combining all atom types.
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=rdfcalc.ps,height=6cm}}
+\centerline{\includegraphics[height=6cm]{rdfcalc.ps}}
 \centerline{Figure 21: The RDF Calculator Panel}
 \vskip 5mm
 
@@ -1107,7 +1107,7 @@ based on the RDF data in the RDFDAT file.
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=sokplot.ps,height=4cm}}
+\centerline{\includegraphics[height=4cm]{sokplot.ps}}
 \centerline{Figure 22: The S(k) Plotter Panel}
 \vskip 5mm
 
@@ -1130,7 +1130,7 @@ convention, the layers lie in the x, y plane.
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=zdenplot.ps,height=4.0cm}}
+\centerline{\includegraphics[height=4.0cm]{zdenplot.ps}}
 \centerline{Figure 23: The Z-Density Plotter Panel}
 \vskip 5mm
 
@@ -1168,7 +1168,7 @@ Graphics window.
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=slice.ps,height=5cm}}
+\centerline{\includegraphics[height=5cm]{slice.ps}}
 \centerline{Figure 24: The Slice Panel}
 \vskip 5mm
 
@@ -1193,7 +1193,7 @@ performed and the result plotted on-screen.
 ~
 
 \vskip 5mm
-\centerline{\psfig{figure=msd.ps,height=6cm}}
+\centerline{\includegraphics[height=6cm]{msd.ps}}
 \centerline{Figure 25: The MSD Panel}
 \vskip 5mm
 
@@ -1248,7 +1248,7 @@ time). The facilities available are:
 ~
 
 \begin{center}
-\centerline{\psfig{file=gself.ps,height=7cm}}
+\centerline{\includegraphics[height=7cm]{gself.ps}}
 \centerline{Figure 26: The Gs(r,t) Calculator Panel}
 \end{center}
 
@@ -1275,7 +1275,7 @@ the parent HOVGSL.n file.
 ~
 
 \begin{center}
-\centerline{\psfig{file=hoveplot.ps,height=4.0cm}}
+\centerline{\includegraphics[height=4.0cm]{hoveplot.ps}}
 \centerline{Figure 27: The van Hove Plotter Panel}
 \end{center}
 
@@ -1295,7 +1295,7 @@ file HOVGDF.n,) is identical to the self correlation function case.
 ~
 
 \begin{center}
-\centerline{\psfig{file=gdiff.ps,height=8cm}}
+\centerline{\includegraphics[height=8cm]{gdiff.ps}}
 \centerline{Figure 28: The Gd(r,t) Calculator Panel}
 \end{center}
 
@@ -1323,7 +1323,7 @@ file HOVGDF.n,) is identical to the self correlation function case.
 ~
 
 \begin{center}
-\centerline{\psfig{file=skw.ps,height=6cm}}
+\centerline{\includegraphics[height=6cm]{skw.ps}}
 \centerline{Figure 29: The S(k,w) Calculator Panel}
 \end{center}
 
@@ -1337,7 +1337,7 @@ provided.
 ~
 
 \begin{center}
-\centerline{\psfig{file=skwplot.ps,height=4.0cm}}
+\centerline{\includegraphics[height=4.0cm]{skwplot.ps}}
 \centerline{Figure 30: The S(k,w) Plotter Panel}
 \end{center}
 
@@ -1430,7 +1430,7 @@ controlled by the buttons, which are as follows:
 ~
 
 \begin{center}
-\centerline{\psfig{file=plot.ps,height=11.5cm}}
+\centerline{\includegraphics[height=11.5cm]{plot.ps}}
 \centerline{Figure 31: The GUI Graph Plotter}
 \end{center}
 
@@ -1513,7 +1513,7 @@ selected edit operation. The following properties should be noted.
 ~
 
 \begin{center}
-\centerline{\psfig{file=editor.ps,height=11.5cm}}
+\centerline{\includegraphics[height=11.5cm]{editor.ps}}
 \centerline{Figure 32: The GUI with the Molecular Editor activated.}
 \end{center}
 

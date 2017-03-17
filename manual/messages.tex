@@ -735,6 +735,17 @@ the permitted maximum.\\
 {\em Action:}\\
 Standard user response. Fix the parameter {\tt mxtinv}.
 
+\subsubsection*{Message 74: error - work array allocation failed in minimiser}
+
+This is a memory allocation error. Probable cause: excessive size of
+simulated system. \\
+
+\noindent
+{\em Action:}\\
+If the simulated system cannot be replaced by a smaller one, the user
+must consider using more processors or a machine with larger memory
+per processor.
+
 \subsubsection*{Message 75: error - too many atoms in specified system}
 
 \D{} places a limit on the number of atoms that can be simulated.
@@ -2498,6 +2509,229 @@ file. Only one is allowed.\\
 \noindent
 {\em Action:}\\
 Remove the offending impact directive from the CONTROL file and rerun.
+
+\subsubsection*{Message 518: error - cannot use pimd with the shell model}
+
+The shell model and path integral MD are incompatible in \DD{}.\\
+
+\noindent
+{\em Action:}\\
+The user must revert to a rigid ion model to use PIMD.
+
+\subsubsection*{Message 519: error - pimd array allocation failure in forces}
+
+This is a memory allocation error. Probable cause: excessive size of
+simulated system. \\
+
+\noindent
+{\em Action:}\\
+If the simulated system cannot be replaced by a smaller one, the user
+must consider using more processors or a machine with larger memory
+per processor.
+
+\subsubsection*{Message 520: error - cannot use pimd with constraint bonds}
+
+Constraint bonds and path integral MD are incompatible in \DD{}.\\
+
+\noindent
+{\em Action:}\\
+The user must replace the constrained bonds with flexible bonds.
+
+\subsubsection*{Message 522: error - cannot use pimd with rigid molecules}
+
+Rigid molecules (or rigid molecular parts) are incompatible with path
+integral MD in \DD{}. \\
+
+\noindent
+{\em Action:}\\
+The user must revert to fully flexible models to use PIMD.
+
+\subsubsection*{Message 523: error - pimd THEOLD file incompatible at restart}
+
+The file THEOLD, which contains the final thermostats from a previous run, 
+does not match the requirements of the restarted simulation. \\
+
+\noindent
+{\em Action:}\\ Check that the THEOLD file is available to the
+program and that it is the correct one for the simulated system.
+Replace if necesssary.
+
+\subsubsection*{Message 524: error - cannot use pimd with neutral groups}
+
+The PIMD feature of \DD{} does not permit the use of neutral groups. \\
+
+\noindent
+{\em Action:}\\ The user must remove the neutral groups from the
+simulation and adopt an alternative method for handling the system
+electrostatics.
+
+\subsubsection*{Message 525: error - cannot use pimd with metadynamics}
+
+\DD{} does not currently support the use of path integral MD with metadynamics. \\
+
+\noindent
+{\em Action:}\\
+There is currently no remedy for this problem.
+
+\subsubsection*{Message 526: error - cannot use pimd with solvation functions}
+
+\DD{} does not currently support the use of path integral MD with the program's solvation features\\
+
+\noindent
+{\em Action:}\\
+There is currently no remedy for this problem.
+
+\subsubsection*{Message 527: error - cannot use pimd in free energy calculations}
+
+\DD{} does not currently support the use of path integral MD with the free energy features\\
+
+\noindent
+{\em Action:}\\
+There is currently no remedy for this problem.
+
+\subsubsection*{Message 528: error - pimd array deallocation failure in forces}
+
+The program has failed to release the memory allocated to redundant arrays.\\
+
+\noindent
+{\em Action:}\\
+This is an unlikely error and implies a system fault. Consult your system manager.
+
+\subsubsection*{Message 529: error - cannot use pimd with frozen atoms}
+
+The concept of frozen atoms is incompatible with path integral MD. \\
+
+\noindent
+{\em Action:}\\
+\DD{} does not currently allow for this possibility, so forget it.
+
+\subsubsection*{Message 530: error - read\_thermostats allocation failure}
+
+This is a memory allocation error. Probable cause: excessive size of
+simulated system. \\
+
+\noindent
+{\em Action:}\\
+If the simulated system cannot be replaced by a smaller one, the user
+must consider using more processors or a machine with larger memory
+per processor.
+
+\subsubsection*{Message 531: error - read\_thermostats deallocation failure}
+
+The program has failed to release the memory allocated to redundant arrays.\\
+
+\noindent
+{\em Action:}\\
+This is an unlikely error and implies a system fault. Consult your system manager.
+
+\subsubsection*{Message 532: error - write\_thermostats allocation failure}
+
+This is a memory allocation error. Probable cause: excessive size of
+simulated system. \\
+
+\noindent
+{\em Action:}\\
+If the simulated system cannot be replaced by a smaller one, the user
+must consider using more processors or a machine with larger memory
+per processor.
+
+\subsubsection*{Message 533: error - write\_thermostats deallocation failure}
+
+The program has failed to release the memory allocated to redundant arrays.\\
+
+\noindent
+{\em Action:}\\
+This is an unlikely error and implies a system fault. Consult your system manager.
+
+\subsubsection*{Message 534: error - alloc\_pimd\_arrays allocation failure}
+
+This is a memory allocation error. Probable cause: excessive size of
+simulated system. \\
+
+\noindent
+{\em Action:}\\
+If the simulated system cannot be replaced by a smaller one, the user
+must consider using more processors or a machine with larger memory
+per processor.
+
+\subsubsection*{Message 535: error - alloc\_pimd\_arrays deallocation failure}
+
+The program has failed to release the memory allocated to redundant arrays.\\
+
+\noindent
+{\em Action:}\\
+This is an unlikely error and implies a system fault. Consult your system manager.
+
+\subsubsection*{Message 536: error - thermo\_chain\_vv array allocation failure}
+
+This is a memory allocation error. Probable cause: excessive size of
+simulated system. \\
+
+\noindent
+{\em Action:}\\
+If the simulated system cannot be replaced by a smaller one, the user
+must consider using more processors or a machine with larger memory
+per processor.
+
+\subsubsection*{Message 537: error - thermo\_chain\_vv array deallocation failure}
+
+The program has failed to release the memory allocated to redundant arrays.\\
+
+\noindent
+{\em Action:}\\
+This is an unlikely error and implies a system fault. Consult your system manager.
+
+\subsubsection*{Message 538: error - thermo\_chain\_sy array allocation failure}
+
+This is a memory allocation error. Probable cause: excessive size of
+simulated system. \\
+
+\noindent
+{\em Action:}\\
+If the simulated system cannot be replaced by a smaller one, the user
+must consider using more processors or a machine with larger memory
+per processor.
+
+\subsubsection*{Message 539: error - thermo\_chain\_sy array deallocation failure}
+
+The program has failed to release the memory allocated to redundant arrays.\\
+
+\noindent
+{\em Action:}\\
+This is an unlikely error and implies a system fault. Consult your system manager.
+
+\subsubsection*{Message 540: error - alloc\_sol\_arrays array allocation failure}
+
+This is a memory allocation error. Probable cause: excessive size of
+simulated system. \\
+
+\noindent
+{\em Action:}\\
+If the simulated system cannot be replaced by a smaller one, the user
+must consider using more processors or a machine with larger memory
+per processor.
+
+\subsubsection*{Message 541: error - alloc\_free\_arrays array allocation failure}
+
+This is a memory allocation error. Probable cause: excessive size of
+simulated system. \\
+
+\noindent
+{\em Action:}\\
+If the simulated system cannot be replaced by a smaller one, the user
+must consider using more processors or a machine with larger memory
+per processor.
+
+\subsubsection*{Message 542: error - alloc\_exi\_arrays array allocation failure}
+
+This is a memory allocation error. Probable cause: excessive size of
+simulated system. \\
+
+\noindent
+{\em Action:}\\
+If the simulated system cannot be replaced by a smaller one, the user
+must consider using more processors or a machine with larger memory
+per processor.
 
 \subsubsection*{Message 601: error - Ewald SPME incompatible with solvation}
 

@@ -116,8 +116,8 @@ algorithm is in operation. NVE ensemble.
 
 \subsubsection{Test Case 12: Hautman-Klein test case 2}
 This is a simple test system consisting of 1024 charged particles in a
-layer under NVE conditions. Lennard Jones forces are used to keep the
-atoms apart. The similation cell is square in the XY plane. NVE ensemble.
+layer in the NVT ensemble. Lennard Jones forces are used to keep the
+atoms apart. The simulation cell is square in the XY plane. NVE ensemble.
 
 \subsubsection{Test Case 13: Carbon Nanotube with Tersoff potential}
 This system consists of 800 carbon atoms in a nanotube 41.7 A in length. The
@@ -293,6 +293,28 @@ flexible 3-centre TIP3P model. The temperature is 310K and pressure 1
 atmosphere maintained in a Hoover NPT ensemble. The metadynamics is controlled
 by 6 order parameters: the global potential energy and 5 Steinhardt $Q_{4}$
 parameters. Gaussian convergence is controlled by well-tempered dynamics.
+
+\subsubsection{Test Case 40: Path Integral Simulation of Neon at 20K}
+
+This system consists of 256 Neon atoms with a (periodic) system volume
+of 7084.5 $\AA^{3}$ (corresponding to a reduced density of $\rho^{*}
+\sim 0.785$) at a temperature of 20 K. Each atom is represented by a
+ring of 10 beads.  The simulation uses the gentle thermostat to handle
+thermalisation and maintain the system temperature at 20 K. A
+relatively short time step of 0.0025 ps is used, which reflects the
+difficulty of performing a stable and accurate simulation in systems
+of this kind.
+
+\subsubsection{Test Case 41: Path Integral Simulation of Water at 300K}
+
+This system is composed of 102 water molecules in a periodic system at
+a volume of 3711.28 $\AA^{3}$ ($\rho=0.82$ g/ml) at a temperature of
+300 K. Individual atoms are represented by a ring of 35 beads. The
+water molecules are constructed from three charged atoms with harmonic
+O-H bonds and a harmonic cosine valence angle potential for the H-O-H
+angle (equilibrium value 104.5$^{o}$). The van der Waals forces are
+12-6 potentials. A short time step of 0.0001 ps is used. A chain of
+three Nos\'{e}-Hoover thermostats is used in this case.
 
 \subsection{Benchmark Cases}
 

@@ -1,18 +1,19 @@
 
 \section{The DL\_POLY Classic Package}
 
-\D{} \cite{smith-96a} is a molecular simulation package
-designed to facilitate molecular dynamics simulations of macromolecules,
-polymers, ionic systems, solutions and other molecular systems on a
-distributed memory parallel computer. The package was written to support the
-UK project CCP5\index{CCP5} by Bill Smith and Tim Forester \cite{smith-87a}
-under grants from the Engineering and Physical Sciences Research Council and
-is the copyright of the Science and Technology Facilities Council (STFC).
+\D{} \cite{smith-96a} is a molecular simulation package designed to
+facilitate molecular dynamics simulations of macromolecules, polymers,
+ionic systems, solutions and other molecular systems on a distributed
+memory parallel computer. The package was originally written to
+support the UK project CCP5\index{CCP5} by Bill Smith and Tim Forester
+\cite{smith-87a} under grants from the Engineering and Physical
+Sciences Research Council and is the copyright of the Science and
+Technology Facilities Council (STFC).
 
 \D{} is based on a replicated data parallelism. It is suitable for simulations
 of up to 30,000 atoms on up to 100 processors.  Though it is designed for
 distributed memory parallel machines, we have taken care to ensure that it
-can, with minimum modification, be run on the popular workstations. Scaling up
+can, with minimum modification, be run on common workstations. Scaling up
 a simulation from a small workstation to a massively parallel machine is
 therefore a useful feature of the package.
 
@@ -20,11 +21,11 @@ We request that our users respect the copyright of the \D{} source and not alter
 any authorship or copyright notices within. 
 
 Further information about the \D{} package can be obtained from
-our website: \[\WEB{}.\index{WWW}\]
+the CCP5 Program Library website: \[\SOFT{}.\index{WWW}\]
 
 \section{Functionality}
 
-The following is a list of the features \D{}.
+The following is a list of the features in \D{}.
 
 \subsection{Molecular Systems}
 
@@ -46,10 +47,14 @@ The following is a list of the features \D{}.
 \item Covalent systems e.g. C, Si, Ge, SiC, SiGe etc.
 \end{enumerate}
 
+In addition, since version 1.10, \DD{} can perform a path integral
+molecular dynamics (PIMD) simulation of atomistic systems and systems
+composed of flexible molecules.
+
 \subsection{The \D{} Force Field\index{force field}}
 
-The \D{} force field\index{force field!DL\_POLY} includes the following features:
-\index{potential!electrostatic}
+The \D{} force field\index{force field}\index{force field!DL\_POLY}
+includes the following features: \index{potential!electrostatic}
 
 \begin{enumerate}
 \item All common forms of non-bonded\index{potential!nonbonded} atom-atom potential;
@@ -64,13 +69,20 @@ The \D{} force field\index{force field!DL\_POLY} includes the following features
 \item The Tersoff density dependent potential for covalent systems \cite{tersoff-89a}.
 \end{enumerate}
 
-The parameters describing many of these these potentials may be obtained, for
-example, from the GROMOS\index{force field!GROMOS}\index{GROMOS}
-\cite{gunsteren-87a}, Dreiding\index{force field!Dreiding}
-\cite{mayo-90a} or AMBER\index{force field!AMBER}\index{AMBER} \cite{weiner-86a} forcefield, which share functional
-forms.  It is relatively easy to adapt \D{} to user specific force
-fields\index{force field}. Note that \D{} does not have its own
-force field. It is designed to be used with existing force fields.
+The parameters describing many of these these potentials may be
+obtained, for example, from the GROMOS\index{force
+  field!GROMOS}\index{GROMOS} \cite{gunsteren-87a},
+Dreiding\index{force field!Dreiding} \cite{mayo-90a} or
+AMBER\index{force field!AMBER}\index{AMBER} \cite{weiner-86a}
+force field, which share functional forms.
+
+Note that \D{} does not have its own \index{force field} force
+field. However, the force fields mentioned above can be adapted for
+\D{} using the program \DLF{}, which was developed at Daresbury
+Laboratory by Chin Yong, specifically for constructing \DD{}
+compatible force field files. \DLF{} can be found via the CCP5 Program
+Library website \SOFT{}. Otherwise adaptation by hand is possible for
+simple systems.
 
 \subsection{Boundary Conditions}
 
@@ -99,6 +111,11 @@ user interfaces. An attractive aspect of java is the portability of the
 compiled GUI, which may be run without recompiling on any Java supported
 machine. The GUI is an integral component of the \D{} package and is available
 under the same terms. (See \cite{smith-gui}.)
+
+Other graphics packages are suitable for use with \D. In particular
+VMD \cite{VMD}\index{VMD} and Aten \cite{aten} \index{Aten} are
+recommended. VMD is particularly good for visualizing \DD{} HISTORY
+files and Aten is useful for constructing systems for simulation.
 
 \subsection{Algorithms\index{algorithm}}
 
@@ -198,12 +215,11 @@ execution.
 
 \subsection{Version Control System (CVS)}
 
-\D{} was developed with the aid of the CVS\index{CVS} version
-control system. We strongly recommend that users of \D{} adopt this
-system for local development of the \D{} code, particularly where
-several users access the same source code. For information on
-CVS\index{CVS} please contact:\[info-cvs-request@gnu.org\] or visit
-the website: \[\WEB{}.\index{WWW}\]
+\D{} was developed with the aid of the CVS\index{CVS} version control
+system. We strongly recommend that users of \D{} adopt this (or a
+similar) system for local development of the \D{} code, particularly
+where several users access the same source code. References to
+suitable software can be found on the internet.
 
 \subsection{Required Program Libraries}
 
@@ -349,22 +365,16 @@ appropriate makefile.
 
 \subsection{The {\em utility} Sub-directory}
 
-This sub-directory stores all the utility programs in \D{}.  Users who devise
+This sub-directory stores all the utility programs in \D.  Users who devise
 their own utilities are advised to store them in the {\em utility}
 sub-directory.
 
 \subsection{The {\em data} Sub-directory}
 
 This sub-directory contains examples of input and output files for
-testing the released version of \D{}. The examples of input data
+testing the released version of \D. The examples of input data
 are copied into the {\em execute} sub-directory when a program is being
 tested. The test cases are documented in chapter \ref{data}.
-
-\subsection{The {\em bench} Sub-directory}
-
-This directory contains examples of input and output data for \D{} that
-are suitable for benchmarking \D{} on large scale computers. These are
-described in chapter \ref{data}.
 
 \subsection{The {\em execute} Sub-directory}
 
@@ -393,40 +403,29 @@ backup.
 \subsection{The {\em java} Sub-directory}
 
 The \D{} Java Graphical User Interface (GUI)\index{Graphical User
-Interface} is based on the Java language developed by Sun.  The Java
-source code for this GUI is to be found in this sub-directory, along
-with a few FORTRAN sub-sub-directories which contain some additional
-capabilities accessible from the GUI. These sources are complete and
-sufficient to create a working GUI, provided the user has installed
-the Java Development Kit, (1.4 or above) which is available free from
-Sun at 
-\[\href{http://java.sun.com}{http://java.sun.com}\] 
-The GUI, once compiled, may be
-executed on any machine where Java is installed, though note the
-FORTRAN components will need to be recompiled if the machine is
-changed.  (See \cite{smith-gui}.)
+  Interface} is based on the Java language developed by Sun.  The Java
+source code for this GUI is to be found in this sub-directory togther
+with a java executable GUI.jar which can be run immediately if a Java
+runner is available on your system.
+
+\[java -jar GUI.jar \]
+
+Otherwise the source files are complete and sufficient to create a
+working GUI, provided the user has a java compiler installed (or the
+Java Development Kit, 1.4 or above), both of which are available free
+from \[\href{http://www.oracle.com}{http://www.oracle.com}\] 
+The GUI, once compiled, may be executed on any machine where Java is installed.
+(See \cite{smith-gui}.)
 
 \section{Obtaining the Source Code}
 
 \index{FORGE} \D{} source code and the associated test data is available from
-CCPForge at \[ \FORGE{}. \]
+CCPForge at \[ \FORGE. \]
 
 
 \section{Other Information}
 
-The DL\_POLY Classic website: \[\WEB{} \index{WWW}\]
-provides additional information in the form of
-\begin{enumerate}
-\item Access to all documentation;
-\item Frequently asked questions;
-\item Bug reports;
-\item Access to the DL\_POLY online forum.
-\end{enumerate}
-\noindent
-The DL\_POLY {\bf Forum} is a web based centre for all DL\_POLY users to
-exchange comments and queries. You may access the forum through the DL\_POLY
-Classic website. A registration (and vetting) process is required before you
-can use the forum, but it is open in principle to everyone. It is a good place
-to contact other users and discuss applications.
+The CCP5 Program Library website: \[\SOFT{} \index{WWW}\] provides
+information on other Daresbury Laboratory programs related to \DD{}.
 
 \clearpage

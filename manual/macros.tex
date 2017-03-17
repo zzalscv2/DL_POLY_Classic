@@ -2,7 +2,7 @@
 \subsection{Useful Macros}
 \label{macros}
 \subsubsection{Macros}
-Macros are simple executable files containing standard unix commands.
+Macros are simple executable files containing standard linux commands.
 A number of the are supplied with DL\_POLY and are found in the
 {\em execute} sub-directory\index{sub-directory}. The available macros are as follows.
 {\sl
@@ -18,13 +18,18 @@ A number of the are supplied with DL\_POLY and are found in the
 }
 
 The function of each of these is described below. It is worth noting
-that most of these functions can be performed by the \D{}
-java GUI \cite{smith-gui}.
+that most of these functions can be performed by the \D{} java GUI
+\cite{smith-gui}. (It may be necessary to set the {\em execute} access
+to the macro using the linux command:
+
+\noindent chmod -x {\em macro}
+
+\noindent where {\em macro} is one of the above names.)
 
 \subsubsection{{\sl cleanup}}
 
 {\sl cleanup} removes several standard data files from the {\em
-execute} sub-directory\index{sub-directory}. It contains the unix commands:
+execute} sub-directory\index{sub-directory}. It contains the linux commands:
 \begin{verbatim}
 #!/bin/tcsh
 #
@@ -45,7 +50,7 @@ be stored elsewhere beforehand!)
 
 \subsubsection{{\sl copy}}
 
-{\sl copy} invokes the unix commands:
+{\sl copy} invokes the linux commands:
 
 \begin{verbatim}
 #!/bin/tcsh
@@ -64,56 +69,27 @@ macro.
 
 \subsubsection{{\sl gopoly}}
 
-{\sl gopoly} is used to submit a DL\_POLY job to the Daresbury Intel Xeon
-cluster and takes a form similar for batch processing on many parallel
-machines. The following is for an 8 processor job:
+{\sl gopoly} is a simple script to submit a DL\_POLY job to a standard linux parallel machine.
 
 \begin{verbatim}
-#!/bin/bash
-#
-# The parallel environment to run in and the number of nodes
-#$ -pe mpich 2
-#
-# Run from the directory the job was submitted from
-#$ -cwd
-#
-# Export all environment variables from submission shell
-# to the job
-#$ -V
-#
-# Merge stderr and stdout streams
-#$ -j yes
-#
-# What to name the output
-#$ -o GOPOLY.$JOB_ID
-
-# How many processors per node
-PPN=4
-
-# The location of the binary to run
-binary=/home/user/dl_poly_2.20/execute/DLPOLY.X
-
-# Create the machinefile
-sed s/$/:4/ $HOME/.mpich/mpich_hosts.$JOB_ID > \
-$HOME/.mpich/ndfile.$JOB_ID
-
-# Do it!
-mpirun \
--np $((NSLOTS*PPN)) \
--machinefile $HOME/.mpich/ndfile.$JOB_ID \
-$binary
+mpirun -np $1 DLPOLY.X
 \end{verbatim}
 
-\noindent Normally the job is submitted by the unix command:\\~\\
-{\sl qsub} {\sl gopoly}\\~\\
-\noindent where {\sl qsub} is a local command for submission to the Xeon
-cluster. The number of required nodes and the job time are indicated in the
-above script.
+\noindent Normally the job is submitted by the linux command:\\~\\
+{\sl gopoly  8}\\~\\
+\noindent where (in this case) {\sl 8} specifies the use of 8 processors.
+
+If the {\em serial} version of \DD{} is being used it is of course
+acceptable to simply type:
+
+\begin{verbatim}
+DLPOLY.X &
+\end{verbatim}
 
 \subsubsection{\sl gui}
 
 {\sl gui} is a macro that starts up the \D{} Java GUI. It invokes the
-following unix commands:
+following linux commands:
 
 \begin{verbatim}
 java -jar ../java/GUI.jar
@@ -127,7 +103,7 @@ higher version is required to run the GUI.)
 \subsubsection{{\sl select}}
 
 {\sl select} is a macro enabling easy selection of one of the test
-cases. It invokes the unix commands:
+cases. It invokes the linux commands:
 
 \begin{verbatim}
 #!/bin/tcsh
@@ -158,7 +134,7 @@ sub-directory\index{sub-directory} to run the {\sl n}-th test case.
 
 The {\sl store} macro provides a convenient way of moving data back
 from the {\em execute} sub-directory\index{sub-directory} to the {\em
-data} sub-directory\index{sub-directory}. It invokes the unix
+data} sub-directory\index{sub-directory}. It invokes the linux
 commands:
 
 \begin{verbatim}
@@ -198,9 +174,9 @@ if (-e CFGMIN) then
 endif
 \end{verbatim}
 
-\noindent which first creates a new DL\_POLY {\em data/TEST..} if necessary
-sub-directory\index{sub-directory} and then moves the standard
-DL\_POLY output data files into it.
+\noindent which first creates a new DL\_POLY {\em data/TEST..}
+sub-directory\index{sub-directory} if necessary and then moves the
+standard DL\_POLY output data files into it.
 
 {\sl store} requires two arguments:\\~\\
 {\sl store n a}\\~\\

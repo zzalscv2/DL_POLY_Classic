@@ -9,15 +9,17 @@ makefiles  has been provided in the
 sub-directory {\em build} (see example in Appendix \ref{A1} of this
 document). The versions go by the names of: 
 \begin{itemize}
-\item MakePAR - to build a parallel MPI version on a unix platform;
-\item MakeSEQ - to build a sequential (one processor) unix version;
-\item MakeWIN - to build a Windows (one processor, XP) version.
+\item MakePAR - to build a parallel MPI version on a linux platform;
+\item MakeSEQ - to build a sequential (one processor) linux version;
 \end{itemize}
-Select the one you need and copy it into the {\em source} directory. (In
-what follows we assume the makefile in the {\em source} directory is called
-`Makefile'.) The Makefile will build an executable with a wide
-range of functionality - sufficient for the test cases and for most
-users' requirements. 
+Select the one you need and copy it into the {\em source}
+directory. (In what follows we assume the makefile in the {\em source}
+directory is called ``Makefile''.) The Makefile will build an executable
+with a wide range of functionality - sufficient for the test cases and
+for most users' requirements.  Note the MakeSEQ version can be used on
+Windows machines if you are running the CygWin shell and using the
+gfortran compiler. Multi processor versions can be compiled using the
+MakePAR makefile if OpenMPI is available in CygWin.
 
 Users will need to modify the Makefile if they are to add additional
 functionality to the code, or if it requires adaptation for a non
@@ -27,56 +29,50 @@ desired (see below: ``Modifying the makefile'').
 
 Note the following system requirements for a successful build of \D{}.
 \begin{enumerate}
-\item A FORTRAN 90 compiler;
-\item The Java SDK from Sun Microsystems (if the GUI is required).
-\item A UNIX operating system (or Windows XP with CygWin, if a PC 
+\item A FORTRAN 90 compiler, such as gfortran or G95;
+\item The Java SDK from Oracle (to compile the GUI, if required).
+\item A linux operating system (or Windows with CygWin, if a PC 
 version is required).
 \end{enumerate}
 
 Run the Makefile you copied from the {\em build} sub-directory in the
 {\em source} sub-directory. It will create the executable in the {\em
 execute} sub-directory. The compilation of the program is initiated by
-typing the command:
+typing the command: \\~\\
 
-~
-
-{\em make} $target$
-
-~ 
+{\em make} $target$\\~\\
 
 \noindent where $target$ is the specification of the required machine
-(e.g. hpcx). For many computer systems this is all that is required
-to compile a working version of \D{}. (To determine which targets are
-already defined in the makefile, typing the command {\em make} without
-a nominated target will produce a list of known targets.)
+or compiler (e.g. ``gfortran''). For many computer systems this is all
+that is required to compile a working version of \D{}. (To determine
+which targets are already defined in the makefile, typing the command
+{\em make} without a nominated target will produce a list of targets
+known to the makefile.)
 
 The full specification of the {\em make} command is as follows
-
-~
+\\~\\
 
 {\em make} $<$TARGET= $\ldots >$ 
-$<$ EX=$\ldots >$ $<$ BINROOT=$\ldots >$ 
+$<$ EX=$\ldots >$ $<$ BINROOT=$\ldots >$ \\~\\
 
-~
-
-\noindent where some (or all) of the keywords may be omitted. 
-The keywords and their uses are described below.  Note that keywords
-may also be set in the unix environment (e.g. with the ``setenv''
-command in a C-shell).
-
-For PCs running Windows, \label{PC compile} the makefile assumes the
-user has installed the Cygwin Unix API available from
+\noindent where some (or all) of the keywords may be omitted.  The
+keywords and their uses are described below.  Note that keywords may
+also be set in the linux environment (e.g. with the ``setenv'' command
+in a C-shell). For PCs running Windows, \label{PC compile} the makefile
+assumes the user has installed the Cygwin linux API available from
 \[\href{http://sources.redhat.com/cygwin}{http://sources.redhat.com/cygwin}\]
-The recommended FORTRAN 90 compiler is GFORTRAN, but G95 can also be used,
-see: 
+The recommended FORTRAN 90 compiler is gfortran (which is available
+under CygWin),but G95 can also be used, see: 
 \[\href{http://ftp.g95.org/}{http://ftp.g95.org/}\].
+In principle any Fortran 90 compiler will do, but these are ones that
+have been used successfully by the development team.
 
 \subsubsection{Keywords for the Makefile}
 
 \begin{enumerate}
 \item {\bf TARGET}\\~\\
-The TARGET keyword indicates which kind of computer the code is
-to be compiled for. This {\bf must} be specifed - there is no default value.
+The TARGET keyword indicates which kind of computerm (or compiler) 
+the code is to be compiled for. This {\bf must} be specifed.
 Valid targets can be listed by the makefile if the command {\em make}
 is typed, without arguments. The list frequently changes as more
 targets are added and redundant ones removed. Users are encouraged to
@@ -88,6 +84,16 @@ executable is ``DLPOLY.X''.
 The BINROOT keyword specifies the directory in which the executable is
 to be stored.  The default setting is ``../execute''.
 \end{enumerate}
+
+\noindent Clearing up the directory after a compilation can be performed
+by typing \\~\\
+
+{\em make} clean\\~\\
+
+\noindent which removes all *.o and *.mod files from the source directory.
+(It is sometimes useful to do this before a recompile, particularly if you 
+suspect the code is not correctly incorporating changes you have made to
+the source code.)
 
 \subsubsection{Modifying the Makefile}
 
@@ -110,25 +116,10 @@ insert replacement (dummy) routines for the MPI calls.
 
 
 \item {\bf Enabling the Smoothed Particle Mesh Ewald}\\~\\
-
 The standard compilation of \D{} will incorporate a basic 3D Fast
 Fourier Transform (FFT) routine to enable the SPME functionality.
-Users may wish to try alternative FFT routines, which may offer faster
-performance. Some `hooks' for these appear in the code as comment
-lines in the FORTRAN source. The user should search for the
-following keys in the code:
 
-\begin{itemize}
-\item CCRAY - for the Cray FFT routines;
-\item CFFTW - for the FFTW public domain FFT routines;
-\item CESSL - for the IBM scientific library FFT routines;
-\item CSGIC - for the Silicon Graphics FFT routines.
-\end{itemize}
-
-The appropriate lines should be uncommented and the references to the
-{\sc DLPFFT3} subroutine should be commented out before compiling.
-
-\item {\bf Problems with optimization ?}\\~\\
+\item {\bf Problems with optimization?}\\~\\
 Some subroutines may not compile correctly when using optimization on
 some compilers. This is not necessarily the fault of the \D{} code, some
 compilers are just flakey. This can be circumvented by compiling the offending
@@ -141,7 +132,7 @@ module containing several related subroutines and add this to the ``OBJ\_MOD''
 list.
 \end{enumerate}
 
-\subsubsection{Note on Interpolation}
+\subsubsection{A Note on Interpolation}
 \label{interpol}
 
 In \D{} the short-range (Van der Waals\index{potential!van der Waals})
@@ -190,10 +181,10 @@ Examples of input files are found in the {\em data} sub-directory,
 which can be copied into the {\em execute} subdirectory using the {\sl
 select} macro found in the {\em execute} sub-directory.
 
-A successful run of \D{} will generate several data files, which appear
-in the {\em execute} sub-directory. The most obvious one is the file
-OUTPUT (section \ref{outputfile}), which provides an effective summary
-of the job run: the input information; starting configuration;
+A successful run of \D{} will generate several data files, which
+appear in the {\em execute} sub-directory. The most obvious one is the
+file OUTPUT (section \ref{outputfile}), which provides an effective
+summary of the job run: the input information; starting configuration;
 instantaneous and rolling-averaged thermodynamic data; final
 configurations; radial distribution functions (RDFs); and job timing
 data. The OUTPUT file is human readable.  Also present will be the
@@ -206,17 +197,25 @@ final positions, velocities and forces of the atoms when the run ended
 and is human readable.  The STATIS file (section \ref{statisfile})
 contains a catalogue of instantaneous values of thermodynamic and
 other variables, in a form suitable for temporal or statistical
-analysis.  Finally, the HISTORY file (section \ref{historyfile})
+analysis. In standard use \DD{} may also create the files RDFDAT (section
+{\ref{rdffile}) or ZDNDAT (section {\ref{zdnfile}), containing the
+RDF and Z-density data respectively. They are both human readable
+files. Finally, the HISTORY file (section \ref{historyfile})
 provides a time ordered sequence of configurations to facilitate
-further analysis of the atomic motions.  Depending on which version of
-the {\sc traject} subroutine you compiled in the code, this file may
-be either formatted (human readable) or unformatted.  You may move
-these output files back into the {\em data} sub-directory using the {\sl
-store} macro found in the {\em execute} sub-directory.
+further analysis of the atomic motions.  Depending on which
+version of the {\sc traject} subroutine you compiled in the code,
+this file may be either formatted (human readable) or unformatted.
+You may move these output files back into the {\em data}
+sub-directory using the {\sl store} macro found in the {\em
+execute} sub-directory.
 
-Note that versions of \D{} after 2.10 may also create the files RDFDAT
-and ZDNDAT, containing the RDF and Z-density data respectively. They
-are both human readable files.
+Note that the special extensions of \D{} including: structural 
+optimisation (Section \ref{minimisation}); hyperdynamics
+(Chapter \ref{hyperdynamics}); solvation (Chapter \ref{solvation});
+metadynamics (Chapter \ref{metadynamics}); and path integral
+molecular dynamics (Chapter \ref{pimd}); all have associated
+families of input and output files. These are described in the
+indicated locations of this manual.
 
 \subsection{Restarting \D{}}
 
@@ -291,7 +290,7 @@ starting structure prior to a dynamical simulation.
 
 The available algorithms are:
 \begin{enumerate}
-\item `Zero' temperature molecular dynamics 
+\item ``Zero'' temperature molecular dynamics 
       \index{minimisation!zero temperature}. This is equivalent 
       to a dynamical simulation at
       low temperature. At each time step the molecules move in the
@@ -311,7 +310,7 @@ The available algorithms are:
       strategy which we find does allow the bonds to converge within the
       accuracy required by SHAKE. The subroutine that performs this procedure
       is {\sc strucopt}, which is found in the file {\sc optimiser\_module.f}.
-\item `Programmed' energy minimisation, involving both molecular 
+\item ``Programmed'' energy minimisation, involving both molecular 
       dynamics and conjugate gradients
       \index{minimisation!programmed}.  This method combines conjugate
       gradient minimisation with molecular dynamics. Minimisation is
@@ -333,7 +332,7 @@ from the final structure.
 
 ~
 
-{\bf Comments on the Minimisation Procedures} 
+{\bf Additional Comments on the Minimisation Procedures} 
 
 \begin{enumerate} 
 \item The zero temperature dynamics is really dynamics conducted at 1

@@ -27,7 +27,7 @@ facility has been retained in the \D{} implementation (see section
 \hrule
 \vspace{1.0cm}
 \begin{center}
-\centerline{\psfig{file=Hills.ps,height=6.0cm}}
+\includegraphics[height=6.0cm]{Hills.ps}
 \end{center}
 \caption{Model Potential Energy Surface.\label{potsurf}}
 The potential energy surface of a solid is characterised by deep
@@ -74,7 +74,7 @@ given in the following section.
 \hrule
 \vspace{1.0cm}
 \begin{center}
-\centerline{\psfig{file=NEB.ps,height=5cm}}
+\includegraphics[height=5cm]{NEB.ps}
 \end{center}
 \caption{Basic NEB Theory\label{nebfig}}
 \index{hyperdynamics!reaction path}
@@ -154,7 +154,7 @@ third order splines.
 \hrule
 \vspace{1.0cm}
 \begin{center}
-\centerline{\psfig{file=BiasPot.ps,height=6cm}}
+\includegraphics[height=6cm]{BiasPot.ps}
 \end{center}
 \caption{Basic BPD Theory\label{bpdfig}}
 The normal potential energy surface (continuous line) is characterised
@@ -315,7 +315,7 @@ Two ways of running bias potential dynamics are available in \D{}. The
 first is referred to as ``Full Path Kinetics'' since it attempts to
 reproduce a full description of the diffusion path with the associated
 activation energies. This is described in section \ref{FPK}. (A variation of
-Full Path Kinetics allows the user to bypass the Nudged Elatic Band
+Full Path Kinetics allows the user to bypass the Nudged Elastic Band
 calculations, which is useful in circumstances where the NEB has problems.)
 The second is ``configurational sampling'', which exploits BPD to explore
 the range of structural states available to a system, which need not
@@ -351,7 +351,7 @@ deemed to have occured if one or more atoms are displaced by more than
 a preset distance (the `catch radius').  If a transition is
 detected, the program optionally performs a NEB calculation, using the 
 two reference structures, to find the activation energy ($E^{*}$). 
-Note that it is not essential calculate an activation energy if one is
+Note that it is not essential to calculate an activation energy if one is
 confident that the bias chosen does not exceed the safe limit described by
 Voter (equation \ref{votcon}).
 \item A determination of the time of the transition is made.
@@ -452,7 +452,7 @@ CONFIG structure for the BPD simulation.
 \item Set the remaining CONTROL keywords as were defined for the initial
       equilibration simulations.
 \end{enumerate}
-\item Before starting the BPD simulation, use the UNIX `mkdir' command to
+\item Before starting the BPD simulation, use the LINUX `mkdir' command to
       make the following empty directories: 
 \begin{itemize}
    \item {\em BASINS} - to receive any new structures found;
@@ -474,10 +474,10 @@ CONFIG structure for the BPD simulation.
    equation (\ref{boost}), and then continue the simulation.
 \item When the simulation ends, proceed as follows.
 \begin{enumerate}
-\item Check the EVENTS file to see if any structural
+\item Check the EVENTS file (see \ref{eventsfile}) to see if any structural
   transitions have been obtained. Each event is represented by a
   single record and transitions are flagged with the keyword TRA at
-  the start of the record. Use unix `grep' to locate these entries. No
+  the start of the record. Use linux `grep' to locate these entries. No
   observed transitions indicates that either a longer simulation is
   necessary, or running with a higher bias $E_{bias}$ should be
   considered.
@@ -539,7 +539,7 @@ CONFIG structure for the BPD simulation.
   whenever a new state is found. In this respect the reference state
   `follows' the diffusion path. This is a clear distinction from TAD.
 \item We repeat again the important message that if any of the 
-  transitions reported by PBD has an activation energy that is below
+  transitions reported by BPD has an activation energy that is below
   the value of the bias term $E_{bias}$
   (i.e. $N*E^{*}<E_{bias}$,) this represents a violation of the
   condition in equation (\ref{votcon}), which means the observed
@@ -670,7 +670,7 @@ out the low temperature diffusion pathway.
 \hrule
 \vspace{1.0cm}
 \begin{center}
-\centerline{\psfig{file=TAD.ps,height=6cm}}
+\includegraphics[height=6cm]{TAD.ps}
 \end{center}
 \caption{Basic TAD Theory\label{tadfig}}. 
 Plot of $log(1/t)$ vs. $1/T$ for the TAD method. Simulations at high
@@ -876,7 +876,7 @@ equilibration can be short if the system was pre-equilibrated.
 \item Set the remaining CONTROL keywords as were defined for the initial
   equilibration simulations.
 \end{enumerate}
-\item Before starting the TAD simulation, use the UNIX `mkdir' command to
+\item Before starting the TAD simulation, use the LINUX `mkdir' command to
    make the following empty directories: 
 \begin{itemize}
    \item {\em BASINS} - to receive any new structures found
@@ -897,10 +897,10 @@ equilibration can be short if the system was pre-equilibrated.
   the starting basin and continue.
 \item When the simulation ends, proceed as follows.
 \begin{enumerate}
-\item Check the EVENTS file to see if any structural transitions
+\item Check the EVENTS file (see \ref{eventsfile}) to see if any structural transitions
   have been obtained. Each event is represented by a single record and
   transitions are flagged with the keyword TRA at the start of
-  the record. Use unix `grep' to locate these entries. No observed
+  the record. Use linux `grep' to locate these entries. No observed
   transitions indicates either a longer simulation is necessary, or
   a higher temperature simulation should be considered.
 \item Check that the simulation was sufficiently long to guarantee all
@@ -1002,7 +1002,7 @@ It may be necessary to restart a TAD simulation for a number of reasons.
 \item The user may sometimes observe successive transitions into the same 
   state. If a transition to an already visited state occurs it is
   indicated with the flag TRR (repeat transition) in the EVENTS
-  file. Such repeated transitions are normal but if they occur in
+  file (\ref{eventsfile}). Such repeated transitions are normal but if they occur in
   succession it implies that there is some correlation creeping into
   the resetting of the system back into the starting state. This
   however is harmless as the accumulated simulation time is reset back
@@ -1028,30 +1028,33 @@ sub-directories of the DL\_POLY {\em execute} sub-directory. These
 files are as follows.
 
 \begin{enumerate}
-\item HYPRES - the hyperdynamics restart file, which stores 
+\item HYPRES - the hyperdynamics restart file, \index{HYPRES file} which stores 
 (unformatted) data to permit continuation of an unfinished BPD or TAD
 simulation. It is created in the {\em execute} sub-directory. This
 file becomes the HYPOLD file, which is used in restarting a BPD or TAD
 simulation.
-\item EVENTS - a summary of events that have occurred in the
+\item EVENTS - a summary of events that have occurred in the \index{EVENTS file}
 course of a hyperdynamics simulation - one record per event. It is
 generated in the {\em execute} sub-directory.
-\item CFGBSNnn - a `basin' file, which contains the coordinates of each
+\item CFGBSNnn - a `basin' file, which contains the coordinates of each \index{CFGBSNnn file}
 distinct state \D{} has found during the BPD or TAD run. nn is an integer
 rising from 0 to 9999. All such files are generated in the {\em
 execute/BASINS} sub-directory.
-\item PROnn.XY - a `profile' file, which is a list of the reaction 
+\item PROnn.XY - a `profile' file, which is a list of the reaction \index{PROnn.XY file}
 coordinate and configuration energy of each bead in the converged NEB
 calculation. nn is an integer rising from 0 to 9999. All such files are
 generated in the {\em execute/PROFILES} sub-directory and are plotable
 XY files.
-\item CFGTRAnn - a configuration file used to interpolate when a
+\item CFGTRAnn - a configuration file used to interpolate when a \index{CFGTRAnn file}
 transition has occured. nn is an integer rising from 0 to 9999.
 All such files are generated in the {\em execute/TRACKS} sub-directory.
 \end{enumerate}
 These files are described in further detail below.
 
 \subsubsection{The HYPRES and HYPOLD Files}
+\label{hypresfile}
+\index{HYPRES file}
+\index{HYPOLD file}
 
 The HYPRES and HYPOLD files are unformatted (i.e. not human readable)
 and are {\em restart files} for BPD or TAD runs of \D{}. The HYPRES file
@@ -1308,7 +1311,7 @@ multiple maximum on the reaction path.\index{hyperdynamics!reaction path}
 To run a NEB calculation with \D{} it is first necessary to identify the
 start and end basins among the CFGBSNnn files in the BASINS directory
 described in section \ref{cfgbsn}. From the information provided in
-the EVENTS \ref{eventsfile} file it should be possible to decide which
+the EVENTS file (see \ref{eventsfile}) it should be possible to decide which
 files are needed. The user then needs to modify the CONTROL file in
 the following way.
 \begin{enumerate}

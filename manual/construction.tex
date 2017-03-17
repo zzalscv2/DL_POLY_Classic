@@ -6,8 +6,8 @@
 The \D{} executable program is constructed as follows.
 
 \begin{enumerate}
-\item \D{} is supplied as a UNIX compressed tar file. This must uncompressed
-and un-tared to create the \D{} directory (section \ref{directory}).
+\item \D{} is supplied as a gzipped tar file. This must be unpacked
+to create the \D{} directory (section \ref{directory}).
 \item In the {\em build} subdirectory you will find the required \D{}
 makefile (see section \ref{compile} and Appendix \ref{A1}, where a
 sample Makefile is listed). This must
@@ -24,15 +24,15 @@ this are stored in the subdirectory {\em java}. Compilation of this is
 simple and requires running the javac compiler and the jar
 utility. Details for these procedures are provided in the GUI manual
 \cite{smith-gui}.
-\item To run the executable for the first time you require the files CONTROL,
-FIELD and CONFIG (and possibly TABLE or TABEAM if you have tabulated
-potentials). These must be present in the directory from which the program
-is executed. (See section \ref{inputfiles} for the description of the input
-files.)
-\item Executing the program will produce the files OUTPUT, REVCON and
-REVIVE (and optionally STATIS, HISTORY, RDFDAT and ZDNDAT) in the
-executing directory.  (See section \ref{outputfiles} for the
-description of the output files.)
+\item To run the executable for the first time you require (as a
+minimum) the files CONTROL, FIELD and CONFIG (and possibly TABLE or
+TABEAM if you have tabulated potentials). These must be present in
+the directory from which the program is executed. (See section
+\ref{inputfiles} for the description of the input files.)
+\item Executing the program will most often produce the files OUTPUT,
+REVCON and REVIVE (and optionally STATIS, HISTORY, RDFDAT and
+ZDNDAT) in the executing directory.  (See section \ref{outputfiles}
+for the description of the output files.)
 \end{enumerate}
 
 This simple procedure is enough to create a standard version to run
