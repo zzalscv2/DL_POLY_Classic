@@ -31,19 +31,22 @@ c***********************************************************************
 
       contains
       
-      subroutine alloc_ter_arrays(idnode)
-
+      subroutine alloc_ter_arrays(idnode,mxnode)
+      
       implicit none
-
+      
       integer, parameter :: nnn=20
 
-      integer i,fail,idnode,npairs
+      logical safe
+      integer i,fail,idnode,mxnode,npairs
       dimension fail(nnn)
 
-      do i=1,nnn
-        fail(i)=0
-      enddo
+      safe=.true.
 
+c     allocate arrays
+
+      fail(:)=0
+      
       npairs=(mxter*(mxter+1))/2
       allocate (prmter(mxter,mxpter),stat=fail(1))
       allocate (prmter2(2,npairs),stat=fail(2))
@@ -65,11 +68,11 @@ c***********************************************************************
       allocate (vmbp(mxgrid,npairs,3),stat=fail(18))
       allocate (gmbp(mxgrid,npairs,3),stat=fail(19))
       allocate (filter(mxsite),stat=fail(20))
-
-      do i=1,nnn
-        if(fail(i).gt.0)call error(idnode,1945)
-      enddo
-
+      
+      if(any(fail.gt.0))safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,1945)
+      
       end subroutine alloc_ter_arrays
 
       subroutine define_tersoff

@@ -17,6 +17,9 @@ c***********************************************************************
       use vv_motion_module
       use vv_rotation1_module
       use vv_rotation2_module
+      use vv_pimd_module
+      
+      logical, parameter :: gaussian_switch=.true.
       
       contains
       
@@ -25,12 +28,12 @@ c***********************************************************************
      x  keyens,nscons,ntcons,ntpatm,ntfree,nspmf,ntpmf,mode,nofic,
      x  tstep,engke,engrot,tolnce,quattol,vircon,vircom,virtot,
      x  temp,press,volm,sigma,taut,taup,chit,chip,consv,conint,
-     x  elrc,virlrc,virpmf)
+     x  elrc,virlrc,virpmf,gaumom)
 
 c***********************************************************************
 c     
 c     dl_poly subroutine for selecting the integration algorithm
-c     to solve the the equations of motion. based on the leapfrog
+c     to solve the equations of motion. based on the leapfrog
 c     verlet algorithm
 c     
 c     copyright - daresbury laboratory
@@ -46,6 +49,7 @@ c***********************************************************************
       real(8) tstep,engke,engrot,tolnce,quattol,vircon,vircom
       real(8) virtot,temp,press,volm,sigma,taut,taup,chit,chip
       real(8) consv,conint,elrc,virlrc,virpmf
+      real(8) gaumom(0:5)
       
       safe=.true.
       safeq=.true.
@@ -282,11 +286,15 @@ c     invalid option
         endif
 
       endif
-
+      
+c     calculate gaussian moments of momenta
+      
+      call gaussian_moments(idnode,mxnode,natms,temp,gaumom)
+      
 c    check on convergence of pmf-shake
-
+      
       if(ntpmf.gt.0) then
-
+        
         if(mxnode.gt.1) call gstate(safep)
         if(.not.safep) call error(idnode,438)
 
@@ -330,12 +338,12 @@ c     eliminate "flying ice cube" in long simulations (Berendsen)
      x  keyens,nscons,ntcons,ntpatm,ntfree,nspmf,ntpmf,mode,nofic,
      x  ntshl,keyshl,tstep,engke,engrot,tolnce,vircon,vircom,virtot,
      x  temp,press,volm,sigma,taut,taup,chit,chip,consv,conint,elrc,
-     x  virlrc,virpmf,chit_shl,sigma_shl)
+     x  virlrc,virpmf,chit_shl,sigma_shl,gaumom)
 
 c***********************************************************************
 c     
 c     dl_poly subroutine for selecting the integration algorithm
-c     to solve the the equations of motion. based on the velocity
+c     to solve the equations of motion. based on the velocity
 c     verlet algorithm
 c     
 c     copyright - daresbury laboratory
@@ -352,12 +360,13 @@ c***********************************************************************
       real(8) tstep,engke,engrot,tolnce,vircon,vircom
       real(8) virtot,temp,press,volm,sigma,taut,taup,chit,chip
       real(8) consv,conint,elrc,virlrc,virpmf,chit_shl,sigma_shl
+      real(8) gaumom(0:5)
       
       if(ngrp.eq.0) then
         
         if(keyens.eq.0) then
 
-c     verlet leapfrog 
+c     velocity verlet
 
           call nvevv_1
      x      (safe,lshmov,isw,idnode,mxnode,natms,imcon,nscons,
@@ -587,7 +596,15 @@ c     invalid option
         endif
 
       endif
+      
+c     calculate gaussian moments of momenta
+      
+      if(isw.eq.2)then
+        
+        call gaussian_moments(idnode,mxnode,natms,temp,gaumom)
 
+      endif
+      
 c     check on convergence of pmf-shake
 
       if(ntpmf.gt.0) then
@@ -621,4 +638,222 @@ c     eliminate "flying ice cube" in long simulations (Berendsen)
       return
       end subroutine vv_integrate
 
+      subroutine pimd_integrate
+     x  (isw,idnode,mxnode,imcon,natms,keyens,nstep,tstep,taut,
+     x  temp,engke,engthe,chi,uuu,gaumom)
+      
+c***********************************************************************
+c     
+c     dl_poly subroutine for selecting the integration algorithm
+c     to solve the pimd equations of motion. based on the velocity
+c     verlet algorithm
+c     
+c     copyright - daresbury laboratory
+c     author    - w. smith september 2016
+c     
+c***********************************************************************
+
+      implicit none
+
+      integer isw,idnode,mxnode,imcon,natms,keyens,nstep
+      real(8) tstep,engke,engthe,temp,taut,chi
+      real(8) uuu(102),gaumom(0:5)
+      
+      
+      engthe=0.d0
+      
+      if(keyens.eq.40) then
+        
+c     nvt ensemble
+        
+        call pimd_nvt
+     x    (isw,idnode,mxnode,natms,tstep,taut,temp,engke,engthe)
+        
+      elseif(keyens.eq.41) then
+        
+c     nvt ensemble - gentle thermostat
+        
+        call pimd_nvt_gth1
+     x    (isw,idnode,mxnode,natms,tstep,taut,temp,engke,engthe,
+     x    chi,uuu)
+        
+      else if(keyens.eq.42) then
+        
+c     nvt ensemble - nose-hoover chains
+        
+        call pimd_nvt_nhc
+     x    (isw,idnode,mxnode,natms,tstep,taut,temp,engke,engthe)
+        
+      else
+        
+c     invalid option
+        
+        call error(idnode,430)
+        
+      endif
+
+      if(isw.eq.2)then
+        
+        if(gaussian_switch)then
+          
+c     calculate gaussian moments of bead momentum
+          
+          call bead_moments
+     x      (idnode,mxnode,natms,nbeads,temp,gaumom)
+          
+        else
+          
+c     calculate gaussian moments of thermostats
+          
+          call thermostat_moments
+     x      (idnode,mxnode,natms,nbeads,nchain,temp,taut,gaumom)
+          
+        endif
+
+      endif
+      
+      return
+      end subroutine pimd_integrate
+
+      subroutine gaussian_moments(idnode,mxnode,natms,temp,gaumom)
+
+c***********************************************************************
+c     
+c     dl_poly module for calculating the gaussian moments of atomic
+c     momenta
+c     copyright - daresbury laboratory
+c     author    - w. smith    dec 2016
+c     
+c***********************************************************************
+      
+      implicit none
+
+      integer idnode,mxnode,natms,iatm0,iatm1,i
+      real(8) ppp,ff1,ff2,temp,gaumom(0:5)
+      
+      iatm0=(idnode*natms)/mxnode+1
+      iatm1=((idnode+1)*natms)/mxnode
+      
+      do i=iatm0,iatm1
+        
+        if(lstfrz(i).gt.0)cycle
+        
+        ff1=gaumom(0)+1.d0
+        ff2=gaumom(0)/(gaumom(0)+1.d0)
+        ppp=weight(i)*(vxx(i)**2+vyy(i)**2+vzz(i)**2)/(boltz*temp)
+        gaumom(0)=ff1
+        gaumom(1)=ppp/(3.d0*ff1)+gaumom(1)*ff2
+        gaumom(2)=ppp**2/(15.d0*ff1)+gaumom(2)*ff2
+        gaumom(3)=ppp**3/(105.d0*ff1)+gaumom(3)*ff2
+        gaumom(4)=ppp**2*ppp**2/(945.d0*ff1)+gaumom(4)*ff2
+        gaumom(5)=ppp**3*ppp**2/(10395.d0*ff1)+gaumom(5)*ff2
+        
+      enddo
+      
+      end subroutine gaussian_moments
+
+      subroutine bead_moments(idnode,mxnode,natms,nbeads,temp,gaumom)
+
+c**********************************************************************
+c     
+c     dl_poly_classic subroutine for calculating the moments of the 
+c     bead momentum distribution function in a path intergral molecular
+c     dynamics simulation
+c     
+c     copyright - daresbury laboratory
+c     author    - w.smith dec 2016
+c     
+c**********************************************************************
+      
+      implicit none
+      
+      integer, intent(in ) :: idnode,mxnode,natms,nbeads
+      real(8), intent(in)  :: temp
+
+      integer i,iatm0,iatm1
+      real(8) ppp
+      real(8) gaumom(0:5)
+      
+      iatm0=nbeads*((idnode*natms)/mxnode)
+      iatm1=nbeads*(((idnode+1)*natms)/mxnode)
+
+      do i=1,iatm1-iatm0
+        
+        ppp=(pxx(i)**2+pyy(i)**2+pzz(i)**2)/(zmass(i)*boltz*temp)
+        gaumom(0)=gaumom(0)+1.d0
+        gaumom(1)=ppp/(3.d0*gaumom(0))+
+     x    gaumom(1)*(gaumom(0)-1.d0)/gaumom(0)
+        gaumom(2)=ppp**2/(15.d0*gaumom(0))+
+     x    gaumom(2)*(gaumom(0)-1.d0)/gaumom(0)
+        gaumom(3)=ppp**3/(105.d0*gaumom(0))+
+     x    gaumom(3)*(gaumom(0)-1.d0)/gaumom(0)
+        gaumom(4)=ppp**2*ppp**2/(945.d0*gaumom(0))+
+     x    gaumom(4)*(gaumom(0)-1.d0)/gaumom(0)
+        gaumom(5)=ppp**3*ppp**2/(10395.d0*gaumom(0))+
+     x    gaumom(5)*(gaumom(0)-1.d0)/gaumom(0)
+        
+      enddo
+
+      end subroutine bead_moments
+
+      subroutine thermostat_moments
+     x  (idnode,mxnode,natms,nbeads,nchain,temp,taut,gaumom)
+
+c**********************************************************************
+c     
+c     dl_poly_classic subroutine for calculating the moments of the 
+c     thermostat momentum distribution function in a path intergral 
+c     molecular dynamics simulation
+c     
+c     copyright - daresbury laboratory
+c     author    - w.smith dec 2016
+c     
+c**********************************************************************
+      
+      implicit none
+      
+      integer, intent(in ) :: idnode,mxnode,natms,nbeads,nchain
+      real(8), intent(in)  :: temp,taut
+
+      integer i,j,k,iatm0,iatm1
+      real(8) ppp,qqq,qqk
+      real(8) gaumom(0:5)
+      
+      iatm0=nbeads*((idnode*natms)/mxnode)
+      iatm1=nbeads*(((idnode+1)*natms)/mxnode)
+      
+      qqq=boltz*temp*taut**2
+      qqk=hbar**2/(boltz*temp*dble(nbeads))
+
+      
+      do k=1,nbeads
+        
+        do i=k,iatm1-iatm0,nbeads
+          
+          do j=1,nchain
+            
+            ppp=(pcx(j,i)**2+pcy(j,i)**2+pcz(j,i)**2)/
+     x        (qqq*boltz*temp)
+            gaumom(0)=gaumom(0)+1.d0
+            gaumom(1)=ppp/(3.d0*gaumom(0))+
+     x        gaumom(1)*(gaumom(0)-1.d0)/gaumom(0)
+            gaumom(2)=ppp**2/(15.d0*gaumom(0))+
+     x        gaumom(2)*(gaumom(0)-1.d0)/gaumom(0)
+            gaumom(3)=ppp**3/(105.d0*gaumom(0))+
+     x        gaumom(3)*(gaumom(0)-1.d0)/gaumom(0)
+            gaumom(4)=ppp**2*ppp**2/(945.d0*gaumom(0))+
+     x        gaumom(4)*(gaumom(0)-1.d0)/gaumom(0)
+            gaumom(5)=ppp**3*ppp**2/(10395.d0*gaumom(0))+
+     x        gaumom(5)*(gaumom(0)-1.d0)/gaumom(0)
+            
+          enddo
+          
+        enddo
+        
+        qqq=qqk
+
+      enddo
+
+      end subroutine thermostat_moments
+      
       end module integrator_module

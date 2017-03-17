@@ -29,7 +29,7 @@ c***********************************************************************
 
       contains
       
-      subroutine alloc_exc_arrays(idnode)
+      subroutine alloc_exc_arrays(idnode,mxnode)
 
 c***********************************************************************
 c     
@@ -38,25 +38,28 @@ c     copyright - daresbury laboratory
 c     author    - w. smith    sep 2003
 c     
 c***********************************************************************
-
+      
       implicit none
-
+      
       integer, parameter :: nnn=3
-
-      integer i,fail,idnode
+      
+      logical safe
+      integer i,fail,idnode,mxnode
       dimension fail(nnn)
-
-      do i=1,nnn
-        fail(i)=0
-      enddo
+      
+      safe=.true.
+      
+c     allocate arrays
+      
+      fail(:)=0
       allocate (lexatm(msatms,mxexcl),stat=fail(1))
       allocate (nexatm(msatms),stat=fail(2))
       allocate (noxatm(msatms),stat=fail(3))
-
-      do i=1,nnn
-        if(fail(i).gt.0)call error(idnode,1012)
-      enddo
-
+      
+      if(any(fail.gt.0))safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,1012)
+      
       end subroutine alloc_exc_arrays
 
       subroutine exclude(idnode,mxnode,natms,ntpmls)
@@ -74,7 +77,7 @@ c
 c     rigid body exclusions added : t.forester nov 1993
 c     check on 1..4 scale factors : t.forester feb 1994
 c     inversion terms added       : w.smith    jul 1996
-c
+c     
 c***********************************************************************
       
       implicit none
@@ -93,7 +96,7 @@ c***********************************************************************
 
 c     check on array allocations
         
-        nsatms=(natms+mxnode-1)/mxnode
+        nsatms=(natms-1)/mxnode+1
         if(nsatms.gt.msatms)then
           
           if(idnode.eq.0)write(nrite,*)'make msatms >= ',nsatms
@@ -140,7 +143,6 @@ c     initialise excluded atom arrays
         
       enddo
       
-
 c     loop over molecules in system
       
       ibonds=0
@@ -165,23 +167,7 @@ c     exclude sites on basis of chemical bonds
             ia=lstbnd(ibonds,1)+isite
             ib=lstbnd(ibonds,2)+isite
 
-c     check interaction not already included
-
-            lchk=.true.
-            do jz=1,min(nexsit(ia),mxexcl)
-              if(lexsit(ia,jz).eq.ib-isite)lchk=.false.
-            enddo
-            if(lchk)then
-              nexsit(ia)=nexsit(ia)+1
-              nexsit(ib)=nexsit(ib)+1
-              if(max(nexsit(ia),nexsit(ib)).gt.mxexcl)then
-                ibig=max(ibig,nexsit(ia),nexsit(ib))
-                safe=.false.
-              else
-                lexsit(ia,nexsit(ia))=ib-isite
-                lexsit(ib,nexsit(ib))=ia-isite
-              endif
-            endif
+            call check_exclude(lchk,safe,ia,ib,isite,ibig,nexsit,lexsit)
             
           endif
           
@@ -195,23 +181,7 @@ c     exclude sites on basis of bond constraints
           ia=lstcon(iconst,1)+isite
           ib=lstcon(iconst,2)+isite
 
-c     check interaction not already included
-
-          lchk=.true.
-          do jz=1,min(nexsit(ia),mxexcl)
-            if(lexsit(ia,jz).eq.ib-isite)lchk=.false.
-          enddo
-          if(lchk)then
-            nexsit(ia)=nexsit(ia)+1
-            nexsit(ib)=nexsit(ib)+1
-            if(max(nexsit(ia),nexsit(ib)).gt.mxexcl)then
-              ibig=max(ibig,nexsit(ia),nexsit(ib))
-              safe=.false.
-            else
-              lexsit(ia,nexsit(ia))=ib-isite
-              lexsit(ib,nexsit(ib))=ia-isite
-            endif
-          endif
+          call check_exclude(lchk,safe,ia,ib,isite,ibig,nexsit,lexsit)
           
         enddo
         
@@ -220,67 +190,18 @@ c     exclude sites on basis of bond angles
         do i=1,numang(itmols)
           
           iangle=iangle+1
+
           if(keyang(iangle).gt.0)then
+            
             ia=lstang(iangle,1)+isite
             ib=lstang(iangle,2)+isite
             ic=lstang(iangle,3)+isite
 
-c     check if already added to lists ..
-c     ia - ib interaction
-
-            lchk=.true.
-            do jz=1,min(nexsit(ia),mxexcl)
-              if(lexsit(ia,jz).eq.ib-isite)lchk=.false.
-            enddo
-            if(lchk)then
-              nexsit(ia)=nexsit(ia)+1
-              nexsit(ib)=nexsit(ib)+1
-              if(max(nexsit(ia),nexsit(ib)).gt.mxexcl)then
-                ibig=max(ibig,nexsit(ia),nexsit(ib))
-                safe=.false.
-              else
-                lexsit(ia,nexsit(ia))=ib-isite
-                lexsit(ib,nexsit(ib))=ia-isite
-              endif
-            endif
-
-c     ib - ic interaction
-
-            lchk=.true.
-            do jz=1,min(nexsit(ib),mxexcl)
-              if(lexsit(ib,jz).eq.ic-isite)lchk=.false.
-            enddo
-            if(lchk)then
-              nexsit(ib)=nexsit(ib)+1
-              nexsit(ic)=nexsit(ic)+1
-              if(max(nexsit(ib),nexsit(ic)).gt.mxexcl)then
-                ibig=max(ibig,nexsit(ib),nexsit(ic))
-                safe=.false.
-              else
-                lexsit(ib,nexsit(ib))=ic-isite
-                lexsit(ic,nexsit(ic))=ib-isite
-              endif
-            endif
-
-c     ia - ic interaction
-
-            lchk=.true.
-            do jz=1,min(nexsit(ia),mxexcl)
-              if(lexsit(ia,jz).eq.ic-isite)lchk=.false.
-            enddo
-            if(lchk)then
-              nexsit(ia)=nexsit(ia)+1
-              nexsit(ic)=nexsit(ic)+1
-              if(max(nexsit(ia),nexsit(ic)).gt.mxexcl)then
-                ibig=max(ibig,nexsit(ia),nexsit(ic))
-                safe=.false.
-              else
-                lexsit(ia,nexsit(ia))=ic-isite
-                lexsit(ic,nexsit(ic))=ia-isite
-              endif
-            endif
-
-          endif
+            call check_exclude(lchk,safe,ia,ib,isite,ibig,nexsit,lexsit)
+            call check_exclude(lchk,safe,ib,ic,isite,ibig,nexsit,lexsit)
+            call check_exclude(lchk,safe,ia,ic,isite,ibig,nexsit,lexsit)
+            
+          endif          
           
         enddo
         
@@ -299,24 +220,8 @@ c     exclude on basis of rigid groups
               
               ib=lstgst(igrp,jk)+isite
               
-c     check interaction not already included
-
-              lchk=.true.
-              do jz=1,min(nexsit(ia),mxexcl)
-                if(lexsit(ia,jz).eq.ib-isite)lchk=.false.
-              enddo
-              
-              if(lchk)then
-                nexsit(ia)=nexsit(ia)+1
-                nexsit(ib)=nexsit(ib)+1
-                if(max(nexsit(ia),nexsit(ib)).gt.mxexcl)then
-                  ibig=max(ibig,nexsit(ia),nexsit(ib))
-                  safe=.false.
-                else
-                  lexsit(ia,nexsit(ia))=ib-isite
-                  lexsit(ib,nexsit(ib))=ia-isite
-                endif
-              endif
+              call check_exclude(lchk,safe,ia,ib,isite,ibig,nexsit,
+     x          lexsit)
               
             enddo
             
@@ -333,139 +238,39 @@ c     exclude sites on basis of 1-4 dihedral angles
           ib=lstdih(idihdr,2)+isite
           ic=lstdih(idihdr,3)+isite
           id=lstdih(idihdr,4)+isite
+
+          call check_exclude(lchk,safe,ia,ib,isite,ibig,nexsit,lexsit)
+          call check_exclude(lchk,safe,ib,ic,isite,ibig,nexsit,lexsit)
+          call check_exclude(lchk,safe,ia,ic,isite,ibig,nexsit,lexsit)
+          call check_exclude(lchk,safe,id,ib,isite,ibig,nexsit,lexsit)
+          call check_exclude(lchk,safe,id,ic,isite,ibig,nexsit,lexsit)
+          call check_exclude(lchk,safe,ia,id,isite,ibig,nexsit,lexsit)
           
-c     check if already added to lists ..
-c     ia - ib interaction
+c     ia-id interaction: may need to reset vdw and elec scale factors
           
-          lchk=.true.
-          do jz=1,min(nexsit(ia),mxexcl)
-            if(lexsit(ia,jz).eq.ib-isite)lchk=.false.
-          enddo
-          if(lchk)then
-            nexsit(ia)=nexsit(ia)+1
-            nexsit(ib)=nexsit(ib)+1
-            if(max(nexsit(ia),nexsit(ib)).gt.mxexcl)then
-              ibig=max(ibig,nexsit(ia),nexsit(ib))
-              safe=.false.
-            else
-              lexsit(ia,nexsit(ia))=ib-isite
-              lexsit(ib,nexsit(ib))=ia-isite
-            endif
-          endif
-          
-c     ib - ic interaction
-          
-          lchk=.true.
-          do jz=1,min(nexsit(ib),mxexcl)
-            if(lexsit(ib,jz).eq.ic-isite)lchk=.false.
-          enddo
-          if(lchk)then
-            nexsit(ib)=nexsit(ib)+1
-            nexsit(ic)=nexsit(ic)+1
-            if(max(nexsit(ib),nexsit(ic)).gt.mxexcl)then
-              ibig=max(ibig,nexsit(ib),nexsit(ic))
-              safe=.false.
-            else
-              lexsit(ib,nexsit(ib))=ic-isite
-              lexsit(ic,nexsit(ic))=ib-isite
-            endif
-          endif
-          
-c     ia - ic interaction
-          
-          lchk=.true.
-          do jz=1,min(nexsit(ia),mxexcl)
-            if(lexsit(ia,jz).eq.ic-isite)lchk=.false.
-          enddo
-          if(lchk)then
-            nexsit(ia)=nexsit(ia)+1
-            nexsit(ic)=nexsit(ic)+1
-            if(max(nexsit(ia),nexsit(ic)).gt.mxexcl)then
-              ibig=max(ibig,nexsit(ia),nexsit(ic))
-              safe=.false.
-            else
-              lexsit(ia,nexsit(ia))=ic-isite
-              lexsit(ic,nexsit(ic))=ia-isite
-            endif
-          endif
-          
-c     id - ib interaction
-          
-            lchk=.true.
-            do jz=1,min(nexsit(id),mxexcl)
-              if(lexsit(id,jz).eq.ib-isite)lchk=.false.
-            enddo
-            if(lchk)then
-              nexsit(id)=nexsit(id)+1
-              nexsit(ib)=nexsit(ib)+1
-              if(max(nexsit(id),nexsit(ib)).gt.mxexcl)then
-                ibig=max(ibig,nexsit(id),nexsit(ib))
-                safe=.false.
-              else
-                lexsit(id,nexsit(id))=ib-isite
-                lexsit(ib,nexsit(ib))=id-isite
-              endif
-            endif
+          if(.not.lchk.and.keydih(idihdr).ne.7)then
             
-c     id - ic interaction
-            
-            lchk=.true.
-            do jz=1,min(nexsit(id),mxexcl)
-              if(lexsit(id,jz).eq.ic-isite)lchk=.false.
-            enddo
-            if(lchk)then
-              nexsit(id)=nexsit(id)+1
-              nexsit(ic)=nexsit(ic)+1
-              if(max(nexsit(id),nexsit(ic)).gt.mxexcl)then
-                ibig=max(ibig,nexsit(id),nexsit(ic))
-                safe=.false.
-              else
-                lexsit(id,nexsit(id))=ic-isite
-                lexsit(ic,nexsit(ic))=id-isite
-              endif
-            endif
-            
-c     ia - id interaction: may need to reset vdw and elec scale factors
-            
-            lchk=.true.
-            do jz=1,min(nexsit(ia),mxexcl)
-              if(lexsit(ia,jz).eq.id-isite)lchk=.false.
-            enddo
-            if(lchk)then
-              
-              nexsit(ia)=nexsit(ia)+1
-              nexsit(id)=nexsit(id)+1
-              if(max(nexsit(ia),nexsit(id)).gt.mxexcl)then
-                ibig=max(ibig,nexsit(ia),nexsit(id))
-                safe=.false.
-              else
-                lexsit(ia,nexsit(ia))=id-isite
-                lexsit(id,nexsit(id))=ia-isite
-              endif
-              
-            elseif(keydih(idihdr).ne.7)then
-              
 c     if already excluded reset 1..4 vdw and coulombic scale factors
-              
-              check=((abs(prmdih(idihdr,4)).gt.1.d-10).or.
-     x          (abs(prmdih(idihdr,5)).gt.1.d-10))
             
-              if(check)then
-                
-                a1=dble(itmols)
-                a2=dble(ia)
-                a3=dble(id)
-                call warning(idnode,20,a1,a2,a3)
-                
-                prmdih(idihdr,4)=0.d0
-                prmdih(idihdr,5)=0.d0
-                
-              endif
+            check=((abs(prmdih(idihdr,4)).gt.1.d-10).or.
+     x        (abs(prmdih(idihdr,5)).gt.1.d-10))
+            
+            if(check)then
+              
+              a1=dble(itmols)
+              a2=dble(ia)
+              a3=dble(id)
+              call warning(idnode,20,a1,a2,a3)
+              
+              prmdih(idihdr,4)=0.d0
+              prmdih(idihdr,5)=0.d0
               
             endif
             
-          enddo
+          endif
           
+        enddo
+        
 c     exclude sites on basis of inversion potentials
         
         do i=1,numinv(itmols)
@@ -475,116 +280,13 @@ c     exclude sites on basis of inversion potentials
           ib=lstinv(invers,2)+isite
           ic=lstinv(invers,3)+isite
           id=lstinv(invers,4)+isite
-
-c     check if already added to lists ..
-c     ia - ib interaction
-
-          lchk=.true.
-          do jz=1,min(nexsit(ia),mxexcl)
-            if(lexsit(ia,jz).eq.ib-isite)lchk=.false.
-          enddo
-          if(lchk)then
-            nexsit(ia)=nexsit(ia)+1
-            nexsit(ib)=nexsit(ib)+1
-            if(max(nexsit(ia),nexsit(ib)).gt.mxexcl)then
-              ibig=max(ibig,nexsit(ia),nexsit(ib))
-              safe=.false.
-            else
-              lexsit(ia,nexsit(ia))=ib-isite
-              lexsit(ib,nexsit(ib))=ia-isite
-            endif
-          endif
-
-c     ib - ic interaction
-
-          lchk=.true.
-          do jz=1,min(nexsit(ib),mxexcl)
-            if(lexsit(ib,jz).eq.ic-isite)lchk=.false.
-          enddo
-          if(lchk)then
-            nexsit(ib)=nexsit(ib)+1
-            nexsit(ic)=nexsit(ic)+1
-            if(max(nexsit(ib),nexsit(ic)).gt.mxexcl)then
-              ibig=max(ibig,nexsit(ib),nexsit(ic))
-              safe=.false.
-            else
-              lexsit(ib,nexsit(ib))=ic-isite
-              lexsit(ic,nexsit(ic))=ib-isite
-            endif
-          endif
-
-c     ia - ic interaction
-
-          lchk=.true.
-          do jz=1,min(nexsit(ia),mxexcl)
-            if(lexsit(ia,jz).eq.ic-isite)lchk=.false.
-          enddo
-          if(lchk)then
-            nexsit(ia)=nexsit(ia)+1
-            nexsit(ic)=nexsit(ic)+1
-            if(max(nexsit(ia),nexsit(ic)).gt.mxexcl)then
-              ibig=max(ibig,nexsit(ia),nexsit(ic))
-              safe=.false.
-            else
-              lexsit(ia,nexsit(ia))=ic-isite
-              lexsit(ic,nexsit(ic))=ia-isite
-            endif
-          endif
-
-c     id - ib interaction
-
-            lchk=.true.
-            do jz=1,min(nexsit(id),mxexcl)
-              if(lexsit(id,jz).eq.ib-isite)lchk=.false.
-            enddo
-            if(lchk)then
-              nexsit(id)=nexsit(id)+1
-              nexsit(ib)=nexsit(ib)+1
-              if(max(nexsit(id),nexsit(ib)).gt.mxexcl)then
-                ibig=max(ibig,nexsit(id),nexsit(ib))
-                safe=.false.
-              else
-                lexsit(id,nexsit(id))=ib-isite
-                lexsit(ib,nexsit(ib))=id-isite
-              endif
-            endif
-
-c     id - ic interaction
-
-            lchk=.true.
-            do jz=1,min(nexsit(id),mxexcl)
-              if(lexsit(id,jz).eq.ic-isite)lchk=.false.
-            enddo
-            if(lchk)then
-              nexsit(id)=nexsit(id)+1
-              nexsit(ic)=nexsit(ic)+1
-              if(max(nexsit(id),nexsit(ic)).gt.mxexcl)then
-                ibig=max(ibig,nexsit(id),nexsit(ic))
-                safe=.false.
-              else
-                lexsit(id,nexsit(id))=ic-isite
-                lexsit(ic,nexsit(ic))=id-isite
-              endif
-            endif
-
-c     ia - id interaction
-
-            lchk=.true.
-            do jz=1,min(nexsit(ia),mxexcl)
-              if(lexsit(ia,jz).eq.id-isite)lchk=.false.
-            enddo
-            if(lchk)then
-              nexsit(ia)=nexsit(ia)+1
-              nexsit(id)=nexsit(id)+1
-              if(max(nexsit(ia),nexsit(id)).gt.mxexcl)then
-                ibig=max(ibig,nexsit(ia),nexsit(id))
-                safe=.false.
-              else
-                lexsit(ia,nexsit(ia))=id-isite
-                lexsit(id,nexsit(id))=ia-isite
-              endif
-
-          endif
+          
+          call check_exclude(lchk,safe,ia,ib,isite,ibig,nexsit,lexsit)
+          call check_exclude(lchk,safe,ib,ic,isite,ibig,nexsit,lexsit)
+          call check_exclude(lchk,safe,ia,ic,isite,ibig,nexsit,lexsit)
+          call check_exclude(lchk,safe,id,ib,isite,ibig,nexsit,lexsit)
+          call check_exclude(lchk,safe,id,ic,isite,ibig,nexsit,lexsit)
+          call check_exclude(lchk,safe,ia,id,isite,ibig,nexsit,lexsit)
           
         enddo
         
@@ -597,23 +299,7 @@ c     exclude sites on basis of core-shell units
           ia=lstshl(ishels,1)+isite
           ib=lstshl(ishels,2)+isite
 
-c     check interaction not already included
-          
-          lchk=.true.
-          do jz=1,min(nexsit(ia),mxexcl)
-            if(lexsit(ia,jz).eq.ib-isite)lchk=.false.
-          enddo
-          if(lchk)then
-            nexsit(ia)=nexsit(ia)+1
-            nexsit(ib)=nexsit(ib)+1
-            if(max(nexsit(ia),nexsit(ib)).gt.mxexcl)then
-              ibig=max(ibig,nexsit(ia),nexsit(ib))
-              safe=.false.
-            else
-              lexsit(ia,nexsit(ia))=ib-isite
-              lexsit(ib,nexsit(ib))=ia-isite
-            endif
-          endif
+          call check_exclude(lchk,safe,ia,ib,isite,ibig,nexsit,lexsit)
           
 c     exclude sites on basis of bonds to core-shell units
 
@@ -629,88 +315,29 @@ c     exclude sites on basis of bonds to core-shell units
 
               if(ia.eq.ia1)then
 
-c     check interaction not already included
-          
-                lchk=.true.
-                do jz=1,min(nexsit(ib1),mxexcl)
-                  if(lexsit(ib1,jz).eq.ib-isite)lchk=.false.
-                enddo
-                if(lchk)then
-                  nexsit(ib1)=nexsit(ib1)+1
-                  nexsit(ib)=nexsit(ib)+1
-                  if(max(nexsit(ib1),nexsit(ib)).gt.mxexcl)then
-                    ibig=max(ibig,nexsit(ib1),nexsit(ib))
-                    safe=.false.
-                  else
-                    lexsit(ib1,nexsit(ib1))=ib-isite
-                    lexsit(ib,nexsit(ib))=ib1-isite
-                  endif
-                endif
+                call check_exclude
+     x            (lchk,safe,ib1,ib,isite,ibig,nexsit,lexsit)
 
               endif
 
               if(ia.eq.ib1)then
 
-c     check interaction not already included
-          
-                lchk=.true.
-                do jz=1,min(nexsit(ia1),mxexcl)
-                  if(lexsit(ia1,jz).eq.ib-isite)lchk=.false.
-                enddo
-                if(lchk)then
-                  nexsit(ia1)=nexsit(ia1)+1
-                  nexsit(ib)=nexsit(ib)+1
-                  if(max(nexsit(ia1),nexsit(ib)).gt.mxexcl)then
-                    ibig=max(ibig,nexsit(ia1),nexsit(ib))
-                    safe=.false.
-                  else
-                    lexsit(ia1,nexsit(ia1))=ib-isite
-                    lexsit(ib,nexsit(ib))=ia1-isite
-                  endif
-                endif
+                call check_exclude
+     x            (lchk,safe,ia1,ib,isite,ibig,nexsit,lexsit)
 
               endif
 
               if(ib.eq.ia1)then
 
-c     check interaction not already included
-          
-                lchk=.true.
-                do jz=1,min(nexsit(ia),mxexcl)
-                  if(lexsit(ia,jz).eq.ib1-isite)lchk=.false.
-                enddo
-                if(lchk)then
-                  nexsit(ia)=nexsit(ia)+1
-                  nexsit(ib1)=nexsit(ib1)+1
-                  if(max(nexsit(ia),nexsit(ib1)).gt.mxexcl)then
-                    ibig=max(ibig,nexsit(ia),nexsit(ib1))
-                    safe=.false.
-                  else
-                    lexsit(ia,nexsit(ia))=ib1-isite
-                    lexsit(ib1,nexsit(ib1))=ia-isite
-                  endif
-                endif
+                call check_exclude
+     x            (lchk,safe,ia,ib1,isite,ibig,nexsit,lexsit)
 
               endif
+              
               if(ib.eq.ib1)then
 
-c     check interaction not already included
-          
-                lchk=.true.
-                do jz=1,min(nexsit(ia),mxexcl)
-                  if(lexsit(ia,jz).eq.ia1-isite)lchk=.false.
-                enddo
-                if(lchk)then
-                  nexsit(ia)=nexsit(ia)+1
-                  nexsit(ia1)=nexsit(ia1)+1
-                  if(max(nexsit(ia),nexsit(ia1)).gt.mxexcl)then
-                    ibig=max(ibig,nexsit(ia),nexsit(ia1))
-                    safe=.false.
-                  else
-                    lexsit(ia,nexsit(ia))=ia1-isite
-                    lexsit(ia1,nexsit(ia1))=ia-isite
-                  endif
-                endif
+                call check_exclude
+     x            (lchk,safe,ia,ia1,isite,ibig,nexsit,lexsit)
 
               endif
 
@@ -730,88 +357,29 @@ c     exclude sites on basis of constraint bonds to core-shell units
 
             if(ia.eq.ia1)then
 
-c     check interaction not already included
-          
-              lchk=.true.
-              do jz=1,min(nexsit(ib1),mxexcl)
-                if(lexsit(ib1,jz).eq.ib-isite)lchk=.false.
-              enddo
-              if(lchk)then
-                nexsit(ib1)=nexsit(ib1)+1
-                nexsit(ib)=nexsit(ib)+1
-                if(max(nexsit(ib1),nexsit(ib)).gt.mxexcl)then
-                  ibig=max(ibig,nexsit(ib1),nexsit(ib))
-                  safe=.false.
-                else
-                  lexsit(ib1,nexsit(ib1))=ib-isite
-                  lexsit(ib,nexsit(ib))=ib1-isite
-                endif
-              endif
+              call check_exclude
+     x          (lchk,safe,ib1,ib,isite,ibig,nexsit,lexsit)
 
             endif
 
             if(ia.eq.ib1)then
 
-c     check interaction not already included
-          
-              lchk=.true.
-              do jz=1,min(nexsit(ia1),mxexcl)
-                if(lexsit(ia1,jz).eq.ib-isite)lchk=.false.
-              enddo
-              if(lchk)then
-                nexsit(ia1)=nexsit(ia1)+1
-                nexsit(ib)=nexsit(ib)+1
-                if(max(nexsit(ia1),nexsit(ib)).gt.mxexcl)then
-                  ibig=max(ibig,nexsit(ia1),nexsit(ib))
-                  safe=.false.
-                else
-                  lexsit(ia1,nexsit(ia1))=ib-isite
-                  lexsit(ib,nexsit(ib))=ia1-isite
-                endif
-              endif
+              call check_exclude
+     x          (lchk,safe,ia1,ib,isite,ibig,nexsit,lexsit)
 
             endif
 
             if(ib.eq.ia1)then
 
-c     check interaction not already included
-          
-              lchk=.true.
-              do jz=1,min(nexsit(ia),mxexcl)
-                if(lexsit(ia,jz).eq.ib1-isite)lchk=.false.
-              enddo
-              if(lchk)then
-                nexsit(ia)=nexsit(ia)+1
-                nexsit(ib1)=nexsit(ib1)+1
-                if(max(nexsit(ia),nexsit(ib1)).gt.mxexcl)then
-                  ibig=max(ibig,nexsit(ia),nexsit(ib1))
-                  safe=.false.
-                else
-                  lexsit(ia,nexsit(ia))=ib1-isite
-                  lexsit(ib1,nexsit(ib1))=ia-isite
-                endif
-              endif
+              call check_exclude
+     x          (lchk,safe,ia,ib1,isite,ibig,nexsit,lexsit)
 
             endif
+            
             if(ib.eq.ib1)then
 
-c     check interaction not already included
-          
-              lchk=.true.
-              do jz=1,min(nexsit(ia),mxexcl)
-                if(lexsit(ia,jz).eq.ia1-isite)lchk=.false.
-              enddo
-              if(lchk)then
-                nexsit(ia)=nexsit(ia)+1
-                nexsit(ia1)=nexsit(ia1)+1
-                if(max(nexsit(ia),nexsit(ia1)).gt.mxexcl)then
-                  ibig=max(ibig,nexsit(ia),nexsit(ia1))
-                  safe=.false.
-                else
-                  lexsit(ia,nexsit(ia))=ia1-isite
-                  lexsit(ia1,nexsit(ia1))=ia-isite
-                endif
-              endif
+              call check_exclude
+     x          (lchk,safe,ia,ia1,isite,ibig,nexsit,lexsit)
 
             endif
 
@@ -821,38 +389,23 @@ c     exclude sites on basis of rigid units involving  core or shell
           
           igrp=igrp-numgrp(itmols)
           do kk=1,numgrp(itmols)
-          
-            igrp=igrp+1
-          
-            id=listyp(igrp)
-          
-            do jj=1,numgsit(id)
             
+            igrp=igrp+1
+            
+            id=listyp(igrp)
+            
+            do jj=1,numgsit(id)
+              
               ia1=lstgst(igrp,jj)+isite
               if(ia1.eq.ia)then
 
                 do jk=1,numgsit(id)
-            
+                  
                   if(jk.ne.jj)then
                     ib1=lstgst(igrp,jk)+isite
 
-c     check interaction not already included
-          
-                    lchk=.true.
-                    do jz=1,min(nexsit(ib1),mxexcl)
-                      if(lexsit(ib1,jz).eq.ib-isite)lchk=.false.
-                    enddo
-                    if(lchk)then
-                      nexsit(ib1)=nexsit(ib1)+1
-                      nexsit(ib)=nexsit(ib)+1
-                      if(max(nexsit(ib1),nexsit(ib)).gt.mxexcl)then
-                        ibig=max(ibig,nexsit(ib1),nexsit(ib))
-                        safe=.false.
-                      else
-                        lexsit(ib1,nexsit(ib1))=ib-isite
-                        lexsit(ib,nexsit(ib))=ib1-isite
-                      endif
-                    endif
+                    call check_exclude
+     x                (lchk,safe,ib1,ib,isite,ibig,nexsit,lexsit)
 
                   endif
 
@@ -863,28 +416,12 @@ c     check interaction not already included
               if(ia1.eq.ib)then
 
                 do jk=1,numgsit(id)
-            
+                  
                   if(jk.ne.jj)then
                     ib1=lstgst(igrp,jk)+isite
 
-c     check interaction not already included
-          
-                    lchk=.true.
-                    do jz=1,min(nexsit(ia),mxexcl)
-                      if(lexsit(ia,jz).eq.ib1-isite)lchk=.false.
-                    enddo
-                    if(lchk)then
-                      nexsit(ia)=nexsit(ia)+1
-                      nexsit(ib1)=nexsit(ib1)+1
-                      if(max(nexsit(ia),nexsit(ib1)).gt.mxexcl)then
-                        ibig=max(ibig,nexsit(ia),nexsit(ib1))
-                        safe=.false.
-                      else
-                        lexsit(ia,nexsit(ia))=ib1-isite
-                        lexsit(ib1,nexsit(ib1))=ia-isite
-                      endif
-
-                    endif
+                    call check_exclude
+     x                (lchk,safe,ia,ib1,isite,ibig,nexsit,lexsit)
 
                   endif
 
@@ -897,7 +434,7 @@ c     check interaction not already included
           enddo
 
         enddo
-
+        
         isite=isite+numsit(itmols)
         
       enddo
@@ -909,13 +446,14 @@ c     check for exceeded array bounds
       if(mxnode.gt.1)call gstate(safe)
       if(.not.safe)then
         if(mxnode.gt.1)call gimax(ibig,1,jj)
-        if(idnode.eq.0)write(nrite,*)'mxexcl must be at least ',ibig
-        if(idnode.eq.0)write(nrite,*)'mxexcl is currently     ',mxexcl
+        if(idnode.eq.0)then
+          write(nrite,*)'mxexcl must be at least ',ibig
+          write(nrite,*)'mxexcl is currently     ',mxexcl
+        endif
         call error(idnode,65)
       endif
-
-c     remove redundant entries from exclusion list
-c     (there shouldn't be any!)
+      
+c     remove redundant entries from exclusion list (none expected!)
       
       do i=1,ntpsit
         
@@ -950,10 +488,46 @@ c     (there shouldn't be any!)
         nexsit(i)=nlast
         
       enddo
-
       
       return
       end subroutine exclude
+
+      subroutine check_exclude(lchk,safe,ia,ib,isite,ibig,nexsit,lexsit)
+c***********************************************************************
+c     
+c     dl_poly subroutine for checking that atom pair ia and ib have
+c     a bonded interaction and must be incorporated in the excluded
+c     atom list unless identified previously
+c     
+c     copyright - daresbury laboratory     2016
+c     author    - w. smith 2016
+c     
+c***********************************************************************
+      
+      implicit none
+
+      logical lchk,safe
+      integer ia,ib,isite,ibig,jz
+      integer nexsit(mxsite),lexsit(mxsite,mxexcl)
+      
+      lchk=.true.
+      do jz=1,min(nexsit(ia),mxexcl)
+        if(lexsit(ia,jz).eq.ib-isite)lchk=.false.
+      enddo
+      if(lchk)then
+        nexsit(ia)=nexsit(ia)+1
+        nexsit(ib)=nexsit(ib)+1
+        if(max(nexsit(ia),nexsit(ib)).gt.mxexcl)then
+          ibig=max(ibig,nexsit(ia),nexsit(ib))
+          safe=.false.
+        else
+          lexsit(ia,nexsit(ia))=ib-isite
+          lexsit(ib,nexsit(ib))=ia-isite
+        endif
+      endif
+      
+      return
+      end            
 
       subroutine excludeneu(idnode,mxnode,nneut)
 
@@ -1218,7 +792,7 @@ c
 c     dl_poly subroutine for constructing the excluded pair
 c     interaction list of the system to be simulated
 c     part 2 
-c
+c     
 c     copyright - daresbury laboratory 1992
 c     author    - w. smith        june 1992
 c     
@@ -1302,7 +876,7 @@ c     final sort into brode-ahlrichs ordering
       
       ii=0
       do i=1+idnode,natms,mxnode
-        
+
         ii=ii+1
         do j=1,nexatm(ii)
           
@@ -1365,4 +939,3 @@ c     copy exclude list into metafreeze module
       end subroutine exclude_copy_mtd
       
       end module exclude_module
-

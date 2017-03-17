@@ -4,9 +4,9 @@ c***********************************************************************
 c     
 c     dl_poly module for defining valence angle potentials
 c     copyright - daresbury laboratory
-c     author    - w. smith    sep 2003
-c     modified  - p.-a.cazade      oct 2007 : solvation etc.
-c     modified  - d. quigley           2010 : metadynamics
+c     author    - w. smith      sep 2003
+c     modified  - p.-a.cazade   oct 2007 : solvation etc.
+c     modified  - d. quigley        2010 : metadynamics
 c     
 c***********************************************************************
 
@@ -30,7 +30,7 @@ c***********************************************************************
 
       contains
       
-      subroutine alloc_ang_arrays(idnode)
+      subroutine alloc_ang_arrays(idnode,mxnode)
       
 c***********************************************************************
 c     
@@ -42,27 +42,29 @@ c***********************************************************************
       
       implicit none
 
-      integer i,fail,idnode
+      logical safe
+      integer i,fail,idnode,mxnode
       dimension fail(5)
 
-      do i=1,5
-        fail(i)=0
-      enddo
+      safe=.true.
+      fail(:)=0
 
       allocate (prmang(mxtang,mxpang),stat=fail(1))
       allocate (numang(mxtmls),stat=fail(2))
       allocate (keyang(mxtang),stat=fail(3))
       allocate (lstang(mxtang,3),stat=fail(4))
       allocate (listang(mxangl,4),stat=fail(5))
+      
+      if(any(fail.gt.0))safe=.false.
+      if(mxnode.gt.1)call gstate(safe)
+      if(.not.safe)call error(idnode,1010)
 
-      do i=1,5
-        if(fail(i).gt.0)call error(idnode,1010)
-      enddo
-
+c     initialise numang array
+      
       do i=1,mxtmls
          numang(i)=0
       enddo
-
+      
       end subroutine alloc_ang_arrays
 
       subroutine define_angles
@@ -82,22 +84,25 @@ c***********************************************************************
       logical safe
       character*8 keyword
       character*1 message(80)
-      integer idnode,itmols,nangle,nsite,ntmp,i,iang,iang1
-      integer idum,iatm1,iatm2,iatm3,isite1,isite2,isite3,ia,ja
-      real(8) engunit
+      integer idnode,itmols,nangle,nsite,ntmp,iang,j
+      integer idum,iatm1,iatm2,iatm3,isite1,isite2,isite3,keytmp
+      real(8) engunit,parpot(mxpang)
 
       ntmp=intstr(record,lenrec,idum)
       numang(itmols)=numang(itmols)+ntmp
+
       if(idnode.eq.0)then
         write(nrite,"(/,1x,'number of bond angles',
      x    10x,i10)")ntmp
         write(nrite,"(/,/,1x,'bond angle details:',
-     x    /,/,21x,7x,'key',5x,'index',5x,'index',5x,
-     x    'index',5x,'f-const',7x,'angle',/)")
+     x    /,/,18x,'unit',5x,'key',5x,'index',5x,'index',5x,
+     x    'index',7x,'f-const',8x,'angle',/)")
       endif
       
-      iang1=numang(itmols)
-      do iang=1,iang1
+      do iang=1,ntmp
+
+        nangle=nangle+1
+        if(nangle.gt.mxtang)call error(idnode,50)
 
 c     read bond angle potential parameters
         
@@ -107,118 +112,123 @@ c     read bond angle potential parameters
         call copystring(record,message,80)
         call lowcase(record,4)
         call getword(keyword,record,4,lenrec)
+        
+        if(keyword(1:4).eq.'harm')then
+          keytmp=1
+        elseif(keyword(1:4).eq.'-hrm')then
+          keytmp=-1
+        elseif(keyword(1:4).eq.'quar')then
+          keytmp=2
+        elseif(keyword(1:4).eq.'-qur')then
+          keytmp=-2
+        elseif(keyword(1:4).eq.'thrm')then
+          keytmp=3
+        elseif(keyword(1:4).eq.'-thm')then
+          keytmp=-3
+        elseif(keyword(1:4).eq.'shrm')then
+          keytmp=4
+        elseif(keyword(1:4).eq.'-shm')then
+          keytmp=-4
+        elseif(keyword(1:4).eq.'bvs1')then
+          keytmp=5
+        elseif(keyword(1:4).eq.'-bv1')then
+          keytmp=-5
+        elseif(keyword(1:4).eq.'bvs2')then
+          keytmp=6
+        elseif(keyword(1:4).eq.'-bv2')then
+          keytmp=-6
+        elseif(keyword(1:4).eq.'hcos')then
+          keytmp=7
+        elseif(keyword(1:4).eq.'-hcs')then
+          keytmp=-7
+        elseif(keyword(1:4).eq.'cos ')then
+          keytmp=8
+        elseif(keyword(1:4).eq.'-cos')then
+          keytmp=-8
+        elseif(keyword(1:4).eq.'mmsb')then
+          keytmp=9
+        elseif(keyword(1:4).eq.'-msb')then
+          keytmp=-9
+        elseif(keyword(1:4).eq.'stst') then
+          keytmp=10
+        elseif(keyword(1:4).eq.'-sts') then
+          keytmp=-10
+        elseif(keyword(1:4).eq.'stbe') then
+          keytmp=11
+        elseif(keyword(1:4).eq.'-stb') then
+          keytmp=-11
+        elseif(keyword(1:4).eq.'cmps') then
+          keytmp=12
+        elseif(keyword(1:4).eq.'-cmp') then
+          keytmp=-12
+        else
+          if(idnode.eq.0)write(nrite,*)message
+          call error(idnode,440)
+        endif
+
         iatm1=intstr(record,lenrec,idum)
         iatm2=intstr(record,lenrec,idum)
         iatm3=intstr(record,lenrec,idum)
-
-c     test for frozen atom pairs
-
+        parpot(1)=dblstr(record,lenrec,idum)
+        parpot(2)=dblstr(record,lenrec,idum)
+        parpot(3)=dblstr(record,lenrec,idum)
+        parpot(4)=dblstr(record,lenrec,idum)
+        parpot(5)=dblstr(record,lenrec,idum)
+        parpot(6)=dblstr(record,lenrec,idum)
+        
         isite1=nsite-numsit(itmols)+iatm1
         isite2=nsite-numsit(itmols)+iatm2
         isite3=nsite-numsit(itmols)+iatm3
+
+c     test for frozen atom pairs
 
         if(lfzsit(isite1)*lfzsit(isite2)*
      x    lfzsit(isite3).ne.0)then
           
           numang(itmols)=numang(itmols)-1
-          if(idnode.eq.0)write(nrite,'(14x,a16,40a1)')
-     x      '*** frozen *** ',(message(i),i=1,40)
-
+          if(idnode.eq.0)
+     x      write(nrite,"(a8,4x,i10,4x,a4,3i10,10f15.6)")
+     x      '*frozen*',iang,keyword(1:4),iatm1,iatm2,iatm3,
+     x      (parpot(j),j=1,mxpang)
+          
         else
-
-          nangle=nangle+1
           
-          if(nangle.gt.mxtang)call error(idnode,50)
+          if(idnode.eq.0)
+     x      write(nrite,"(12x,i10,4x,a4,3i10,10f15.6)")
+     x      iang,keyword,iatm1,iatm2,iatm3,(parpot(j),j=1,mxpang)
           
-          if(keyword(1:4).eq.'harm')then
-            keyang(nangle)=1
-          elseif(keyword(1:4).eq.'-hrm')then
-            keyang(nangle)=-1
-          elseif(keyword(1:4).eq.'quar')then
-            keyang(nangle)=2
-          elseif(keyword(1:4).eq.'-qur')then
-            keyang(nangle)=-2
-          elseif(keyword(1:4).eq.'thrm')then
-            keyang(nangle)=3
-          elseif(keyword(1:4).eq.'-thm')then
-            keyang(nangle)=-3
-          elseif(keyword(1:4).eq.'shrm')then
-            keyang(nangle)=4
-          elseif(keyword(1:4).eq.'-shm')then
-            keyang(nangle)=-4
-          elseif(keyword(1:4).eq.'bvs1')then
-            keyang(nangle)=5
-          elseif(keyword(1:4).eq.'-bv1')then
-            keyang(nangle)=-5
-          elseif(keyword(1:4).eq.'bvs2')then
-            keyang(nangle)=6
-          elseif(keyword(1:4).eq.'-bv2')then
-            keyang(nangle)=-6
-          elseif(keyword(1:4).eq.'hcos')then
-            keyang(nangle)=7
-          elseif(keyword(1:4).eq.'-hcs')then
-            keyang(nangle)=-7
-          elseif(keyword(1:4).eq.'cos ')then
-            keyang(nangle)=8
-          elseif(keyword(1:4).eq.'-cos')then
-            keyang(nangle)=-8
-          elseif(keyword(1:4).eq.'mmsb')then
-            keyang(nangle)=9
-          elseif(keyword(1:4).eq.'-msb')then
-            keyang(nangle)=-9
-          elseif(keyword(1:4).eq.'stst') then
-            keyang(nangle)=10
-          elseif(keyword(1:4).eq.'-sts') then
-            keyang(nangle)=-10
-          elseif(keyword(1:4).eq.'stbe') then
-            keyang(nangle)=11
-          elseif(keyword(1:4).eq.'-stb') then
-            keyang(nangle)=-11
-          elseif(keyword(1:4).eq.'cmps') then
-            keyang(nangle)=12
-          elseif(keyword(1:4).eq.'-cmp') then
-            keyang(nangle)=-12
-          else
-            if(idnode.eq.0)write(nrite,*)message
-            call error(idnode,440)
-          endif
-
-          lstang(nangle,1)=iatm1
-          lstang(nangle,2)=iatm2
-          lstang(nangle,3)=iatm3
-          prmang(nangle,1)=dblstr(record,lenrec,idum)
-          prmang(nangle,2)=dblstr(record,lenrec,idum)
-          prmang(nangle,3)=dblstr(record,lenrec,idum)
-          prmang(nangle,4)=dblstr(record,lenrec,idum)
-          prmang(nangle,5)=dblstr(record,lenrec,idum)
-          prmang(nangle,6)=dblstr(record,lenrec,idum)
-          
-          if(idnode.eq.0) 
-     x      write(nrite,"(27x,a4,3i10,1p,e12.4,0p,9f12.6)")
-     x      keyword(1:4),(lstang(nangle,ia),ia=1,3),
-     x      (prmang(nangle,ja),ja=1,mxpang)
-
-c     convert energies to internal units
-          
-          prmang(nangle,1)=prmang(nangle,1)*engunit
-          if(abs(keyang(nangle)).eq.2)then
-            prmang(nangle,3)=prmang(nangle,3)*engunit
-            prmang(nangle,4)=prmang(nangle,4)*engunit
-          elseif(abs(keyang(nangle)).eq.12)then
-            prmang(nangle,2)=prmang(nangle,2)*engunit            
-            prmang(nangle,3)=prmang(nangle,3)*engunit
-          endif
-
-c     convert angles to radians
-          
-          if(abs(keyang(nangle)).eq.12)then
-            prmang(nangle,4)=prmang(nangle,4)*(pi/180.d0)
-          elseif(abs(keyang(nangle)).ne.10)then
-            prmang(nangle,2)=prmang(nangle,2)*(pi/180.d0) 
-          endif
-
         endif
-
+        
+        keyang(nangle)=keytmp
+        lstang(nangle,1)=iatm1
+        lstang(nangle,2)=iatm2
+        lstang(nangle,3)=iatm3
+        prmang(nangle,1)=parpot(1)
+        prmang(nangle,2)=parpot(2)
+        prmang(nangle,3)=parpot(3)
+        prmang(nangle,4)=parpot(4)
+        prmang(nangle,5)=parpot(5)
+        prmang(nangle,6)=parpot(6)
+        
+c     convert energies to internal units
+        
+        prmang(nangle,1)=prmang(nangle,1)*engunit
+        if(abs(keytmp).eq.2)then
+          prmang(nangle,3)=prmang(nangle,3)*engunit
+          prmang(nangle,4)=prmang(nangle,4)*engunit
+        elseif(abs(keytmp).eq.12)then
+          prmang(nangle,2)=prmang(nangle,2)*engunit            
+          prmang(nangle,3)=prmang(nangle,3)*engunit
+        endif
+        
+c     convert angles to radians
+        
+        if(abs(keytmp).eq.12)then
+          prmang(nangle,4)=prmang(nangle,4)*(pi/180.d0)
+        elseif(abs(keytmp).ne.10)then
+          prmang(nangle,2)=prmang(nangle,2)*(pi/180.d0) 
+        endif
+        
       enddo
       
       return
@@ -257,14 +267,15 @@ c***********************************************************************
       real(8), allocatable :: xdab(:),ydab(:),zdab(:)
       real(8), allocatable :: xdbc(:),ydbc(:),zdbc(:)
       
+      safe=.true.
+      
       allocate (xdab(msbad),ydab(msbad),zdab(msbad),stat=fail1)
       allocate (xdbc(msbad),ydbc(msbad),zdbc(msbad),stat=fail2)
-      if(fail1.ne.fail2)call error(idnode,1020)
-
-c     flag for undefined potentials
-
-      safe=.true.
-
+      
+      if(fail1.gt.0.or.fail2.gt.0)safe=.false.
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,1020)
+      
 c     check size of work arrays
 
       if((ntangl-mxnode+1)/mxnode.gt.msbad)call error(idnode,419)

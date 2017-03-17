@@ -31,34 +31,41 @@ c***********************************************************************
 
       contains
       
-      subroutine alloc_prp_arrays(idnode)
+      subroutine alloc_prp_arrays(idnode,mxnode)
 
       implicit none
 
       integer, parameter :: nnn=6
 
-      integer i,fail,idnode
+      logical safe
+      integer i,fail,idnode,mxnode,numatm
       dimension fail(nnn)
 
-      do i=1,nnn
-        fail(i)=0
-      enddo
+      safe=.true.
+      numatm=nbeads*mxatms
+
+c     allocate arrays
+
+      fail(:)=0
+      
       allocate (zdens(mxzdn,mxatyp),stat=fail(1))
       allocate (rdf(mxrdf,mxxtyp),amsd(mxatyp),stat=fail(2))
       allocate (stpval(mxnstk),sumval(mxnstk),stat=fail(3))
       allocate (ssqval(mxnstk),zumval(mxnstk),stat=fail(4))
       allocate (ravval(mxnstk),stkval(mxstak,mxnstk),stat=fail(5))
-      allocate (xx0(mxatms),yy0(mxatms),zz0(mxatms),stat=fail(6))
-      do i=1,nnn
-        if(fail(i).ne.0)call error(idnode,1740)
-      enddo
-
+      allocate (xx0(numatm),yy0(numatm),zz0(numatm),stat=fail(6))
+      
+      if(any(fail.gt.0))safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,1740)
+      
       end subroutine alloc_prp_arrays
 
       subroutine result
-     x  (ltad,lbpd,lgofr,lpgr,lzden,idnode,imcon,keyens,mxnode,natms,
-     x  levcfg,nzden,nstep,ntpatm,numacc,numrdf,keybpd,chip,chit,conint,
-     x  rcut,tstep,engcfg,volm,virtot,vircom,zlen,tboost,chit_shl)
+     x  (ltad,lbpd,lgofr,lpgr,lzden,lpimd,idnode,imcon,keyens,mxnode,
+     x  natms,nbeads,levcfg,nzden,nstep,ntpatm,numacc,numrdf,keybpd,
+     x  chip,chit,conint,rcut,tstep,engcfg,volm,virtot,vircom,zlen,
+     x  tboost,chit_shl,gaumom)
 
 c***********************************************************************
 c     
@@ -73,19 +80,43 @@ c***********************************************************************
       implicit none
 
       character*1 hms,dec
-      logical lgofr,lpgr,lzden,check,ltad,lbpd,goprint
+      logical lgofr,lpgr,lzden,check,ltad,lbpd,lpimd,goprint
       
-      integer idnode,imcon,keyens,mxnode,natms,nzden,nstep,ntpatm
-      integer levcfg,numacc,numrdf,keybpd,i,iadd,io,j
+      integer idnode,imcon,keyens,mxnode,natms,nbeads,nzden,nstep
+      integer ntpatm,levcfg,numacc,numrdf,keybpd,i,iadd,io,j
       real(8) chip,chit,conint,rcut,tstep,volm,timelp,avvol,zlen,dc
       real(8) engcfg,virtot,vircom,prntim,simtim,tboost,chit_shl
+      real(8) rgau,gaumom(0:5)
+
+c     sum the gaussian moments
+      
+      if(mxnode.gt.1)then
+        
+        buffer(1)=gaumom(0)
+        call gdsum(buffer(1),1,buffer(2))
+        
+        if(nint(buffer(1)).eq.0)then
+          rgau=0.d0
+        else
+          rgau=1.d0/buffer(1)
+        endif
+        
+        do i=1,5
+          
+          gaumom(i)=(gaumom(0)*rgau)*gaumom(i)
+          
+        enddo
+        
+        call gdsum(gaumom(0),6,buffer(1))
+        
+      endif
 
 c     save restart data
       
       call revive
-     x  (lgofr,lzden,idnode,imcon,mxnode,natms,levcfg,nstep,nzden,
-     x  numacc,numrdf,chip,chit,conint,tstep,engcfg,virtot,vircom,
-     x  tboost,chit_shl)
+     x  (lgofr,lzden,lpimd,idnode,imcon,mxnode,natms,nbeads,levcfg,
+     x  nstep,nzden,numacc,numrdf,chip,chit,conint,tstep,engcfg,virtot,
+     x  vircom,tboost,chit_shl,gaumom)
 
 c     for TAD and BPD system averages not generally meaningful 
 c     useful only for BPD in configurational sampling mode
@@ -118,8 +149,11 @@ c     final averages and fluctuations
      x      'vir_bnd',5x,'vir_ang',5x,'vir_con',5x,'vir_tet',/,
      x      1x,'cpu time',6x,'volume',4x,'temp_shl',5x,'eng_shl',
      x      5x,'vir_shl',7x,'alpha',8x,'beta',7x,'gamma',5x,'vir_pmf',
-     x      7x,'press',/,/,
-     x      1x,120('-'))")          
+     x    7x,'press')")
+          if(lpimd)write(nrite,"(1x,'pimd    ',5x,'eng_qpi',5x,
+     x      'eng_qvr',5x,'eng_rng',5x,'vir_rng',5x,'qms_rgr',5x,
+     x      'qms_bnd',5x,'eng_the')")
+          write(nrite,"(/,/,1x,120('-'))")
           
           call get_prntime(hms,timelp,prntim)
           call get_simtime(dec,nstep,tstep,simtim)
@@ -128,8 +162,15 @@ c     final averages and fluctuations
      x      nstep,(sumval(i),i=1,9),
      x      simtim,dec,(sumval(i),i=10,18),
      x      prntim,hms,(sumval(i),i=19,27)
+          iadd=mxatyp+45
+          if(lpimd)then
+            write(nrite,'(9x,1p,9e12.4)')(sumval(iadd+i),i=1,7)
+          endif
           write(nrite,"(/,1x,' r.m.s. ',1p,9e12.4,/,1x,'fluctn. ',
      x      1p,9e12.4,/,9x,9e12.4)") (ssqval(i),i=1,27)
+          if(lpimd)then
+            write(nrite,'(9x,1p,9e12.4)')(ssqval(iadd+i),i=1,7)
+          endif
           write(nrite,"(1x,120('-'))")
           
 c     write out bias potential boost factor
@@ -138,6 +179,7 @@ c     write out bias potential boost factor
      x      'calculated bias potential boost factor',1p,e16.8)")tboost
           
           if(numacc.gt.0)then
+            
             iadd=27
             
 c     write out estimated diffusion coefficients
@@ -150,7 +192,6 @@ c     write out estimated diffusion coefficients
               
               do i=1,ntpatm
                 
-                iadd=iadd+1
                 dc=(ravval(iadd)-sumval(iadd))/
      x            (3.d0*dble(numacc-min(mxnstk,numacc-1))*tstep)*10.d0
                 if(dc.lt.1d-10) dc=0.d0
@@ -160,6 +201,8 @@ c     write out estimated diffusion coefficients
               enddo
               
             endif
+
+            iadd=iadd+mxatyp
             
 c     print out average pressure tensor
             
@@ -170,6 +213,7 @@ c     print out average pressure tensor
               write(nrite,'(9x,1p,3e12.4,24x,3e12.4)')
      x          (sumval(i+j),j=1,3),(ssqval(i+j),j=1,3)
             enddo
+            
             iadd=iadd+9
             
             write(nrite,'(/,12x,a,1p,e12.4)') 'trace/3. ',
@@ -186,11 +230,13 @@ c     write out mean cell vectors for npt
                 write(nrite,'(3f20.10,9x,1p,3e12.4)')
      x            (sumval(i+j),j=1,3),(ssqval(i+j),j=1,3)
               enddo
-              iadd=iadd+9
               
             endif
             
-c     write out remaining registers
+            iadd=iadd+9
+            if(lpimd)iadd=iadd+7
+            
+c     write out remaining nonzero registers (if any)
             
             check=.false.
             do i=iadd+1,mxnstk
@@ -218,24 +264,35 @@ c     write out remaining registers
             
           endif
           
-c     print out sample of final configuration 
+c     print out gaussian moments of momenta
           
-          write(nrite,"(/,/,1x,'sample of final configuration',/)")
-          write(nrite,"(6x,'i',7x,'x(i)',8x,'y(i)',8x,'z(i)',
-     x      7x,'vx(i)',7x,'vy(i)',7x,'vz(i)',7x,'fx(i)',7x,
-     x      'fy(i)',7x,'fz(i)',/,/)")
-          io=(natms+19)/20
-          
-          do i=1,natms,io
-            
-            write(nrite,"(1x,i6,1p,3e12.4,3e12.4,3e12.4)") 
-     x        i,xxx(i),yyy(i),zzz(i),vxx(i),vyy(i),vzz(i),
-     x        fxx(i),fyy(i),fzz(i)
-            
-          enddo
+          write(nrite,'(/,/,1x,a34,1p,e13.6,a8)')
+     x      "gaussian moments of momenta. over ",
+     x      gaumom(0)," samples"
+          write(nrite,'(1p,5e16.6)')(gaumom(i),i=1,5)
           
         endif
         
+      endif
+      
+c     print out sample of final configuration 
+      
+      if(idnode.eq.0)then
+        
+        write(nrite,"(/,/,1x,'sample of final configuration',/)")
+        write(nrite,"(6x,'i',7x,'x(i)',8x,'y(i)',8x,'z(i)',
+     x7x,'vx(i)',7x,'vy(i)',7x,'vz(i)',7x,'fx(i)',7x,
+     x'fy(i)',7x,'fz(i)',/,/)")
+        io=(natms*nbeads+19)/20
+        
+        do i=1,natms*nbeads,io
+          
+          write(nrite,"(1x,i6,1p,3e12.4,3e12.4,3e12.4)") 
+     x      i,xxx(i),yyy(i),zzz(i),vxx(i),vyy(i),vzz(i),
+     x      fxx(i),fyy(i),fzz(i)
+          
+        enddo
+
       endif
       
 c     bypass printing averages for certain tad and bpd options
@@ -586,14 +643,15 @@ c     print out information
       end subroutine rdf1
 
       subroutine static
-     x  (lbpd,lzeql,idnode,intsta,imcon,keyens,natms,nstack,
+     x  (lbpd,lzeql,lpimd,idnode,intsta,imcon,keyens,natms,nstack,
      x  nstep,nsteql,ntpatm,numacc,mxnode,nblock,keybpd,numbpd,
      x  consv,degfre,degrot,engang,engbnd,engcpe,engdih,enginv,
      x  engke,engrot,engsrp,engunit,engcfg,stpeng,stpeth,stpprs,
      x  stptmp,stpvir,stpvol,tstep,virbnd,engfbp,vircom,vircon,
      x  vircpe,virsrp,engfld,virfld,engtbp,virtbp,virpmf,virshl,
      x  engshl,engtet,virtet,degshl,shlke,virang,width,engmet,
-     x  virmet,engter,virter,boost,tboost)
+     x  virmet,engter,virter,boost,tboost,engqpi,engqvr,engrng,
+     x  virrng,qmsrgr,qmsbnd,engthe)
 
 c***********************************************************************
 c     
@@ -608,7 +666,7 @@ c***********************************************************************
 
       implicit none
 
-      logical lbpd,lzeql,newjob
+      logical lbpd,lzeql,lpimd,newjob
       integer idnode,intsta,imcon,keyens,natms,nstack,nstep,j
       integer nsteql,ntpatm,numacc,mxnode,i,iadd,k,kstak
       integer nblock,keybpd,numbpd
@@ -619,7 +677,8 @@ c***********************************************************************
       real(8) engtbp,virtbp,virpmf,virshl,engshl,engtet,virtet
       real(8) degshl,shlke,virang,width,sclnv1,sclnv2,stprot
       real(8) stpcns,stpshl,zistk,engmet,virmet,engter,virter
-      real(8) tbold,aterm,bterm,cterm,boost,tboost
+      real(8) tbold,aterm,bterm,cterm,boost,tboost,engqpi,engqvr
+      real(8) engrng,virrng,qmsrgr,qmsbnd,engthe
 
       save newjob
       
@@ -694,7 +753,7 @@ c     calculate cell volume and minimum cell half-width
 c     energetic properties of system
       
       stpvir=virsrp+vircpe+virbnd+vircon+vircom+virtbp+virang
-     x  +virshl+virtet+virter+virmet+virfld
+     x  +virshl+virtet+virter+virmet+virfld+virrng
       stpeng=engcfg+engke+engrot
       stprot=2.d0*engrot/(boltz*max(1.d0,degrot))
       stpshl=2.d0*shlke/(boltz*max(1.d0,degshl))
@@ -702,8 +761,8 @@ c     energetic properties of system
       stpprs=0.d0
       if(imcon.gt.0)stpprs=(2.d0*engke-stpvir)/(3.d0*stpvol)
       stpeth=stpeng+stpprs*stpvol
-      stpcns=stpeng+consv
-      
+      stpcns=stpeng+consv+engthe
+
 c     convert pressure to units of katm
       
       stpprs=stpprs*prsunt
@@ -786,25 +845,42 @@ c     mean squared displacements
         
       endif
 
-      iadd=iadd+ntpatm
+      iadd=iadd+mxatyp
 
 c     stress tensor
 
       if(abs(stpvol).le.1.d-10) stpvol=1.d0
+      
       do i=1,9
         stpval(iadd+i)=stress(i)*prsunt/(stpvol)
       enddo
+      
       iadd=iadd+9
 
 c     cell vectors
       
-      if(keyens.gt.3.and.(keyens.le.7))then
-        do i=1,9
-          stpval(iadd+i)=cell(i)
-        enddo
-        iadd=iadd+9
-      endif
+      do i=1,9
+        stpval(iadd+i)=cell(i)
+      enddo
+      
+      iadd=iadd+9
 
+c     store pimd variables
+      
+      if(lpimd)then
+        
+         stpval(iadd+1)=engqpi/engunit
+         stpval(iadd+2)=engqvr/engunit
+         stpval(iadd+3)=engrng/engunit
+         stpval(iadd+4)=virrng/engunit
+         stpval(iadd+5)=qmsrgr
+         stpval(iadd+6)=qmsbnd
+         stpval(iadd+7)=engthe/engunit
+         
+      endif
+      
+      iadd=iadd+7
+      
 c     check on number of variables for stack - 
       
       if(iadd.gt.mxnstk) call error(idnode,170)
@@ -941,9 +1017,9 @@ c     close statistics file at regular intervals
       end subroutine static
 
       subroutine revive
-     x  (lgofr,lzden,idnode,imcon,mxnode,natms,levcfg,nstep,nzden,
-     x  numacc,numrdf,chip,chit,conint,tstep,engcfg,virtot,vircom,
-     x  tboost,chit_shl)
+     x  (lgofr,lzden,lpimd,idnode,imcon,mxnode,natms,nbeads,levcfg,
+     x  nstep,nzden,numacc,numrdf,chip,chit,conint,tstep,engcfg,virtot,
+     x  vircom,tboost,chit_shl,gaumom)
 
 c***********************************************************************
 c     
@@ -957,17 +1033,20 @@ c***********************************************************************
      
       implicit none
       
-      logical lgofr,lzden
-      integer idnode,imcon,mxnode,natms,nstep,nzden,numacc,numrdf
-      integer levcfg,nsum,nbuff,i,j
+      logical lgofr,lzden,lpimd
+      integer idnode,imcon,mxnode,natms,nstep,nbeads,nzden,numacc
+      integer numrdf,levcfg,nsum,nbuff,i,j,numatm
       real(8) chip,chit,conint,tstep,engcfg,rmxnode,virtot,vircom
       real(8) tboost,chit_shl
+      real(8) gaumom(0:5)
 
+      numatm=natms*nbeads
+      
       if(mxnode.gt.1)then
 
 c     merge displacement data
 
-        call merge(idnode,mxnode,natms,mxbuff,xx0,yy0,zz0,buffer)
+        call merge(idnode,mxnode,numatm,mxbuff,xx0,yy0,zz0,buffer)
 
 c     globally sum rdf information before saving
         
@@ -1017,7 +1096,7 @@ c     node 0 handles i/o
 
 c     write configuration data to new configuration file
 
-        call config_write('REVCON',levcfg,imcon,natms,engcfg)
+        call config_write('REVCON',levcfg,imcon,numatm,engcfg)
 
 c     write accumulator data to dump file
         
@@ -1036,6 +1115,7 @@ c     write accumulator data to dump file
         write(nrest) xxs,yys,zzs
         if(lgofr) write(nrest) rdf
         if(lzden) write(nrest) zdens
+        write(nrest) gaumom
         
         close (nrest)
 

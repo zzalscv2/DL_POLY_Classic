@@ -8,14 +8,14 @@ c     copyright - daresbury laboratory
 c     author    - w. smith    sep 2003
 c     
 c***********************************************************************
-
+      
       use config_module
       use error_module
       use setup_module
       use utility_module
-
+      
       implicit none
-
+      
       real(8), allocatable :: csp(:),qqc(:,:,:),ffttable(:)
       real(8), allocatable :: bspx(:,:), bspy(:,:), bspz(:,:)
       real(8), allocatable :: bsdx(:,:), bsdy(:,:), bsdz(:,:)
@@ -24,24 +24,28 @@ c***********************************************************************
       complex(8), allocatable :: qqq(:,:,:)
       complex(8), allocatable :: bscx(:), bscy(:),bscz(:)
 CFFTW      pointer, save :: fplan, bplan
-
+      
       save csp,qqc,qqq,ww1,ww2,ww3,bscx,bscy,bscz,ffttable
       save bspx,bspy,bspz,bsdx,bsdy,bsdz,key1,key2,key3
-
+      
       contains
-
-      subroutine alloc_spme_arrays(idnode)
-
+      
+      subroutine alloc_spme_arrays(idnode,mxnode)
+      
       implicit none
-
+      
       integer, parameter :: nnn=9
-
-      integer i,fail,idnode
+      
+      logical safe
+      integer i,fail,idnode,mxnode
       dimension fail(nnn)
 
-      do i=1,nnn
-        fail(i)=0
-      enddo
+      safe=.true.
+
+c     allocate arrays
+
+      fail(:)=0
+      
       allocate (csp(mxspl),ffttable(mxftab),stat=fail(1))
       allocate (bspx(mxspme,mxspl),bspy(mxspme,mxspl),stat=fail(2))
       allocate (bspz(mxspme,mxspl),bsdx(mxspme,mxspl),stat=fail(3))
@@ -51,10 +55,11 @@ CFFTW      pointer, save :: fplan, bplan
       allocate (ww1(kmaxd),ww2(kmaxe),ww3(kmaxf),stat=fail(7))
       allocate (qqc(kmaxd,kmaxe,kmaxf),stat=fail(8))
       allocate (qqq(kmaxd,kmaxe,kmaxf),stat=fail(9))
-      do i=1,nnn
-         if(fail(i).ne.0)call error(idnode,1750)
-      enddo
-
+      
+      if(any(fail.gt.0))safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,1750)
+      
       end subroutine alloc_spme_arrays
 
       subroutine bspcoe(nospl,kmax1,kmax2,kmax3)

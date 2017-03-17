@@ -5,9 +5,9 @@ c
 c     dl_poly module for utility subroutines and functions
 c     copyright - daresbury laboratory
 c     author    - w. smith     aug 2006
-c     adapted   - p.-a. cazade oct 2007, solvation, free energy
-c     and excitation
-c     adapted   - d. quigley nov 2010, metadynamics
+c     adapted   - p.-a. cazade oct 2007, solvation etc
+c     adapted   - d. quigley   nov 2010, metadynamics
+c     adapted   - w. smith     aug 2016, pimd
 c     
 c***********************************************************************
       
@@ -28,6 +28,7 @@ c***********************************************************************
       use metafreeze_module
       use metal_module
       use parse_module
+      use pimd_module
       use pmf_module
       use property_module
       use rigid_body_module
@@ -40,6 +41,7 @@ c***********************************************************************
       use tersoff_module
       use tether_module
       use three_body_module
+      use utility_module
       use vdw_module
       
       contains
@@ -48,18 +50,18 @@ c***********************************************************************
      x  (seek,lfcap,lgofr,lnsq,loptim,lzero,lminim,lpgr,ltraj,ltscal,
      x  lzeql,lzden,nolink,newgau,lhit,lbpd,ltad,lneb,prechk,tadall,
      x  lsolva,lfree,lfrmas,lexcite,lswitch,lghost,lnfic,nebgo,lpsoc,
-     x  idnode,minstp,intsta,istraj,keybpd,keyens,keyfce,keyres,keyver,
-     x  keytrj,kmax1,kmax2,kmax3,multt,nstack,nstbgr,nsbzdn,nstbpo,
-     x  nhko,nlatt,nstbts,nsteql,nstraj,nstrun,nospl,keytol,numgau,
-     x  khit,nhit,nblock,ntrack,blkout,numneb,mode,nsolva,isolva,nofic,
-     x  alpha,delr,epsq,fmax,press,quattol,rcut,rprim,rvdw,taup,taut,
-     x  temp,timcls,timjob,tolnce,tstep,rlxtol,opttol,zlen,ehit,xhit,
-     x  yhit,zhit,ebias,vmin,catchrad,sprneb,deltad,tlow,hyp_units)
+     x  lpimd,idnode,minstp,intsta,istraj,keybpd,keyens,keyfce,
+     x  keyres,keyver,keytrj,kmax1,kmax2,kmax3,multt,nstack,nstbgr,
+     x  nsbzdn,nstbpo,nhko,nlatt,nstbts,nsteql,nstraj,nstrun,nospl,
+     x  keytol,numgau,khit,nhit,nblock,ntrack,blkout,numneb,mode,nsolva,
+     x  isolva,nofic,nbeads,nchain,alpha,delr,epsq,fmax,press,quattol,
+     x  rcut,rprim,rvdw,taup,taut,temp,timcls,timjob,tolnce,tstep,
+     x  rlxtol,opttol,zlen,ehit,xhit,yhit,zhit,ebias,vmin,catchrad,
+     x  sprneb,deltad,tlow,hyp_units,chi)
       
 c***********************************************************************
 c     
-c     dl_poly subroutine for reading in the simulation control 
-c     parameters
+c     dl_poly subroutine for reading the simulation control parameters
 c     
 c     copyright - daresbury laboratory 1992
 c     author    - w. smith july 1992.
@@ -67,9 +69,6 @@ c     adapted   - p.-a. cazade oct 2007, solvation etc
 c     
 c     modified
 c     author   - t.forester       may  1993
-c     amended  - t.forester       sept 1994 - dl_poly_1.1
-c     amended  - t.forester       nov  1994 - macro version
-c     amended  - w.smith          dec  1994 - t3d adaptation
 c     
 c***********************************************************************
       
@@ -80,19 +79,20 @@ c***********************************************************************
       character*1 directive(lenrec)
       logical lsolva,lfree,lfrmas,lexcite,lswitch,lghost,lnfic,lpsoc
       logical ltscal,lzeql,loptim,ltraj,lfcap,lgofr,lpgr,lpres,safe
-      logical lstep,ltemp,lcut,ldelr,lprim,lforc,lens,lvdw,lrvdw,kill
+      logical lstep,ltemp,lcut,ldelr,lprim,lrfce,lens,novdw,lrvdw,kill
       logical lnsq,lzden,lewald,lspme,lhke,loop,lzero,nolink,newgau
       logical lminim,lminopt,ltad,lneb,lhit,lbpd,prechk,tadall,nebgo
+      logical lpimd,lver
       integer idnode,intsta,istraj,keyens,keyfce,keyres,nstbpo,nsbzdn
       integer keytrj,kmax1,kmax2,kmax3,multt,nstack,nstbgr,khit,nhit
       integer nhko,nlatt,nstbts,nsteql,nstraj,nstrun,nospl,ntrack
-      integer idum,imcon,keyver,keytol,nblock,blkout,numgau
-      integer minstp,numneb,i,keybpd,mode,nsolva,isolva,nofic
+      integer idum,imcon,keyver,keytol,nblock,blkout,numgau,nbeads
+      integer minstp,numneb,i,keybpd,mode,nsolva,isolva,nofic,nchain
       real(8) alpha,delr,epsq,fmax,press,quattol,rcut,rprim,rvdw,taup
       real(8) taut,temp,timcls,timjob,tolnce,tstep,rlxtol,opttol
       real(8) eps,tol,fm,densvar,delrdf,delzdn,zlen,ehit,hyp_units
       real(8) catchrad,sprneb,deltad,tlow,xhit,yhit,zhit,ebias,vmin
-      real(8) prntim
+      real(8) prntim,chi
       
 CSGIC      real(8) dummy
 CCRAY      real(8) dummy
@@ -130,7 +130,6 @@ c     temp scaling interval
       keyres=0
       keyens=0
       keyver=0
-      taut=0.d0
       nstbts=0
       nstbgr=0
       nsbzdn=0
@@ -141,7 +140,6 @@ c     temp scaling interval
       istraj=1
       keytrj=0
       numgau=1
-      alpha=0.d0
       kmax1=0
       kmax2=0
       kmax3=0
@@ -151,11 +149,15 @@ c     temp scaling interval
       niswitch=0
       nswitch=0
       nofic=1000
-      
-      fmax=1000.d0
+      nbeads=1
+      nchain=1
       keyfce=0
       multt=1
       keytol=0
+      alpha=0.d0
+      taut=0.d0
+      taup=0.d0
+      fmax=1000.d0
       tstep=0.d0
       temp=0.d0
       press=0.d0
@@ -181,6 +183,7 @@ c     temp scaling interval
       ebias=0.d0
       catchrad=0.d0
       pfree=0.d0
+      chi=0.d0
       
       lhit=.false.
       lbpd=.false.
@@ -207,9 +210,9 @@ c     temp scaling interval
       lcut=.false.
       ldelr=.false.
       lprim=.false.
-      lforc=.false.
+      lrfce=.false.
       lens=.false.
-      lvdw=.false.
+      novdw=.false.
       lrvdw=.false.
       lpres=.false.
       kill=.false.
@@ -226,6 +229,8 @@ c     temp scaling interval
       lswitch=.false.
       lghost=.false.
       nebgo=.true.
+      lpimd=.false.
+      lver=.false.
       seek='all     '
       
 c     open the simulation input file
@@ -283,12 +288,22 @@ c     choice of integration algorithm
           
           if(findstring('leapfrog',directive,idum))then
             
+            if(lver)then
+              call error(idnode,-94)
+              kill=.true.
+            endif
+            lver=.true.
             keyver=0
             if(idnode.eq.0)write(nrite,
      x        "(/,1x,'leapfrog verlet integration selected')")
             
           elseif(findstring('velocity',directive,idum))then
             
+            if(lver)then
+              call error(idnode,-94)
+              kill=.true.
+            endif
+            lver=.true.
             keyver=1
             if(idnode.eq.0)write(nrite,
      x        "(/,1x,'velocity verlet integration selected')")
@@ -396,7 +411,7 @@ c     re-initialise velocities option (regaussing)
             lpgr=(lgofr.and.lpgr)
             if(idnode.eq.0)write(nrite,
      x        "(/,1x,'g(r) printing option on      ')")
-          
+            
           else
             
             lgofr=.true.
@@ -457,6 +472,73 @@ c     activate nudged elastic band option
           
           call neb_option(directive,lneb,lminopt,idnode,
      x      numneb,keytol,sprneb,opttol,hyp_units)
+          
+c     read path integral option
+
+        elseif(findstring('pimd',directive,idum))then
+          
+          if(lver)then
+            call error(idnode,-94)
+            kill=.true.
+          endif
+          if(lens)then
+            call error(idnode,-414)
+            kill =.true.
+          endif
+          lens=.true.
+          lver=.true.
+          lpimd=.true.
+          keyver=2
+          keyens=40
+          if(findstring('nvt',directive,idum))then
+            keyens=40
+            nbeads=intstr(directive,lenrec,idum)
+            taut=dblstr(directive,lenrec,idum)
+          elseif(findstring('gth',directive,idum))then
+            keyens=41
+            nbeads=intstr(directive,lenrec,idum)
+            taut=dblstr(directive,lenrec,idum)
+            chi=dblstr(directive,lenrec,idum)
+          elseif(findstring('nhc',directive,idum))then
+            keyens=42
+            nbeads=intstr(directive,lenrec,idum)
+            nchain=intstr(directive,lenrec,idum)
+            taut=dblstr(directive,lenrec,idum)
+            nchain=max(nchain,1)
+          else
+c     default is nvt
+            keyens=40
+            nbeads=intstr(directive,lenrec,idum)
+            taut=dblstr(directive,lenrec,idum)
+          endif
+          if(nbeads.eq.0)nbeads=num_beads_default
+          if(taut.le.1.d-6)taut=1.d0
+          
+          if(idnode.eq.0)then
+            write(nrite,"(/,1x,'PIMD option selected')")
+            write(nrite,"(1x,'Number of quantum beads/atom :',i5)")
+     x        nbeads
+            if(keyens.eq.40)then
+              write(nrite,
+     x          "(1x,'Canonical Ensemble with Nose-Hoover Thermostat')")
+              write(nrite,"(1x,'Thermostat relaxation time (ps):',
+     x          1p,e12.4)")taut
+            elseif(keyens.eq.41)then
+              write(nrite,
+     x          "(1x,'Canonical Ensemble with Gentle Thermostat')")
+              write(nrite,"(1x,'Thermostat relaxation time (ps):',
+     x          1p,e12.4)")taut
+              write(nrite,"(1x,'Stochastic force parameter:',
+     x          1p,e12.4)")chi
+            elseif(keyens.eq.42)then
+              write(nrite,
+     x          "(1x,'Canonical Ensemble with Nose-Hoover Chains')")
+              write(nrite,"(1x,'Number of Nose-Hoover chains :',i5)")
+     x          nchain
+              write(nrite,"(1x,'Thermostat relaxation time (ps):',
+     x          1p,e12.4)")taut
+            endif
+          endif
           
         elseif(findstring('impact',directive,idum))then
           
@@ -661,7 +743,7 @@ c     reset stack limit if too large
 c     read Ewald or HK-Ewald or SPM-Ewald sum parameters
           
           call ewald_selection(directive,lhke,lspme,lewald,lcut,
-     x      lforc,kill,idnode,keyfce,imcon,nhko,nlatt,kmax1,kmax2,
+     x      lrfce,kill,idnode,keyfce,imcon,nhko,nlatt,kmax1,kmax2,
      x      kmax3,alpha,rcut)
           
         elseif(findstring('distan',directive,idum))then
@@ -670,12 +752,12 @@ c     read Ewald or HK-Ewald or SPM-Ewald sum parameters
           if(idnode.eq.0)write(nrite,
      x      "(/,/,1x,'Electrostatics : Distance dependent dielectric')")
           
-          if(lforc)then
+          if(lrfce)then
             call  error(idnode,-416)
             kill=.true.
           endif
           
-          lforc=.true.
+          lrfce=.true.
           
         elseif(findstring('coul',directive,idum))then
           
@@ -683,12 +765,12 @@ c     read Ewald or HK-Ewald or SPM-Ewald sum parameters
           if(idnode.eq.0)write(nrite,
      x      "(/,/,1x,'Electrostatics : Coulombic potential')")
           
-          if(lforc)then
+          if(lrfce)then
             call  error(idnode,-416)
             kill=.true.
           endif
           
-          lforc=.true.
+          lrfce=.true.
           
         elseif(findstring('shift',directive,idum))then
           
@@ -731,12 +813,12 @@ c     read Ewald or HK-Ewald or SPM-Ewald sum parameters
             
           endif
           
-          if(lforc)then
+          if(lrfce)then
             call  error(idnode,-416)
             kill=.true.
           endif
           
-          lforc=.true.
+          lrfce=.true.
           
         elseif(findstring('reaction',directive,idum))then
           
@@ -779,12 +861,12 @@ c     read Ewald or HK-Ewald or SPM-Ewald sum parameters
             
           endif
           
-          if(lforc)then
+          if(lrfce)then
             call  error(idnode,-416)
             kill=.true.
           endif
           
-          lforc=.true.
+          lrfce=.true.
           
         elseif(findstring('cap',directive,idum))then
           
@@ -798,7 +880,7 @@ c     read Ewald or HK-Ewald or SPM-Ewald sum parameters
           
           if(idnode.eq.0)write(nrite,
      x      "(/,/,1x,'short-range potential terms off')")
-          lvdw=.true.
+          novdw=.true.
           
         elseif(findstring('no elec',directive,idum))then
           
@@ -806,12 +888,12 @@ c     read Ewald or HK-Ewald or SPM-Ewald sum parameters
           if(idnode.eq.0)write(nrite,
      x      "(/,/,1x,'electrostatic potential terms off')")
           
-          if(lforc)then
+          if(lrfce)then
             call  error(idnode,-416)
             kill=.true.
           endif
           
-          lforc=.true.
+          lrfce=.true.
           
         elseif(findstring('mult',directive,idum))then
           
@@ -917,16 +999,16 @@ c     tolerance for quaternion integration
 c     time for simulation (in seconds/minutes/hours/days or indefinite)
           
           if(findstring('indef',directive,idum))then
-             timjob=1.0d6*365.25d0*24.d0*60.d0*60.d0
+            timjob=1.0d6*365.25d0*24.d0*60.d0*60.d0
           else
-             timjob=dblstr(directive,lenrec,idum)
-             if(findstring('m',directive,idum))then
-               timjob=6.0d1*timjob
-             elseif(findstring('h',directive,idum))then
-               timjob=3.6d3*timjob
-             elseif(findstring('d',directive,idum))then
-               timjob=8.64d4*timjob
-             endif
+            timjob=dblstr(directive,lenrec,idum)
+            if(findstring('m',directive,idum))then
+              timjob=6.0d1*timjob
+            elseif(findstring('h',directive,idum))then
+              timjob=3.6d3*timjob
+            elseif(findstring('d',directive,idum))then
+              timjob=8.64d4*timjob
+            endif
           endif
           
           call get_prntime(hms,timjob,prntim)
@@ -989,29 +1071,30 @@ c     ensure final configuration follows minimisation
         
       endif
       
-c     check force activation options
+c     check force options
       
-      if(.not.lforc)then
+      if(.not.lrfce)then
         
-c     check if any forces are in operation
+c     check the long range force option has been properly specified
         
-        if(.not.lvdw)then
+        if(.not.novdw)then
           
           kill=.true.
           call error(idnode,-383)
-          
+
         endif
         
       else
         
-c     turn on short range forces
+c     check the short range force option has been properly specified
         
-        if(lvdw)then
+        if(novdw)then
           
           if(keyfce.eq.0)then
             
             lcut=.true.
             ldelr=.true.
+            keyfce=keyfce+1
             
           endif
           
@@ -1251,10 +1334,10 @@ c     close CONTROL file
       end subroutine simdef
       
       subroutine sysdef
-     x  (lneut,lnsq,lsolva,lfree,lexcite,lswitch,lghost,idnode,keyfce,
-     x  keyfld,natms,ngrp,ntpatm,ntpmls,ntpvdw,ntptbp,ntpmet,ntpfbp,
-     x  ntpter,nshels,keyshl,ntghost,keyver,dlrpot,engunit,rvdw,rcuttb,
-     x  rctter,rcutfb)
+     x  (lneut,lnsq,lsolva,lfree,lexcite,lswitch,lghost,lpimd,idnode,
+     x  keyfce,keyfld,natms,ngrp,ntpatm,ntpmls,ntpvdw,ntptbp,ntpmet,
+     x  ntpfbp,ntpter,nshels,keyshl,ntghost,keyver,dlrpot,engunit,
+     x  rvdw,rcuttb,rctter,rcutfb)
       
 c***********************************************************************
 c     
@@ -1277,8 +1360,9 @@ c***********************************************************************
       
       implicit none
       
-      logical lunits,lmols,lneut,ltable,lnsq,lshl,safe,lpmf
-      logical loop1,loop2,lsolva,lfree,lexcite,lswitch,lghost
+      logical lunits,lmols,lneut,ltable,lnsq,lshl,safe,lpmf,lrig,lcon
+      logical loop1,loop2,lsolva,lfree,lexcite,lswitch,lghost,lpimd
+      logical lfreeze
       
       integer idnode,keyfce,keyfld,natms,ngrp,ntpatm,ntpmls
       integer ntpvdw,ntptbp,ntpmet,ntpfbp,nshels,ksite
@@ -1319,7 +1403,7 @@ c     number of three body potentials
       ntghost=0
       natmsr=0
       ntcons_ghost=0
-      
+
       lunits=.false.
       lmols=.false.
       lneut=.false.
@@ -1327,6 +1411,9 @@ c     number of three body potentials
       lmetab=.false.
       lshl=.false.
       lpmf=.false.
+      lrig=.false.
+      lcon=.false.
+      lfreeze=.false.
       engunit=1.d0
       
       numbonds(:)=0
@@ -1455,7 +1542,7 @@ c     read molecular data
 c     read in atomic details
                 
                 call define_atoms
-     x            (safe,lneut,idnode,itmols,nsite,ksite,ntpatm)
+     x            (safe,lneut,lfreeze,idnode,itmols,nsite,ksite,ntpatm)
                 if(.not.safe)call abort_field_read(1,idnode,nfield)
                 
 c     read core - shell spring parameters
@@ -1480,6 +1567,7 @@ c     read bond atom indices and constraint bondlength
                 
               elseif(findstring('constr',record,idum))then
                 
+                lcon=.true.
                 call define_constraints
      x            (safe,lghost,idnode,itmols,nconst,nsite,natmsr)
                 if(.not.safe)call abort_field_read(1,idnode,nfield)
@@ -1521,6 +1609,7 @@ c     read rigid body data
                 
               elseif(findstring('rigid',record,idum))then
                 
+                lrig=.true.
                 call define_rigid_body
      x            (safe,lghost,idnode,itmols,ngrp,natmsr)
                 if(.not.safe)call abort_field_read(1,idnode,nfield)
@@ -1697,13 +1786,31 @@ c     if metadynamics and shell selected use only velocity verlet
         keyver=1
         
       endif
-
+      
+c     error exit if pimd incompatible options selected
+      
+      if(lpimd)then
+        
+         if(lshl)call error(idnode,-518)
+         if(lcon)call error(idnode,-520)
+         if(lrig)call error(idnode,-522)
+         if(lneut)call error(idnode,-524)
+         if(lmetadyn)call error(idnode,-525)
+         if(lsolva)call error(idnode,-526)
+         if(lfree)call error(idnode,-527)
+         if(lfreeze)call error(idnode,-529)
+         if(lshl.or.lcon.or.lrig.or.lneut.or.lmetadyn.or.lsolva.or.
+     x     lfree.or.lfreeze)call error(idnode,0)
+         
+      endif
+      
       return
       end subroutine sysdef
       
       subroutine sysgen
-     x  (loglnk,lneut,nolink,lfree,lfrmas,idnode,imcon,keyens,
-     x  keyfce,keyres,levcfg,multt,mxnode,ntpmls,delr,rcut,volm)
+     x  (loglnk,lneut,nolink,lfree,lfrmas,lpimd,idnode,imcon,keyens,
+     x  keyfce,keyres,levcfg,multt,mxnode,ntpmls,nbeads,delr,rcut,
+     x  temp,volm,uuu)
       
 c***********************************************************************
 c     
@@ -1719,13 +1826,14 @@ c***********************************************************************
       
       character*1 atname(8)
       
-      logical loglnk,safe,lneut,nolink,lfree,lfrmas
+      logical loglnk,safe,lneut,nolink,lfree,lfrmas,lpimd,chkmat
       integer idnode,imcon,keyens,keyfce,keyres,levcfg,multt
-      integer ntpmls,i,indatm,indnam,indneu,k,ilx,ily,ilz
-      integer m,l,ncells,idum,mxnode
+      integer ntpmls,i,k,l,m,n,indatm,indnam,indneu,ilx,ily,ilz
+      integer ncells,idum,mxnode,nbeads,numatm,mbeads,matms
       real(8) delr,rcut,volm,xcoord,ycoord,zcoord,totmas,xveloc
       real(8) yveloc,zveloc,xforce,yforce,zforce,axx,rt3,xhi,yhi,zhi
-      real(8) width,dum1,dum2,test,com(3)
+      real(8) width,dum,dum1,dum2,test,disp,temp
+      real(8) com(3),uuu(102)
       
 c     open the system input file
       
@@ -1745,6 +1853,7 @@ c     read the CONFIG file header
       
       levcfg=intstr(record,lenrec,idum)
       imcon=intstr(record,lenrec,idum)
+      
       if(idnode.eq.0)write(nrite,
      x  "(/,/,1x,'selected image convention',6x,i10)")imcon
       
@@ -1759,11 +1868,12 @@ c     check config file contents for consistent data
       
       if(imcon.eq.0.and.(keyens.ge.4.and.keyens.le.7))
      x  call error(idnode,390)
+      
       if(imcon.le.2.and.(keyens.eq.6.or.keyens.eq.7))imcon=3
       if(keyres.gt.0.and.levcfg.lt.1)call error(idnode,85)
       
 c     specify molecular dynamics simulation cell
-      
+     
       if(imcon.eq.0)then
         
 c     if no periodic boundaries - set zero values for cell 
@@ -1801,144 +1911,193 @@ c     read the atomic coordinates
       indneu=0
       safe=.true.
       
-      do k=1,ntpmls
-        
-        do l=1,nummols(k)
-          
-          do m=1,numsit(k)
-            
-            indatm=indatm+1
-            
-            if(indatm.gt.mxatms)call error(idnode,45)
-            
-            xxx(indatm)=0.d0
-            yyy(indatm)=0.d0
-            zzz(indatm)=0.d0
-            vxx(indatm)=0.d0
-            vyy(indatm)=0.d0
-            vzz(indatm)=0.d0
-            fxx(indatm)=0.d0
-            fyy(indatm)=0.d0
-            fzz(indatm)=0.d0
-            
-            if(idnode.eq.0)then
-              
-              if(levcfg.eq.0)then
-                
-                read(nconf,'(8a1)',end=100)atname
-                read(nconf,'(3f20.0)',end=100)xcoord,ycoord,zcoord
-                
-              elseif(levcfg.eq.1)then
-                
-                read(nconf,'(8a1)',end=100)atname
-                read(nconf,'(3f20.0)',end=100)xcoord,ycoord,zcoord
-                read(nconf,'(3f20.0)',end=100)xveloc,yveloc,zveloc
-                
-              else
-                
-                read(nconf,'(8a1)',end=100)atname
-                read(nconf,'(3f20.0)',end=100)xcoord,ycoord,zcoord
-                read(nconf,'(3f20.0)',end=100)xveloc,yveloc,zveloc
-                read(nconf,'(3f20.0)',end=100)xforce,yforce,zforce
-                
-              endif
-              
-c     strip blanks off atom name
-              
-              call strip(atname,8)
-              
-              if(sitnam(indnam+m).eq.mkwd8(atname))then
-                
-                xxx(indatm)=xcoord
-                yyy(indatm)=ycoord
-                zzz(indatm)=zcoord
-                
-                if(levcfg.gt.0)then
-                  
-                  vxx(indatm)=xveloc
-                  vyy(indatm)=yveloc
-                  vzz(indatm)=zveloc
-                  
-                endif
-                
-                if(levcfg.gt.1)then
-                  
-                  fxx(indatm)=xforce
-                  fyy(indatm)=yforce
-                  fzz(indatm)=zforce
-                  
-                endif
-                
-              else
-                
-                write(nrite,"(/,/,'unidentified atom label :',8a1,
-     x            ': atom number ',i5)")atname,indatm
-                safe=.false.
-                
-              endif
-              
-            endif
-            
-            call gstate(safe)
-            if(.not.safe)call error(idnode,25)
-            
-            ltype(indatm)=ltpsit(indnam+m)
-            weight(indatm)=wgtsit(indnam+m)
-            chge(indatm)=chgsit(indnam+m)
-            atmnam(indatm)=sitnam(indnam+m)
-            lstfrz(indatm)=lfzsit(indnam+m)
-            if(lneut)lstneu(indatm)=nugrp(indnam+m)+indneu
-            
-c     reset atomic masses according to free energy definitions
-            
-            if(lfree)then
+c     site multiplicity factor for pimd
 
-              weight_sav(indatm)=weight(indatm)
+      numatm=nbeads*mxatms
+      
+c    restructure config read for pimd when keyres > 0
+
+      if(keyres.eq.0)then
+        mbeads=1
+        matms=mxatms
+      else
+        mbeads=nbeads
+        matms=mxatms*nbeads
+      endif
+
+c     read atomic coordinates, velocities and forces
+      
+      do n=1,mbeads
+        
+        do k=1,ntpmls
+          
+          do l=1,nummols(k)
+            
+            do m=1,numsit(k)
               
-              if(lfrmas)then
+              indatm=indatm+1
+              
+              if(indatm.gt.numatm)call error(idnode,45)
+              
+              xxx(indatm)=0.d0
+              yyy(indatm)=0.d0
+              zzz(indatm)=0.d0
+              vxx(indatm)=0.d0
+              vyy(indatm)=0.d0
+              vzz(indatm)=0.d0
+              fxx(indatm)=0.d0
+              fyy(indatm)=0.d0
+              fzz(indatm)=0.d0
+              
+              if(idnode.eq.0)then
                 
-                if(indatm.ge.ind_fre(1).and.indatm.le.ind_fre(2))then
-                  weight(indatm)=lambda1*weight(indatm)
-                elseif(indatm.ge.ind_fre(3).and.indatm.le.ind_fre(4))
-     x              then
-                  weight(indatm)=lambda2*weight(indatm)
+                read(nconf,'(8a1)',end=100)atname
+                read(nconf,'(3f20.0)',end=100)xcoord,ycoord,zcoord
+                if(levcfg.gt.0)then
+                  read(nconf,'(3f20.0)',end=100)xveloc,yveloc,zveloc
+                endif
+                if(levcfg.gt.1)then
+                  read(nconf,'(3f20.0)',end=100)xforce,yforce,zforce
+                endif
+                
+c     strip blanks off atom name
+                
+                call strip(atname,8)
+                
+                if(sitnam(indnam+m).eq.mkwd8(atname))then
+                  
+                  xxx(indatm)=xcoord
+                  yyy(indatm)=ycoord
+                  zzz(indatm)=zcoord
+                  
+                  if(levcfg.gt.0)then
+                    
+                    vxx(indatm)=xveloc
+                    vyy(indatm)=yveloc
+                    vzz(indatm)=zveloc
+                    
+                  endif
+                  
+                  if(levcfg.gt.1)then
+                    
+                    fxx(indatm)=xforce
+                    fyy(indatm)=yforce
+                    fzz(indatm)=zforce
+                    
+                  endif
+                  
+                else
+                  
+                  write(nrite,"(/,/,'unidentified atom label :',8a1,
+     x              ': atom number ',i5)")atname,indatm
+                  safe=.false.
+                  
                 endif
                 
               endif
               
-            endif
+              call gstate(safe)
+              if(.not.safe)call error(idnode,25)
+              
+              ltype(indatm)=ltpsit(indnam+m)
+              weight(indatm)=wgtsit(indnam+m)
+              chge(indatm)=chgsit(indnam+m)
+              atmnam(indatm)=sitnam(indnam+m)
+              lstfrz(indatm)=lfzsit(indnam+m)
+              if(lneut)lstneu(indatm)=nugrp(indnam+m)+indneu
+              
+c     reset atomic masses according to free energy definitions
+              
+              if(lfree)then
+                
+                weight_sav(indatm)=weight(indatm)
+                
+                if(lfrmas)then
+                  
+                  if(indatm.ge.ind_fre(1).and.indatm.le.ind_fre(2))then
+                    weight(indatm)=lambda1*weight(indatm)
+                  elseif(indatm.ge.ind_fre(3).and.indatm.le.ind_fre(4))
+     x                then
+                    weight(indatm)=lambda2*weight(indatm)
+                  endif
+                  
+                endif
+                
+              endif
+              
+            enddo
+            
+            indneu=indneu+nugrp(indnam+numsit(k))
             
           enddo
           
-          indneu=indneu+nugrp(indnam+numsit(k))
+          indnam=indnam+numsit(k)
           
         enddo
-        
-        indnam=indnam+numsit(k)
-        
+
+        indnam=0
+
       enddo
       
       if(mxnode.gt.1)then
         
-        call gdsum(xxx,indatm,buffer)
-        call gdsum(yyy,indatm,buffer)
-        call gdsum(zzz,indatm,buffer)
+        call gdsum(xxx,matms,buffer)
+        call gdsum(yyy,matms,buffer)
+        call gdsum(zzz,matms,buffer)
         
         if(levcfg.gt.0)then
           
-          call gdsum(vxx,indatm,buffer)
-          call gdsum(vyy,indatm,buffer)
-          call gdsum(vzz,indatm,buffer)
+          call gdsum(vxx,matms,buffer)
+          call gdsum(vyy,matms,buffer)
+          call gdsum(vzz,matms,buffer)
           
         endif
         
         if(levcfg.gt.1)then
           
-          call gdsum(fxx,indatm,buffer)
-          call gdsum(fyy,indatm,buffer)
-          call gdsum(fzz,indatm,buffer)
+          call gdsum(fxx,matms,buffer)
+          call gdsum(fyy,matms,buffer)
+          call gdsum(fzz,matms,buffer)
           
         endif
+        
+      endif
+      
+c     for pimd expand initial atomic system to quantum system
+      
+      if(lpimd.and.keyres.eq.0)then
+        
+        m=indatm*nbeads+1
+        
+        do n=1,nbeads
+          
+          do i=indatm,1,-1
+            
+            m=m-1
+            if(m.gt.numatm)call error(idnode,45)
+            disp=1.d-3**(hbar/sqrt(boltz*temp*weight(i)))/dble(nbeads)
+            
+c     spread beads to fraction of de broglie wavelength
+            
+            xxx(m)=xxx(i)+disp*(2.d0*duni()-1.d0)
+            yyy(m)=yyy(i)+disp*(2.d0*duni()-1.d0)
+            zzz(m)=zzz(i)+disp*(2.d0*duni()-1.d0)
+            
+            fxx(m)=fxx(i)
+            fyy(m)=fyy(i)
+            fzz(m)=fzz(i)
+            ltype(m)=ltype(i)
+            weight(m)=weight(i)
+            chge(m)=chge(i)
+            atmnam(m)=atmnam(i)
+            
+          enddo
+          
+        enddo
+        
+c     initialise parallel random number sequence
+         
+         dum=puni(1,uuu)
         
       endif
       
@@ -1986,12 +2145,14 @@ c     check for diagonal cell matrix if appropriate
       if((imcon.eq.1).or.(imcon.eq.2).or.(imcon.eq.4).or.
      x  (imcon.eq.5).or.(imcon.eq.7))then
         
-        if(abs(cell(2)).gt.1.d-10)call error(idnode,410)
-        if(abs(cell(3)).gt.1.d-10)call error(idnode,410)
-        if(abs(cell(4)).gt.1.d-10)call error(idnode,410)
-        if(abs(cell(6)).gt.1.d-10)call error(idnode,410)
-        if(abs(cell(7)).gt.1.d-10)call error(idnode,410)
-        if(abs(cell(8)).gt.1.d-10)call error(idnode,410)
+        chkmat=.false.
+        if(abs(cell(2)).gt.1.d-10)chkmat=.true.
+        if(abs(cell(3)).gt.1.d-10)chkmat=.true.
+        if(abs(cell(4)).gt.1.d-10)chkmat=.true.
+        if(abs(cell(6)).gt.1.d-10)chkmat=.true.
+        if(abs(cell(7)).gt.1.d-10)chkmat=.true.
+        if(abs(cell(8)).gt.1.d-10)chkmat=.true.
+        if(chkmat)call error(idnode,410)
         
       endif
       
@@ -1999,10 +2160,10 @@ c     put centre of mass at centre of coordinates if imcon=0
       
       if(imcon.eq.0)then
         
-        totmas=getmass(indatm,idnode,mxnode)
-        call getcom(indatm,idnode,mxnode,totmas,com)
+        totmas=getmass(numatm,idnode,mxnode)
+        call getcom(numatm,idnode,mxnode,totmas,com)
         
-        do i=1,indatm
+        do i=1,numatm
           
           xxx(i)=xxx(i)-com(1)
           yyy(i)=yyy(i)-com(2)
@@ -2019,7 +2180,7 @@ c     set widths if unset - needed for check on link cells below
         xhi=abs(xxx(1))
         yhi=abs(yyy(1))
         zhi=abs(zzz(1))
-        do i=2,indatm
+        do i=2,numatm
           
           xhi=max(xhi,abs(xxx(i)))
           yhi=max(yhi,abs(yyy(i)))
@@ -2130,9 +2291,9 @@ c     ensure PBC compliance of starting structure
       
       if(keyres.eq.0.and.imcon.gt.0)then
         
-        call images(imcon,idnode,mxnode,indatm,cell,xxx,yyy,zzz)
+        call images(imcon,idnode,mxnode,numatm,cell,xxx,yyy,zzz)
         if(mxnode.gt.1)
-     x    call merge(idnode,mxnode,indatm,mxbuff,xxx,yyy,zzz,buffer)
+     x    call merge(idnode,mxnode,numatm,mxbuff,xxx,yyy,zzz,buffer)
         
       endif
       
@@ -2145,10 +2306,10 @@ c     error exit for config file read
       end subroutine sysgen
       
       subroutine sysinit
-     x  (lgofr,lzden,lsolva,lfree,lghost,lpsoc,idnode,imcon,keyfce,
-     x  keyres,mxnode,natms,ntshl,nstep,numacc,numrdf,ntpatm,
-     x  ntpmet,ntpvdw,nzden,chip,chit,conint,elrc,engunit,virlrc,
-     x  rvdw,volm,virtot,vircom,tboost,chit_shl)
+     x  (lgofr,lzden,lsolva,lfree,lghost,lpsoc,lpimd,idnode,imcon,
+     x  keyfce,keyres,mxnode,natms,nbeads,ntshl,nstep,numacc,numrdf,
+     x  ntpatm,ntpmet,ntpvdw,nzden,chip,chit,conint,elrc,engunit,
+     x  virlrc,rvdw,volm,virtot,vircom,tboost,chit_shl,engthe,gaumom)
       
 c***********************************************************************
 c     
@@ -2164,12 +2325,15 @@ c***********************************************************************
       
       implicit none
       
-      logical lgofr,lzden,lfree,lsolva,lghost,lpsoc
-      integer idnode,imcon,keyfce,keyres,mxnode,natms,nstep,numacc
-      integer numrdf,ntpatm,nzden,i,j,k,ntpmet,ntshl,ntpvdw
+      logical lgofr,lzden,lfree,lsolva,lghost,lpsoc,lpimd
+      integer idnode,imcon,keyfce,keyres,mxnode,natms,nbeads,nstep
+      integer numacc,numrdf,ntpatm,nzden,i,j,k,ntpmet,ntshl,ntpvdw
       real(8) chip,chit,conint,elrc,engunit,virlrc,rvdw,volm
       real(8) dnumrd,dnstep,dnumac,dnzden,virtot,vircom,tboost
-      real(8) chit_shl
+      real(8) chit_shl,engthe
+      real(8) gaumom(0:5)
+      
+      engthe=0.d0
       
 c     read or initialise accumulator arrays
       
@@ -2193,6 +2357,7 @@ c     read accumulator data from dump file
         
         if(lgofr) read(nrest)rdf
         if(lzden) read(nrest)zdens
+        read(nrest)gaumom
         
         nstep=nint(dnstep)
         numacc=nint(dnumac)
@@ -2226,6 +2391,10 @@ c     and integral for conserved quantity
           
         enddo
         
+c     initialise bias potential boost factor
+        
+        tboost=0.d0
+        
 c     initialise accumulator arrays
         
         do i=1,mxnstk
@@ -2250,25 +2419,21 @@ c     initialise accumulator arrays
         enddo
         
         do j=1,mxnstk
-          
           do i=1,mxstak
             
             stkval(i,j)=0.d0
             
           enddo
-          
         enddo
         
         if(lgofr)then
           
           do i=1,mxxtyp
-            
             do j=1,mxrdf
               
               rdf(j,i)=0.d0
               
             enddo
-            
           enddo
           
         endif
@@ -2276,14 +2441,20 @@ c     initialise accumulator arrays
         if(lzden)then
           
           do i=1,mxatyp
-            
             do j=1,mxzdn
+              
               zdens(j,i)=0.d0
+              
             enddo
-            
           enddo
           
         endif
+
+        do i=0,5
+          
+          gaumom(i)=0.d0
+          
+        enddo
         
       endif
       
@@ -2344,13 +2515,12 @@ c     for rdf table - broadcast and normalise
         if(lgofr)then
           
           do k=1,mxxtyp
-            
             call gdsum(rdf(1,k),mxrdf,buffer)
-            
             do j=1,mxrdf
+              
               rdf(j,k)=rdf(j,k)/dble(mxnode)
+              
             enddo
-            
           enddo
           
         endif
@@ -2358,16 +2528,22 @@ c     for rdf table - broadcast and normalise
         if(lzden)then
           
           do k=1,mxatyp
-            
             call gdsum(zdens(1,k),mxzdn,buffer)
-            
             do j=1,mxzdn
+              
               zdens(j,k)=zdens(j,k)/dble(mxnode)
+              
             enddo
-            
           enddo
           
         endif
+
+c     broadcast and normalise gaussian moments
+        
+        call gdsum(gaumom(0),6,buffer(1))
+        
+        gaumom(0)=gaumom(0)*dble((((idnode+1)*natms)/mxnode)-
+     x    (idnode*natms)/mxnode)/dble(natms)
         
       endif
       
@@ -2395,14 +2571,14 @@ c     number densities and long-range corrections
       endif
       
       if(imcon.eq.0.or.imcon.eq.6)volm=0.d0
-      
+
       return
       end subroutine sysinit
       
       subroutine systemp
-     x  (idnode,imcon,keyres,mxnode,natms,ngrp,nscons,ntcons,
-     x  ntfree,ntshl,levcfg,keyshl,degfre,degshl,degrot,temp,
-     x  tolnce)
+     x  (lpimd,idnode,imcon,keyres,mxnode,natms,nbeads,ngrp,nscons,
+     x  ntcons,ntfree,ntshl,levcfg,keyshl,keyens,degfre,degshl,
+     x  degrot,engke,tolnce,temp,sigma,uuu)
       
 c***********************************************************************
 c     
@@ -2414,10 +2590,12 @@ c
 c***********************************************************************
       
       implicit none
-      
-      integer idnode,imcon,keyres,mxnode,natms,ngrp,nscons
-      integer ntcons,ntfree,ntshl,levcfg,i,io,k,keyshl
-      real(8) degfre,degshl,degrot,temp,tolnce,sigma,rsq
+
+      logical lpimd
+      integer idnode,imcon,keyres,mxnode,natms,nbeads,ngrp,nscons
+      integer ntcons,ntfree,ntshl,levcfg,i,io,k,keyshl,keyens
+      real(8) degfre,degshl,degrot,tolnce,temp,sigma,engke,rsq
+      real(8) uuu(102)
       
 c     number of degrees of freedom 
 c     3 for com translation
@@ -2428,10 +2606,9 @@ c     3 for angular momentum about origin (non-periodic systems only)
       if(imcon.eq.0.or.imcon.eq.6)degrot=max(0.d0,degrot-3.0d0)
       degshl=dble(3*ntshl)
       
-c     lose one degree of freedom if temperature constrained
-c     gaussian constraints
-      
-c     if(keyens.eq.1)degfre=degfre-1.d0
+c$$$     lose one degree of freedom if temperature constrained
+c$$$     gaussian constraints
+c$$$     if(keyens.eq.1)degfre=degfre-1.d0
       
       if(idnode.eq.0)
      x  write(nrite,"(/,/,' total degrees of freedom       ',f20.0,/,
@@ -2439,86 +2616,108 @@ c     if(keyens.eq.1)degfre=degfre-1.d0
      x  ' shell pseudo degrees of freedom',f20.0)")
      x  degfre,degrot,degshl
       if(degfre.lt.1.d0)call error(idnode,350)
-      
-c     define reciprocal masses of atoms
-      
-      do i=1,natms
-        
-        if(lstfrz(i).ne.0.or.weight(i).lt.1.d-6)then
-          
-          rmass(i)=0.d0
-          weight(i)=0.d0
-          
-        else
-          
-          rmass(i)=1.d0/weight(i)
-          
-        endif
-        
-      enddo
-      
-c     generate starting velocities
+
+c     set temperature control parameter
       
       sigma=temp*boltz*degfre*0.5d0
       
-      if(keyres.eq.0)then
+      if(lpimd)then
         
-        call gauss(natms,vxx,vyy,vzz)
+c     initialise pimd simulations
+      
+        call pimd_init
+     x    (idnode,mxnode,natms,keyres,keyens,temp,sigma,engke,
+     x    stress,uuu)
+
+      else
         
-        do i=1,natms
+c     initialise classical md simulations
+        
+        do i=1,natms*nbeads
           
-          rsq=sqrt(rmass(i))
-          vxx(i)=vxx(i)*rsq
-          vyy(i)=vyy(i)*rsq
-          vzz(i)=vzz(i)*rsq
+          if(lstfrz(i).ne.0.or.weight(i).lt.1.d-6)then
+            
+            rmass(i)=0.d0
+            weight(i)=0.d0
+            
+          else
+            
+            rmass(i)=1.d0/weight(i)
+            
+          endif
           
         enddo
         
-        if(ntcons.gt.0)call quench
-     x    (imcon,idnode,mxnode,natms,nscons,tolnce)
+c     generate starting velocities
         
-        if(ngrp.gt.0)call quatqnch(idnode,imcon,mxnode,natms,ngrp)
-        
-        if(keyshl.eq.1)then
+        if(keyres.eq.0)then
           
-          do k=1,4
+          call gauss(natms*nbeads,vxx,vyy,vzz)
+          
+          do i=1,natms*nbeads
             
-            call vscaleg(idnode,mxnode,imcon,natms,ngrp,sigma)
-            call shlqnch(idnode,mxnode,ntshl,temp)
-            
-          enddo
-          
-        else
-          
-          call vscaleg(idnode,mxnode,imcon,natms,ngrp,sigma)
-          
-        endif
-        
-      elseif(keyres.eq.1.or.keyres.eq.3)then 
-        
-        if(ngrp.gt.0)call quatqnch(idnode,imcon,mxnode,natms,ngrp)
-        
-      elseif(keyres.eq.2)then
-        
-        if(ngrp.gt.0)then 
-          
-          call vscaleg
-     x      (idnode,mxnode,imcon,natms,ngrp,sigma)
-          
-        elseif(keyshl.eq.1)then
-          
-          do k=1,4
-            
-            call vscaleg(idnode,mxnode,imcon,natms,ngrp,sigma)
-            call shlqnch(idnode,mxnode,ntshl,temp)
+            rsq=sqrt(rmass(i))
+            vxx(i)=vxx(i)*rsq
+            vyy(i)=vyy(i)*rsq
+            vzz(i)=vzz(i)*rsq
             
           enddo
           
-        else
+          if(ntcons.gt.0)call quench
+     x      (imcon,idnode,mxnode,natms,nscons,tolnce)
           
-          call vscaleg(idnode,mxnode,imcon,natms,ngrp,sigma)
+          if(ngrp.gt.0)call quatqnch(idnode,imcon,mxnode,natms,ngrp)
+          
+          if(keyshl.eq.1)then
+            
+            do k=1,4
+              
+              call vscaleg(idnode,mxnode,imcon,natms,ngrp,sigma)
+              call shlqnch(idnode,mxnode,ntshl,temp)
+              
+            enddo
+            
+          else
+            
+            call vscaleg(idnode,mxnode,imcon,natms*nbeads,ngrp,sigma)
+            
+          endif
+          
+        elseif(keyres.eq.1.or.keyres.eq.3)then 
+          
+          if(ngrp.gt.0)call quatqnch(idnode,imcon,mxnode,natms,ngrp)
+          
+        elseif(keyres.eq.2)then
+          
+          if(ngrp.gt.0)then 
+            
+            call vscaleg
+     x        (idnode,mxnode,imcon,natms,ngrp,sigma)
+            
+          elseif(keyshl.eq.1)then
+            
+            do k=1,4
+              
+              call vscaleg(idnode,mxnode,imcon,natms,ngrp,sigma)
+              call shlqnch(idnode,mxnode,ntshl,temp)
+              
+            enddo
+            
+          else
+            
+            call vscaleg(idnode,mxnode,imcon,natms*nbeads,ngrp,sigma)
+            
+          endif
           
         endif
+
+c     initial system kinetic energy and stress
+        
+        call kinstress(natms,idnode,mxnode,stress)
+        engke=0.5d0*(stress(1)+stress(5)+stress(9))
+        do i=1,9
+          stress(i)=stress(i)/dble(mxnode)
+        enddo
         
       endif
       
@@ -2527,7 +2726,7 @@ c     print out sample of initial configuration
       if(idnode.eq.0)write(nrite,
      x  "(/,/,1x,'sample of starting configuration',/)")
       
-      io=(natms+19)/20
+      io=(natms*nbeads+19)/20
       if((levcfg.le.1).and.(idnode.eq.0))
      x  write(nrite,"(6x,'i',7x,'x(i)',8x,'y(i)',8x,'z(i)',
      x  7x,'vx(i)',7x,'vy(i)',7x,'vz(i)',/,/)")
@@ -2536,7 +2735,7 @@ c     print out sample of initial configuration
      x  7x,'vx(i)',7x,'vy(i)',7x,'vz(i)',
      x  7x,'fx(i)',7x,'fy(i)',7x,'fz(i)',/,/)")
       
-      do i=1,natms,io
+      do i=1,natms*nbeads,io
         
         if(levcfg.le.1)then
           
@@ -2594,7 +2793,7 @@ c     if excitation calculation, allow for ghost species
       
 c     neutral group bookkeeping
       
-      call neutbook(lneut,idnode,natms,nneut)
+      if(lneut)call neutbook(lneut,idnode,natms,nneut)
       
 c     rigid body bookkeeping 
       
@@ -2792,8 +2991,8 @@ c***********************************************************************
       end subroutine define_units
       
       subroutine quatbook
-     x  (lsolva,idnode,imcon,mxnode,natms,ngrp,ntpmls,ntfree,
-     x  degfre,degrot)
+     x  (lsolva,idnode,imcon,mxnode,natms,ngrp,ntpmls,ntfree,degfre,
+     x  degrot)
       
 c**************************************************************************
 c     
@@ -2970,11 +3169,15 @@ c     centre of mass of groups
 c     assumes group dimensions are smaller than half box width
         
         do i=1,natms
+          
           lstme(i)=0
+          
         enddo
         
         do id=1,mxungp
+          
           gmass(id)=0.d0
+          
         enddo
         
         jr=0
@@ -3627,7 +3830,9 @@ c     find number of unique groups
         
         ngp=0
         do ig=1,ngrp
+          
           ngp=max(ngp,lstgtp(ig))
+          
         enddo
         
 c     calculate reciprocal of rotational inertias 
@@ -3797,7 +4002,9 @@ c     list of atoms integrated on this node
         enddo
         
         do i=1,jr
+          
           lstme(i)=lstrgd(i)
+          
         enddo
         
 c     block parameters for free atoms
@@ -4033,7 +4240,7 @@ c     allocate work arrays
       allocate (itest(mxtmls),index(mxtmls),stat=fail(1))
       allocate (msite(mxtmls),mconst(mxtmls),stat=fail(2))
       allocate (listin(mxatms),stat=fail(3))
-      allocate (kscons(0:mxproc-1),stat=fail(4))
+      allocate (kscons(0:mxnode-1),stat=fail(4))
       do i=1,4
         if(fail(i).ne.0)call error(idnode,1800)
       enddo
@@ -4736,7 +4943,8 @@ c***********************************************************************
       real(8) taut,taup
       
       if(findstring('nve',directive,idum))then
-        
+
+        keyens=0
         if(idnode.eq.0)write(nrite,
      x    "(/,1x,'microcanonical ensemble')")
         if(lens)then
@@ -5373,7 +5581,7 @@ c     information only - skip record
       end subroutine metadyn_option
       
       subroutine ewald_selection
-     x  (directive,lhke,lspme,lewald,lcut,lforc,kill,idnode,keyfce,
+     x  (directive,lhke,lspme,lewald,lcut,lrfce,kill,idnode,keyfce,
      x  imcon,nhko,nlatt,kmax1,kmax2,kmax3,alpha,rcut)
       
 c***********************************************************************
@@ -5388,7 +5596,7 @@ c***********************************************************************
       implicit none
       
       character*1 directive(lenrec)
-      logical lhke,lspme,lewald,lcut,lforc,kill,safe
+      logical lhke,lspme,lewald,lcut,lrfce,kill,safe
       integer idnode,keyfce,imcon,nhko,nlatt,kmax1,kmax2,kmax3,idum
       integer kmaxpow2
       real(8) alpha,rcut,eps,tol,fac,tol1
@@ -5646,11 +5854,11 @@ CCRAY     x                     dummy,1,1,ffttable,dummy,dummy )
         
       endif
       
-      if(lforc)then
+      if(lrfce)then
         call  error(idnode,-416)
         kill=.true.
       endif
-      lforc=.true.
+      lrfce=.true.
       
       return
       end subroutine ewald_selection

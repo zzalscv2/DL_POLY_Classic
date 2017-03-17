@@ -82,7 +82,7 @@ c***********************************************************************
       
       contains
       
-      subroutine alloc_sol_arrays(idnode)
+      subroutine alloc_sol_arrays(idnode,mxnode)
       
 c***********************************************************************
 c     
@@ -96,18 +96,21 @@ c***********************************************************************
       implicit none
       
       integer, parameter :: nnn=37
-
-      integer i,fail,idnode
+      
+      logical safe
+      integer i,fail,idnode,mxnode
       dimension fail(nnn)
+      
+      safe=.true.
       
       mxtmls_sol2=((mxtmls_sol+1)*mxtmls_sol)/2
       mxtmls_sol3=(((mxtmls_sol+3)*mxtmls_sol+2)*mxtmls_sol)/6
       mxtmls_sol4=((((mxtmls_sol+6)*mxtmls_sol+11)*mxtmls_sol+6)*
      x  mxtmls_sol)/24
       
-      do i=1,nnn
-        fail(i)=0
-      enddo
+c     allocate arrays
+      
+      fail(:)=0
       
       allocate (cou_sol(mxtmls_sol2),stat=fail(1))
       allocate (vdw_sol(mxtmls_sol2),stat=fail(2))
@@ -141,9 +144,9 @@ c***********************************************************************
       allocate (inv_sol(mxtmls_sol),stat=fail(36))
       allocate (weight_sav(mxatms_fre),stat=fail(37))
       
-      do i=1,nnn
-        if(fail(i).gt.0)call error(idnode,1030)
-      enddo
+      if(any(fail.gt.0))safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,540)
       
 c     initialise accumulators
       
@@ -207,7 +210,7 @@ c     global sum
       return
       end subroutine solva_temp
       
-      subroutine alloc_free_arrays(idnode)
+      subroutine alloc_free_arrays(idnode,mxnode)
       
 c***********************************************************************
 c     
@@ -221,12 +224,15 @@ c***********************************************************************
       implicit none
       
       integer, parameter :: nnn=12
-      integer i,fail,idnode
+      logical safe
+      integer i,fail,idnode,mxnode
       dimension fail(nnn)
-      
-      do i=1,nnn
-        fail(i)=0
-      enddo
+
+      safe=.true.
+
+c     allocate arrays
+
+      fail(:)=0
       
       allocate (ebuf_exc1(mxebuf_fre),stat=fail(1))
       allocate (ckc1(mxewld_fre),stat=fail(2))
@@ -241,9 +247,9 @@ c***********************************************************************
       allocate (vyo_fre(mxatms_fre),stat=fail(11))
       allocate (vzo_fre(mxatms_fre),stat=fail(12))
       
-      do i=1,nnn
-        if(fail(i).gt.0)call error(idnode,1030)
-      enddo
+      if(any(fail.gt.0))safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,541)
       
       return
       
@@ -533,7 +539,7 @@ c     open the FREENG file if new job or file closed
       return
       end subroutine free_energy_write
       
-      subroutine alloc_exi_arrays(idnode)
+      subroutine alloc_exi_arrays(idnode,mxnode)
       
 c***********************************************************************
 c     
@@ -545,18 +551,21 @@ c
 c***********************************************************************
       
       implicit none
-      integer, parameter :: nnn=15
-      integer i,fail,idnode
-      dimension fail(nnn)
       
+      logical safe
+      integer, parameter :: nnn=15
+      integer i,fail,idnode,mxnode
+      dimension fail(nnn)
+
+      safe=.true.
       mxtmls_exc2=((mxtmls_exc+1)*mxtmls_exc)/2
       mxtmls_exc3=(((mxtmls_exc+3)*mxtmls_exc+2)*mxtmls_exc)/6
       mxtmls_exc4=((((mxtmls_exc+6)*mxtmls_exc+11)*mxtmls_exc+6)*
      x  mxtmls_exc)/24
+
+c     allocate arrays
       
-      do i=1,nnn
-        fail(i)=0
-      enddo
+      fail(:)=0
       
       allocate (cou_exc(mxtmls_exc2),stat=fail(1))
       allocate (vdw_exc(mxtmls_exc2),stat=fail(2))
@@ -574,9 +583,9 @@ c***********************************************************************
       allocate (qfix_exc(mxtmls_exc),stat=fail(14))
       allocate (cou_exc_sic(mxtmls_exc2),stat=fail(15))
       
-      do i=1,nnn
-        if(fail(i).gt.0)call error(idnode,1030)
-      enddo
+      if(any(fail.gt.0))safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,542)
       
 c     initialise accumulators
       

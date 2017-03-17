@@ -23,17 +23,17 @@ c***********************************************************************
 
       subroutine molecular_dynamics
      x  (lfcap,lgofr,lneut,lnsq,loglnk,loptim,lzeql,lzero,newlst,
-     x  stropt,cycle,ltad,lsolva,lfree,lghost,idnode,imcon,
+     x  stropt,cycle,ltad,lsolva,lfree,lghost,lpimd,idnode,imcon,
      x  keyfce,keyfld,keyshl,keystr,keytol,kmax1,kmax2,kmax3,multt,
      x  mxnode,natms,ngrp,nhko,nlatt,nneut,nospl,nscons,nstbgr,nstep,
      x  nsteql,ntangl,ntbond,ntdihd,ntfree,ntinv,ntpfbp,ntpmet,ntptbp,
-     x  ntpter,ntpvdw,ntshl,ntteth,ntcons,numrdf,nsolva,isolva,
+     x  ntpter,ntpvdw,ntshl,ntteth,ntcons,numrdf,nsolva,isolva,nbeads,
      x  alpha,delr,dlrpot,drewd,elrc,engang,engbnd,engcpe,engdih,
      x  engfbp,engfld,enginv,engshl,engsrp,engtbp,engter,engtet,
      x  epsq,fmax,opttol,rctter,rcut,rcutfb,rcuttb,rprim,rvdw,shlke,
      x  engcfg,temp,tstep,virang,virbnd,vircpe,virdih,virfbp,virfld,
      x  virinv,virlrc,virmet,virshl,virsrp,virtbp,virter,virtet,volm,
-     x  engmet,virtot,engord,virord)
+     x  engmet,virtot,engord,virord,engrng,virrng,qmsbnd)
       
 c***********************************************************************
 c     
@@ -49,14 +49,14 @@ c***********************************************************************
       implicit none
       
       logical lfcap,lgofr,lneut,lnsq,loglnk,loptim,lzeql,lzero
-      logical newlst,stropt,cycle,ltad,lsolva,lfree,lghost
+      logical newlst,stropt,cycle,ltad,lsolva,lfree,lghost,lpimd
       
       integer idnode,imcon,keyfce,keyfld,keyshl,keytol,ntcons
       integer keystr,kmax1,kmax2,kmax3,multt,mxnode,natms,ngrp
       integer nhko,nlatt,nneut,nospl,nscons,nstbgr,nstep,nsteql
       integer ntangl,ntbond,ntdihd,ntfree,ntinv,ntpfbp,ntpmet
       integer ntptbp,ntpter,ntpvdw,ntshl,ntteth,numrdf,nsolva
-      integer isolva
+      integer isolva,nbeads
       
       real(8) alpha,delr,dlrpot,drewd,elrc,engang,engbnd
       real(8) engcpe,engdih,engfbp,engfld,enginv,engshl,engsrp
@@ -65,28 +65,28 @@ c***********************************************************************
       real(8) tstep,virang,virbnd,vircpe,virdih,virfbp
       real(8) virfld,virinv,virlrc,virmet,virshl,virsrp
       real(8) virtbp,virter,virtet,volm,engmet,virtot
-      real(8) engord,virord
+      real(8) engord,virord,engrng,virrng,qmsbnd
       
 c     construct verlet neighbour list
       
       call nlist_driver
-     x  (newlst,lneut,lnsq,loglnk,ltad,natms,idnode,mxnode,imcon,
-     x  nneut,keyfce,rcut,delr,tstep)
+     x  (newlst,lneut,lnsq,loglnk,ltad,natms,nbeads,idnode,mxnode,
+     x  imcon,nneut,keyfce,rcut,delr,tstep)
       
 c     calculate atomic forces
       
       call force_manager
      x  (newlst,lneut,lnsq,lgofr,lzeql,loglnk,lfcap,lsolva,lfree,
-     x  lghost,idnode,mxnode,natms,imcon,nstep,nstbgr,nsteql,
+     x  lghost,lpimd,idnode,mxnode,natms,imcon,nstep,nstbgr,nsteql,
      x  numrdf,keyfce,kmax1,kmax2,kmax3,nhko,nlatt,ntpvdw,
      x  ntpmet,nospl,multt,nneut,ntptbp,ntpfbp,ntpter,keyshl,
      x  keyfld,ntbond,ntangl,ntdihd,ntinv,ntteth,ntshl,nsolva,
-     x  isolva,delr,dlrpot,engcpe,engsrp,epsq,rcut,rprim,rvdw,
+     x  isolva,nbeads,delr,dlrpot,engcpe,engsrp,epsq,rcut,rprim,rvdw,
      x  vircpe,virsrp,alpha,drewd,volm,engmet,virmet,elrc,virlrc,
      x  rcuttb,engtbp,virtbp,rcutfb,engfbp,virfbp,rctter,engter,
      x  virter,engbnd,virbnd,engang,virang,engdih,virdih,enginv,
      x  virinv,engtet,virtet,engshl,shlke,virshl,engfld,virfld,
-     x  engcfg,fmax,temp,engord,virord)
+     x  engcfg,fmax,temp,engord,virord,engrng,virrng,qmsbnd)
       
 c     frozen atoms option
       
@@ -112,7 +112,7 @@ c     total virial (excluding constraint virial and c.o.m virial)
 c     for npt routines     note: virsrp already includes virlrc
       
       virtot=vircpe+virsrp+virbnd+virtbp+virter+virfld+
-     x  virang+virshl+virtet+virmet+virord
+     x  virang+virshl+virtet+virmet+virord+virrng
       
       return
       end subroutine molecular_dynamics
@@ -145,15 +145,16 @@ c***********************************************************************
       implicit none
 
       logical,save :: lfirst = .true.
-      logical lfcap,lgofr,lneut,lnsq,loglnk,lzeql,ltad
+      logical lfcap,lgofr,lneut,lnsq,loglnk,lzeql,ltad,lpimd
       logical newlst,relaxed,shgofr,lsolva,lfree,lghost
 
-      integer idnode,imcon,keyfce,keyfld,keyshl
-      integer kmax1,kmax2,kmax3,multt,mxnode,natms
+      integer idnode,imcon,keyfce,keyfld,keyshl,nbeads
+      integer kmax1,kmax2,kmax3,multt,mxnode,natms,l1,l2
       integer nhko,nlatt,nneut,nospl,nstbgr,nstep,nsteql
       integer ntangl,ntbond,ntdihd,ntinv,ntpfbp,ntpmet
       integer ntptbp,ntpter,ntpvdw,ntshl,ntteth,numrdf
       integer keyrlx,ntpmls,pass,nsolva,isolva,ia,ib,ishl
+      integer mtshl
 
       real(8) alpha,delr,dlrpot,drewd,elrc,engang,engbnd
       real(8) engcpe,engdih,engfbp,engfld,enginv,engshl,engsrp
@@ -162,7 +163,8 @@ c***********************************************************************
       real(8) tstep,virang,virbnd,vircpe,virdih,virfbp
       real(8) virfld,virinv,virlrc,virmet,virshl,virsrp
       real(8) virtbp,virter,virtet,volm,engmet,virtot,rlxtol
-      real(8) pass0,pass1,pass2,engord,virord
+      real(8) pass0,pass1,pass2,engord,virord,engrng,virrng
+      real(8) qmsbnd
       
       real(8),allocatable,dimension(:),save :: xdcs,ydcs,zdcs 
 
@@ -170,17 +172,27 @@ c***********************************************************************
       keyrlx=0
       shgofr=lgofr
       relaxed=.false.
+c     dummy variables for pimd option
+      lpimd=.false.
+      nbeads=1
+      engrng=0.d0
+      virrng=0.d0
+      qmsbnd=0.d0
+
+      l1=(idnode*ntshl)/mxnode
+      l2=((idnode+1)*ntshl)/mxnode
+      mtshl=l2-l1
  
       if(lfirst)then
         
-        allocate(xdcs(1:ntshl))
-        allocate(ydcs(1:ntshl))
-        allocate(zdcs(1:ntshl))
+        allocate(xdcs(1:mtshl))
+        allocate(ydcs(1:mtshl))
+        allocate(zdcs(1:mtshl))
         lfirst = .false.
         
       else
         
-        do ishl=1,ntshl
+        do ishl=1,mtshl
           
           ia=listshl(ishl,2)
           ib=listshl(ishl,3)
@@ -197,23 +209,23 @@ c***********************************************************************
 c     construct verlet neighbour list
         
         call nlist_driver
-     x    (newlst,lneut,lnsq,loglnk,ltad,natms,idnode,mxnode,imcon,
-     x    nneut,keyfce,rcut,delr,tstep)
+     x    (newlst,lneut,lnsq,loglnk,ltad,natms,nbeads,idnode,mxnode,
+     x    imcon,nneut,keyfce,rcut,delr,tstep)
         
 c     calculate atomic forces
         
         call force_manager
      x    (newlst,lneut,lnsq,shgofr,lzeql,loglnk,lfcap,lsolva,lfree,
-     x    lghost,idnode,mxnode,natms,imcon,nstep,nstbgr,nsteql,
+     x    lghost,lpimd,idnode,mxnode,natms,imcon,nstep,nstbgr,nsteql,
      x    numrdf,keyfce,kmax1,kmax2,kmax3,nhko,nlatt,ntpvdw,
      x    ntpmet,nospl,multt,nneut,ntptbp,ntpfbp,ntpter,keyshl,
      x    keyfld,ntbond,ntangl,ntdihd,ntinv,ntteth,ntshl,nsolva,
-     x    isolva,delr,dlrpot,engcpe,engsrp,epsq,rcut,rprim,rvdw,
+     x    isolva,nbeads,delr,dlrpot,engcpe,engsrp,epsq,rcut,rprim,rvdw,
      x    vircpe,virsrp,alpha,drewd,volm,engmet,virmet,elrc,virlrc,
      x    rcuttb,engtbp,virtbp,rcutfb,engfbp,virfbp,rctter,engter,
      x    virter,engbnd,virbnd,engang,virang,engdih,virdih,enginv,
      x    virinv,engtet,virtet,engshl,shlke,virshl,engfld,virfld,
-     x    engcfg,fmax,temp,engord,virord)
+     x    engcfg,fmax,temp,engord,virord,engrng,virrng,qmsbnd)
         
 c     frozen atoms option
         
@@ -223,7 +235,7 @@ c     total virial (excluding constraint virial and c.o.m virial)
 c     for npt routines     note: virsrp already includes virlrc
         
         virtot=vircpe+virsrp+virbnd+virtbp+virter+virfld+
-     x    virang+virshl+virtet+virmet+virord
+     x    virang+virshl+virtet+virmet+virord+virrng
         
 c     relaxed shell option
         
@@ -237,7 +249,6 @@ c     relaxed shell option
           pass0=pass0+1.d0
           pass1=pass1/pass0+pass/pass0
           pass2=max(dble(pass),pass2)
-c$$$          write(104,'("Relaxed shells before step: ",I5)')pass+1          
           
         endif
         
@@ -251,7 +262,7 @@ c     end of shell relaxation
       
 c     store vector connecting the cores to the shells
       
-      do ishl=1,ntshl
+      do ishl=1,mtshl
         
         ia=listshl(ishl,2)
         ib=listshl(ishl,3)
@@ -261,7 +272,7 @@ c     store vector connecting the cores to the shells
         
       enddo
       
-      call images(imcon,0,1,ntshl,cell,xdcs,ydcs,zdcs)
+      call images(imcon,0,1,mtshl,cell,xdcs,ydcs,zdcs)
       
       return
       end subroutine shell_relaxation
@@ -293,14 +304,14 @@ c***********************************************************************
       implicit none
 
       logical lfcap,lneut,lnsq,loglnk,lzeql,newlst,stropt,shgofr
-      logical conopt,newjob,ltad,lsolva,lfree,lghost
+      logical conopt,newjob,ltad,lsolva,lfree,lghost,lpimd,safe
       
       integer idnode,imcon,keyfce,keyfld,keyshl,keystr,pass,i
       integer kmax1,kmax2,kmax3,multt,mxnode,natms,ngrp,keytol
       integer nhko,nlatt,nneut,nospl,nscons,nstbgr,nstep,nsteql
       integer ntangl,ntbond,ntdihd,ntfree,ntinv,ntpfbp,ntpmet
       integer ntptbp,ntpter,ntpvdw,ntshl,ntteth,numrdf,ntcons
-      integer fail,nsolva,isolva
+      integer fail,nsolva,isolva,nbeads
 
       real(8) alpha,delr,dlrpot,drewd,elrc,engang,engbnd
       real(8) engcpe,engdih,engfbp,engfld,enginv,engshl,engsrp
@@ -310,7 +321,7 @@ c***********************************************************************
       real(8) virfld,virinv,virlrc,virmet,virshl,virsrp,tolnce
       real(8) virtbp,virter,virtet,volm,engmet,virtot,engcon
       real(8) cfgmin,engunit,hnorm,grad0,grad1,ff1,sgn
-      real(8) engord,virord
+      real(8) engord,virord,engrng,virrng,qmsbnd
       
       real(8), allocatable :: sxx(:),syy(:),szz(:)
       
@@ -331,6 +342,12 @@ c     dummy variables
       lghost=.false.
       nsolva=0
       isolva=1
+c     dummy variables for pimd option
+      lpimd=.false.
+      nbeads=1
+      engrng=0.d0
+      virrng=0.d0
+      qmsbnd=0.d0
       
 c$$$c     diagnostic printing (not usually active)
 c$$$
@@ -350,23 +367,23 @@ c$$$      endif
 c     construct verlet neighbour list
         
         call nlist_driver
-     x    (newlst,lneut,lnsq,loglnk,ltad,natms,idnode,mxnode,imcon,
-     x    nneut,keyfce,rcut,delr,tstep)
+     x    (newlst,lneut,lnsq,loglnk,ltad,natms,nbeads,idnode,mxnode,
+     x    imcon,nneut,keyfce,rcut,delr,tstep)
         
 c     calculate atomic forces
         
         call force_manager
      x    (newlst,lneut,lnsq,shgofr,lzeql,loglnk,lfcap,lsolva,lfree,
-     x    lghost,idnode,mxnode,natms,imcon,nstep,nstbgr,nsteql,
+     x    lghost,lpimd,idnode,mxnode,natms,imcon,nstep,nstbgr,nsteql,
      x    numrdf,keyfce,kmax1,kmax2,kmax3,nhko,nlatt,ntpvdw,
      x    ntpmet,nospl,multt,nneut,ntptbp,ntpfbp,ntpter,keyshl,
      x    keyfld,ntbond,ntangl,ntdihd,ntinv,ntteth,ntshl,nsolva,
-     x    isolva,delr,dlrpot,engcpe,engsrp,epsq,rcut,rprim,rvdw,
+     x    isolva,nbeads,delr,dlrpot,engcpe,engsrp,epsq,rcut,rprim,rvdw,
      x    vircpe,virsrp,alpha,drewd,volm,engmet,virmet,elrc,virlrc,
      x    rcuttb,engtbp,virtbp,rcutfb,engfbp,virfbp,rctter,engter,
      x    virter,engbnd,virbnd,engang,virang,engdih,virdih,enginv,
      x    virinv,engtet,virtet,engshl,shlke,virshl,engfld,virfld,
-     x    engcfg,fmax,temp,engord,virord)
+     x    engcfg,fmax,temp,engord,virord,engrng,virrng,qmsbnd)
         
 c     frozen atoms option
         
@@ -376,7 +393,7 @@ c     total virial (excluding constraint virial and c.o.m virial)
 c     for npt routines     note: virsrp already includes virlrc
         
         virtot=vircpe+virsrp+virbnd+virtbp+virter+virfld+
-     x    virang+virshl+virtet+virmet+virord
+     x    virang+virshl+virtet+virmet+virord+virrng
         
 c     conjugate gradient structure optimisation
         
@@ -405,8 +422,12 @@ c     ensure constraints are satisfied
       
       if(stropt.and.ntcons.gt.0)then
         
+        fail=0
+        safe=.true.
         allocate(sxx(mxatms),syy(mxatms),szz(mxatms),stat=fail)
-        if(fail.ne.0)call error(idnode,9999)
+        if(fail.ne.0)safe=.false.
+        if(mxnode.gt.1)call gstate(safe)
+        if(.not.safe)call error(idnode,74)
         
 c     store current forces
         

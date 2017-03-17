@@ -113,6 +113,14 @@ c     solvation data file
       
       integer, parameter :: nsolwr=43
       
+c     pimd thermostats file
+      
+      integer, parameter :: ntherm=45
+      
+c     pimd random number restart data
+      
+      integer, parameter :: npuni=46
+      
 c     data dumping interval in event of system crash
       
       integer, parameter :: ndump=1000
@@ -121,13 +129,17 @@ c     maximum number of neb calculations
       
       integer, parameter :: maxneb=10
       
+c     pimd defaults
+      
+      integer, parameter :: num_beads_default=10
+
 c     array allocation parameters (set by subroutine parset)
       
-      integer kmaxa,kmaxb,kmaxc,minnode,msatms,msbad,msgrp
+      integer kmaxa,kmaxb,kmaxc,msatms,msbad,msgrp
       integer mspmf,msteth,mxangl,mxatms,mxbond,mxbuff,mxcell
       integer mxcons,mxdihd,mxewld,mxexcl,mxfbp,mxfld,mxgatm,mxgrid
       integer mxgrp,mxinv,mxlist,mxlshp,mxneut,mxngp,mxnstk,mxpang
-      integer mxpbnd,mxpdih,mxpfbp,mxpinv,mxpmf,mxproc,mxptbp,mxpvdw
+      integer mxpbnd,mxpdih,mxpfbp,mxpinv,mxpmf,mxptbp,mxpvdw
       integer mxrdf,mxzdn,mxshl,mxsite,mxspmf,mxstak,mxtang,mxtbnd
       integer mxtbp,mxtcon,mxtdih,mxteth,mxtinv,mxtmls,mxtshl,mxungp
       integer mxvdw,mxxdf,mx2tbp,mx3fbp,mxebuf,mxquat,mxshak,mxspl
@@ -135,12 +147,13 @@ c     array allocation parameters (set by subroutine parset)
       integer mxmet,mxsmet,mxpmet,mxter,mxpter,mxatyp,mxxtyp
       integer mxtmls_fre,mxewld_fre,mxebuf_fre,mxatms_fre,mxatyp_exc
       integer mxtmls_exc,mxtmls_sol,mxebuf_sol,mxatms_sol
+      integer nbeads,nchain,mslist,mspimd
       
-      save kmaxa,kmaxb,kmaxc,minnode,msatms,msbad,msgrp
+      save kmaxa,kmaxb,kmaxc,msatms,msbad,msgrp
       save mspmf,msteth,mxangl,mxatms,mxbond,mxbuff,mxcell
       save mxcons,mxdihd,mxewld,mxexcl,mxfbp,mxfld,mxgatm,mxgrid
       save mxgrp,mxinv,mxlist,mxlshp,mxneut,mxngp,mxnstk,mxpang
-      save mxpbnd,mxpdih,mxpfbp,mxpinv,mxpmf,mxproc,mxptbp,mxpvdw
+      save mxpbnd,mxpdih,mxpfbp,mxpinv,mxpmf,mxptbp,mxpvdw
       save mxrdf,mxzdn,mxshl,mxsite,mxspmf,mxstak,mxtang,mxtbnd
       save mxtbp,mxtcon,mxtdih,mxteth,mxtinv,mxtmls,mxtshl,mxungp
       save mxvdw,mxxdf,mx2tbp,mx3fbp,mxebuf,mxquat,mxshak,mxspl
@@ -148,6 +161,7 @@ c     array allocation parameters (set by subroutine parset)
       save mxmet,mxsmet,mxpmet,mxter,mxpter,mxatyp,mxxtyp
       save mxtmls_fre,mxewld_fre,mxebuf_fre,mxatms_fre,mxatyp_exc
       save mxtmls_exc,mxtmls_sol,mxebuf_sol,mxatms_sol
+      save nbeads,nchain,mslist,mspimd
       
       contains
       
@@ -164,16 +178,17 @@ c
 c***********************************************************************
       
       logical loglnk,lewald,lspme,lhke,nolink,lcshft
-      logical lsolva,lfree,lfrmas,lghost,redirect
+      logical lsolva,lfree,lfrmas,lghost,redirect,lpimd
       real(8) cell,celprp,rctbp,rcfbp,volm,xhi,yhi,zhi,rcut,rvdw
       real(8) densvar,delr,cut,dens,ratio,drdf,dzdn,rcter,buffer
       real(8) zlen
-      integer imcon,nhko,ilx,ily,ilz,ncells
+      integer imcon,nhko,ilx,ily,ilz,ncells,numatm,keyres
       integer idnode,mxnode,mxn1
       
       dimension cell(9),celprp(10),buffer(10)
       
       lhke=.false.
+      lpimd=.false.
       lspme=.false.
       lewald=.false.
       lcshft=.false.
@@ -189,11 +204,6 @@ c***********************************************************************
       mxatyp_exc=1
       mxtmls_exc=1
 
-c     specify maximum and minimum nodes
-      
-      mxproc=mxnode
-      minnode=mxnode
-      
 c     scan the FIELD file data
       
       call fldscan(idnode,mxn1,rctbp,rcfbp,rcter)
@@ -201,18 +211,25 @@ c     scan the FIELD file data
 c     scan CONFIG file data
       
       call cfgscan
-     x  (idnode,nconf,imcon,volm,xhi,yhi,zhi,cell,buffer)
+     x  (idnode,nconf,imcon,numatm,volm,xhi,yhi,zhi,cell,buffer)
       
 c     scan CONTROL file data
       
       call conscan
      x  (redirect,lewald,lspme,lhke,nolink,lcshft,lsolva,lfree,lfrmas,
-     x  lghost,idnode,imcon,nhko,rcut,rvdw,delr,densvar,drdf,dzdn,
-     x  zlen,cell)
+     x  lghost,lpimd,idnode,imcon,nhko,keyres,rcut,rvdw,delr,densvar,
+     x  drdf,dzdn,zlen,cell)
+      
+      if(lpimd.and.keyres.gt.0)then
+        if(numatm.ne.nbeads*mxatms)call abortscan(56,idnode)
+      else
+        if(numatm.ne.mxatms)call abortscan(56,idnode)
+      endif
+      if(lpimd)numatm=nbeads*mxatms
       
 c     set dimension of working coordinate arrays
       
-      msatms=max(1,(mxatms+minnode-1)/minnode)
+      msatms=max(1,(mxatms-1)/mxnode+1)
       if(lsolva)mxatms_sol=mxatms
       if(lfree.or.lghost)mxatms_fre=mxatms
       
@@ -359,27 +376,27 @@ c     maximum number of different sites in system
       
 c     maximum number of chemical bonds per node
       
-      mxbond=max(1,(mxbond+minnode-1)/minnode)
+      mxbond=max(1,(mxbond-1)/mxnode+1)
       
 c     maximum number of bond angles per node
       
-      mxangl=max(1,(mxangl+minnode-1)/minnode)
+      mxangl=max(1,(mxangl-1)/mxnode+1)
       
 c     maximum number of torsion angles per node
       
-      mxdihd=max(1,(mxdihd+minnode-1)/minnode)
+      mxdihd=max(1,(mxdihd-1)/mxnode+1)
       
 c     maximum number of inversion potentials per node
       
-      mxinv=max(1,(mxinv+minnode-1)/minnode)
+      mxinv=max(1,(mxinv-1)/mxnode+1)
       
 c     maximum number of constraints per node
       
-      mxcons=max(1,2*((mxcons+minnode-1)/minnode))
+      mxcons=max(1,2*((mxcons-1)/mxnode+1))
       
 c     maximum number of tethered atoms per node
       
-      msteth=max(1,(msteth+minnode-1)/minnode)
+      msteth=max(1,(msteth-1)/mxnode+1)
       
 c     maximum size for working arrays for bonds, angles, dihedrals
 c     inversion potentials, tethers and core-shell units
@@ -411,7 +428,7 @@ c     maximum number of rigid groups in system
       
 c     maximum number of rigid groups per node
       
-      msgrp=max(1,(mxgrp+minnode-1)/minnode)
+      msgrp=max(1,(mxgrp-1)/mxnode+1)
       
 c     maximum number of sites per rigid unit
       
@@ -427,7 +444,7 @@ c     maximum number of timesteps in stack arrays
       
 c     maximum number of variables in stack arrays
       
-      mxnstk=45+mxatyp
+      mxnstk=52+mxatyp
       
 c     dimension of shake shared atoms array
       
@@ -482,7 +499,7 @@ c     set dimension of working arrays for HK ewald
 
 c     maximum dimension of principal transfer buffer
       
-      mxbuff=max(6*mxatms,8*(mxcons+1),8*(mxgrp+1),mxnstk*mxstak,
+      mxbuff=max(6*numatm,8*(mxcons+1),8*(mxgrp+1),mxnstk*mxstak,
      x  mxebuf,mxgrid,2*kmaxa*kmaxb*kmaxc,2*kmaxd*kmaxe*kmaxf,
      x  10000)
       
@@ -493,6 +510,8 @@ c     decide if link-cells in use or not
       dens=dble(mxatms)/volm
       ratio=1.5d0*dens*(4.d0*pi/3.d0)*cut**3
       mxlist=min(nint(ratio),(mxatms+1)/2)
+      mslist=nbeads*((mxatms-1)/mxnode+1)
+      mspimd=nbeads*((mxatms-1)/mxnode+1)
       if(imcon.eq.0) then
         
         cell(1)=max(xhi+2.d0*cut,3.d0*cut)
@@ -559,11 +578,11 @@ c     maximum number of core-shell unit types
       
 c     potential of mean force array parameter
       
-      mxpmf=max(mxpmf,1)
+      mxpmf=max(1,mxpmf)
       
 c     number of pmf constraints on a processor
       
-      mspmf=max(1,(mxpmf+minnode-1)/minnode)
+      mspmf=max(1,(mxpmf-1)/mxnode+1)
       
 c     maximum number of sites to define pmf units
       
@@ -584,7 +603,7 @@ c     maximum b-spline interpolation order
 c     increment mxneut
       
       if(mxneut.gt.0)mxneut=mxneut+1
-      
+
       return
       
       end subroutine parset
@@ -878,7 +897,7 @@ c     read and process directives from field file
                 enddo
                 
               elseif(findstring('pmf',record,idum))then
-                
+
                 do ipmf=1,2
                   
                   call getrec(safe,idnode,nfield)
@@ -1063,7 +1082,6 @@ c     read and process directives from field file
       
       if(idnode.eq.0)close (nfield)
       
-      if(mxpmf.gt.0)mxpmf=mxatms
       if(mxtcon.gt.0)mxexcl=max(mxexcl,6)
       if(mxtbnd.gt.0)mxexcl=max(mxexcl,6)
       if(mxtang.gt.0)mxexcl=max(mxexcl,16)
@@ -1077,7 +1095,7 @@ c     read and process directives from field file
       end subroutine fldscan
       
       subroutine cfgscan
-     x  (idnode,nconf,imcon,volm,xhi,yhi,zhi,cell,buffer)
+     x  (idnode,nconf,imcon,numatm,volm,xhi,yhi,zhi,cell,buffer)
       
 c***********************************************************************
 c     
@@ -1094,117 +1112,91 @@ c***********************************************************************
       character*80 header
       character*8 name
       logical lvolm
-      real(8) cell,celprp,buffer,extra,volm,xhi,yhi,zhi
+      real(8) cell,celprp,buffer,extra,volm,xhi,yhi,zhi,xlo,ylo,zlo
       real(8) xxx,yyy,zzz,uuu,vvv,www,coz
-      integer idnode,nconf,imcon,i,levcfg
-      dimension cell(9),celprp(10),buffer(10),extra(5)
+      integer idnode,nconf,imcon,levcfg,numatm
+      dimension cell(9),celprp(10),buffer(10),extra(6)
       
       imcon=0
+      numatm=0
+      levcfg=0
+      volm=0.d0
+      cell(:)=0.d0
       xhi=0.d0
       yhi=0.d0
       zhi=0.d0
-      volm=0.d0
-      do i=1,9
-        
-        cell(i)=0.d0
-        
-      enddo
+      
       if(idnode.eq.0)then
         
         open (nconf,file='CONFIG')
         
 c     read the CONFIG file header
         
-        read(nconf,'(a80)',end=100)header
-        read(nconf,'(2i10)',end=100)levcfg,imcon
-        lvolm=(imcon.eq.0.or.imcon.eq.6)
+        read(nconf,'(a80)')header
+        read(nconf,'(3i10)')levcfg,imcon,numatm
         
 c     specify molecular dynamics simulation cell
         
         if(imcon.gt.0)then
           
-          read(nconf,'(3f20.0)',end=100)cell(1),cell(2),cell(3)
-          read(nconf,'(3f20.0)',end=100)cell(4),cell(5),cell(6)
-          read(nconf,'(3f20.0)',end=100)cell(7),cell(8),cell(9)
+          read(nconf,'(3f20.0)')cell(1),cell(2),cell(3)
+          read(nconf,'(3f20.0)')cell(4),cell(5),cell(6)
+          read(nconf,'(3f20.0)')cell(7),cell(8),cell(9)
           call dcell(cell,celprp)
           
         endif
         
-        if(.not.lvolm)then
+        if(imcon.eq.0.or.imcon.eq.6.or.numatm.eq.0)then
           
-          volm=celprp(10)
+          numatm=0
+          xlo=1.d9
+          ylo=1.d9
+          zlo=1.d9
+          xhi=-1.d9
+          yhi=-1.d9
+          zhi=-1.d9
           
-          if(imcon.eq.4)then
+          do while(.true.)
+
+            read(nconf,'(a8)',end=100) name
+            read(nconf,'(3f20.0)')xxx,yyy,zzz
+            if(levcfg.gt.0)read(nconf,*)
+            if(levcfg.gt.1)read(nconf,*)
+            xhi=max(xhi,xxx)
+            yhi=max(yhi,yyy)
+            zhi=max(zhi,zzz)
+            xlo=min(xlo,xxx)
+            ylo=min(ylo,yyy)
+            zlo=min(zlo,zzz)
+            numatm=numatm+1
             
-            volm=0.5d0*celprp(10)
-            
-          elseif(imcon.eq.5)then
-            
-            volm=0.5d0*celprp(10)
-            
-          elseif(imcon.eq.7)then
-            
-            volm=0.5d0*celprp(10)
-            
-          endif
+          enddo
+
+ 100      continue
+          
+          xhi=xhi-xlo+2.d0
+          yhi=yhi-ylo+2.d0
+          zhi=zhi-zlo+2.d0
           
         endif
         
-        i=0
-        do while(.true.)
-          
-          i=i+1
-          if(levcfg.eq.0)then
-            
-            read(nconf,'(a8)',end=100) name
-            read(nconf,'(3f20.0)')xxx,yyy,zzz
-            
-          else if(levcfg.eq.1)then
-            
-            read(nconf,'(a8)',end=100) name
-            read(nconf,'(3f20.0)')xxx,yyy,zzz
-            read(nconf,'(3f20.0)')uuu,vvv,www
-            
-          else
-            
-            read(nconf,'(a8)',end=100) name
-            read(nconf,'(3f20.0)')xxx,yyy,zzz
-            read(nconf,'(3f20.0)')uuu,vvv,www
-            read(nconf,'(3f20.0)')uuu,vvv,www
-            
-          endif
-          
-          if(lvolm)then
-            
-            if(i.eq.1)then
-              
-              xhi=abs(xxx)
-              yhi=abs(yyy)
-              zhi=abs(zzz)
-              
-            else
-              
-              xhi=max(xhi,abs(xxx))
-              yhi=max(yhi,abs(yyy))
-              zhi=max(zhi,abs(zzz))
-              
-            endif
-            
-          endif
-          
-        enddo
-        
-  100   continue
-        
         if(imcon.eq.0)then
+
+          volm=xhi*yhi*zhi
           
-          volm=8.d0*xhi*yhi*zhi
-          
-        else if(imcon.eq.6)then
+        elseif(imcon.eq.6)then
           
           coz=(cell(1)*cell(4)+cell(2)*cell(5)+cell(3)*cell(6))/
      x      (celprp(1)*celprp(2))
-          volm=2.d0*zhi*celprp(1)*celprp(2)*sqrt(1.d0-coz**2)
+          volm=zhi*celprp(1)*celprp(2)*sqrt(1.d0-coz**2)
+          
+        elseif(imcon.eq.4.or.imcon.eq.5.or.imcon.eq.7)then
+          
+          volm=0.5d0*celprp(10)
+          
+        else
+          
+          volm=celprp(10)
           
         endif
         
@@ -1217,13 +1209,15 @@ c     specify molecular dynamics simulation cell
       extra(3)=yhi
       extra(4)=zhi
       extra(5)=volm
-      call gdsum(extra,5,buffer)
+      extra(6)=dble(numatm)
+      call gdsum(extra,6,buffer)
       call gdsum(cell,9,buffer)
       imcon=nint(extra(1))
       xhi=extra(2)
       yhi=extra(3)
       zhi=extra(4)
       volm=extra(5)
+      numatm=nint(extra(6))
       
       return
       
@@ -1231,8 +1225,8 @@ c     specify molecular dynamics simulation cell
       
       subroutine conscan
      x  (redirect,lewald,lspme,lhke,nolink,lcshft,lsolva,lfree,lfrmas,
-     x  lghost,idnode,imcon,nhko,rcut,rvdw,delr,densvar,drdf,dzdn,
-     x  zlen,cell)
+     x  lghost,lpimd,idnode,imcon,nhko,keyres,rcut,rvdw,delr,densvar,
+     x  drdf,dzdn,zlen,cell)
       
 c***********************************************************************
 c     
@@ -1244,11 +1238,11 @@ c
 c***********************************************************************
       
       logical safe,lewald,lspme,lhke,peek,nolink,lcshft,lmetad
-      logical lsolva,lfree,lfrmas,lghost,redirect
+      logical lsolva,lfree,lfrmas,lghost,redirect,lpimd
       real(8) cell,celprp,rcut,rvdw,delr,eps,alpha,fac,tol,tol1
       real(8) densvar,drdf,dzdn,zlen
       integer nhko,idnode,imcon,idum,jmp
-      integer nlatt,kmax1,kmax2,kmax3,kmaxpow2
+      integer nlatt,kmax1,kmax2,kmax3,kmaxpow2,keyres
       dimension celprp(10),cell(9)
       
       nhko=0
@@ -1259,6 +1253,9 @@ c***********************************************************************
       kmaxd=1
       kmaxe=1
       kmaxf=1
+      nbeads=1
+      nchain=1
+      keyres=0
       rcut=0.d0
       rvdw=0.d0
       delr=0.d0
@@ -1267,6 +1264,7 @@ c***********************************************************************
       zlen=0.d0
       densvar=1.d2
       peek=.true.
+      lpimd=.false.
       lhke=.false.
       lspme=.false.
       lewald=.false.
@@ -1301,6 +1299,18 @@ c     open the simulation input file
             
             nolink=.true.
             
+          elseif(findstring('pimd',record,idum))then
+        
+            lpimd = .true.
+            if(findstring('nhc',record,idum))then
+              nbeads=intstr(record,lenrec,idum)
+              nchain=intstr(record,lenrec,idum)
+              nchain=max(nchain,1)
+            else
+              nbeads=intstr(record,lenrec,idum)
+            endif
+            if(nbeads.eq.0)nbeads=num_beads_default
+
           elseif(findstring('metafreeze',record,idum))then
             
             lmetad=.true.
@@ -1310,6 +1320,12 @@ c     open the simulation input file
               call lowcase(record,lenrec)
               lmetad=.not.findstring('endmet',record,idum)
             enddo
+            
+          elseif(findstring('restart',record,idum))then
+
+            keyres=1
+            if(findstring('noscale',record,idum))keyres = 3
+            if(findstring('scale',record,idum))keyres = 2
             
           elseif(findstring('redirect',record,idum))then
             
@@ -1435,21 +1451,21 @@ c     upper limit of 512
               
               kmaxpow2=1
               do while (kmax1.gt.kmaxpow2.and.kmaxpow2.lt.256)
-                kmaxpow2=kmaxpow2 * 2
+                kmaxpow2=kmaxpow2*2
               end do
-              kmaxd=2 * kmaxpow2
+              kmaxd=2*kmaxpow2
               
               kmaxpow2=1
               do while (kmax2.gt.kmaxpow2.and.kmaxpow2.lt.256)
-                kmaxpow2=kmaxpow2 * 2
+                kmaxpow2=kmaxpow2*2
               end do
-              kmaxe=2 * kmaxpow2
+              kmaxe=2*kmaxpow2
               
               kmaxpow2=1
               do while (kmax3.gt.kmaxpow2.and.kmaxpow2.lt.256)
-                kmaxpow2=kmaxpow2 * 2
+                kmaxpow2=kmaxpow2*2
               end do
-              kmaxf=2 * kmaxpow2
+              kmaxf=2*kmaxpow2
               
             elseif(lhke) then
               
@@ -1477,7 +1493,7 @@ c     upper limit of 512
             
             delr=dblstr(record,100,idum)
             
-          else if(findstring('rdf',record,idum))then
+          elseif(findstring('rdf',record,idum))then
             
             if(.not.findstring('print',record,idum))then
               
@@ -1486,7 +1502,7 @@ c     upper limit of 512
               
             endif
             
-          else if(findstring('zden',record,idum))then
+          elseif(findstring('zden',record,idum))then
             
             jmp=intstr(record,lenrec,idum)
             dzdn=dblstr(record,lenrec,idum)
@@ -1560,32 +1576,38 @@ c*********************************************************************
       
       integer key,idnode
       
-      write(nrite,'(/,/,1x,a,i5)') 
-     x  'DL_POLY terminated due to error ', key
-      
-      if(key.eq.17)then
+      if(idnode.eq.0)then
+
+        write(nrite,'(/,/,1x,a,i5)') 
+     x    'DL_POLY terminated due to error ', key
         
-        write(nrite,'(/,/,1x,a)')
-     x    'error - strange exit from CONTROL file processing'
+        if(key.eq.17)then
+          
+          write(nrite,'(/,/,1x,a)')
+     x      'error - strange exit from CONTROL file processing'
+          
+        elseif(key.eq.24)then
+          
+          write(nrite,'(/,/,1x,a)')
+     x      'error - end of file encountered in TABLE file'
+          
+        elseif(key.eq.34)then
+          
+          write(nrite,'(/,/,1x,a)')
+     x      'error - character array memory allocation failure'
+          
+        elseif(key.eq.52)then
+          
+          write(nrite,'(/,/,1x,a)')
+     x      'error - end of FIELD file encountered'
+          
+        elseif(key.eq.56)then
+          
+          write(nrite,'(/,/,1x,a)')
+     x      'error - incorrect atom numbers in CONFIG file'
+          
+        endif
         
-      else if(key.eq.52)then
-        
-        write(nrite,'(/,/,1x,a)')
-     x    'error - end of FIELD file encountered'
-        
-      else if(key.eq.24)then
-        
-        write(nrite,'(/,/,1x,a)')
-     x    'error - end of file encountered in TABLE file'
-        
-      else if(key.eq.34)then
-        
-        write(nrite,'(/,/,1x,a)')
-     x    'error - character array memory allocation failure'
-        
-      endif
-      
-      if(idnode.eq.0) then
         close (nrite)
         close (nhist)
         close (nread)

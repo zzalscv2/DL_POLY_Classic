@@ -29,7 +29,7 @@ c***********************************************************************
       integer listin,listot,listcon,lstfrz,i,j,k,jdnode,idum
 
       dimension listme(mxatms),listin(mxatms),listot(mxatms)
-      dimension lishap(mxlshp),lashap(mxproc),listcon(mxcons,3)
+      dimension lishap(mxlshp),lashap(mxnode),listcon(mxcons,3)
       dimension lstfrz(mxatms)
 
       integer status(MPI_STATUS_SIZE), request
@@ -38,8 +38,6 @@ CMPIU define MPI_SEND MPI_SEND_
 CMPIU define MPI_IRECV MPI_IRECV_
 CMPIU define MPI_WAIT MPI_WAIT_
 
-      if(mxproc.lt.mxnode)call error(idnode,102)
-      
       safe=.true.
 
       do i=1,natms
@@ -157,44 +155,29 @@ c***********************************************************************
       integer idnode,mxnode,natms,nspmf,listpm,listin,lstpmt,lstpmf
       integer npmf,i,j,k
 
-      dimension listpm(mxpmf),listin(mxatms),lstpmt(mxpmf)
+      dimension listpm(mxatms),listin(mxatms),lstpmt(mxatms)
       dimension lstpmf(mxspmf,mspmf),npmf(2)
 
-      if(mxproc.lt.mxnode)call error(idnode,102)
-      if(mxpmf.lt.natms) call error(idnode,490)
-
-      do i=1,natms
+      do i=1,mxatms
         
         listpm(i)=0
+        lstpmt(i)=0
         
       enddo
       
       do k=1,nspmf
         
-        do j = 1,npmf(1)+npmf(2)
+        do j=1,npmf(1)+npmf(2)
 
           i=lstpmf(j,k)
-          listpm(i)= 1
+          listpm(i)=1
+          lstpmt(i)=1
           
         enddo
 
       enddo
-c     
-c     keep record of all atoms subject to pmf constraints
       
-      do i=1,natms
-        
-        if(listpm(i).gt.0)then
-          
-          lstpmt(i)=1
-          
-        else
-          
-          lstpmt(i)=0
-          
-        endif
-        
-      enddo
+c     keep record of all atoms subject to pmf constraints
       
       if(mxnode.gt.1)call gisum(lstpmt,natms,listin)
       
@@ -238,8 +221,6 @@ c***********************************************************************
       dimension lstgtp(mxgrp)
 
       integer status(MPI_STATUS_SIZE)
-      
-      if(mxproc.lt.mxnode)call error(idnode,102)
       
 c     block indices for groups
       

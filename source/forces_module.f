@@ -11,6 +11,7 @@ c***********************************************************************
       
       use config_module
       use coulomb_module
+      use ensemble_tools_module
       use error_module
       use ewald_module
       use exclude_module
@@ -35,16 +36,16 @@ c***********************************************************************
       
       subroutine force_manager
      x  (newlst,lneut,lnsq,lgofr,lzeql,loglnk,lfcap,lsolva,lfree,
-     x  lghost,idnode,mxnode,natms,imcon,nstep,nstbgr,nsteql,
-     x  numrdf,keyfce,kmax1,kmax2,kmax3,nhko,nlatt,ntpvdw,
-     x  ntpmet,nospl,multt,nneut,ntptbp,ntpfbp,ntpter,keyshl,
-     x  keyfld,ntbond,ntangl,ntdihd,ntinv,ntteth,ntshl,nsolva,
-     x  isolva,delr,dlrpot,engcpe,engsrp,epsq,rcut,rprim,rvdw,
+     x  lghost,lpimd,idnode,mxnode,natms,imcon,nstep,nstbgr,nsteql,
+     x  numrdf,keyfce,kmax1,kmax2,kmax3,nhko,nlatt,ntpvdw,ntpmet,
+     x  nospl,multt,nneut,ntptbp,ntpfbp,ntpter,keyshl,keyfld,
+     x  ntbond,ntangl,ntdihd,ntinv,ntteth,ntshl,nsolva,isolva,
+     x  nbeads,delr,dlrpot,engcpe,engsrp,epsq,rcut,rprim,rvdw,
      x  vircpe,virsrp,alpha,drewd,volm,engmet,virmet,elrc,virlrc,
      x  rcuttb,engtbp,virtbp,rcutfb,engfbp,virfbp,rctter,engter,
      x  virter,engbnd,virbnd,engang,virang,engdih,virdih,enginv,
      x  virinv,engtet,virtet,engshl,shlke,virshl,engfld,virfld,
-     x  engcfg,fmax,temp,engord,virord)
+     x  engcfg,fmax,temp,engord,virord,engrng,virrng,qmsbnd)
       
 c*********************************************************************
 c     
@@ -56,24 +57,59 @@ c     author    - w.smith
 c     
 c*********************************************************************
       
+      use pimd_module, only : ring_forces
+      
       implicit none
       
       logical newlst,lneut,lnsq,lgofr,lzeql,loglnk,lfcap,lsolva
-      logical lfree,lghost,llsolva
+      logical lfree,lghost,llsolva,lpimd,safe
       
       integer idnode,mxnode,natms,imcon,nstep,nstbgr,nsteql,numrdf
-      integer keyfce,kmax1,kmax2,kmax3,nhko,nlatt,ntpvdw,ntpmet
-      integer i,nospl,multt,nneut,ntbond,ntangl,ntdihd,nsolva,isolva
-      integer ntinv,ntteth,ntshl,ntptbp,ntpfbp,ntpter,keyshl,keyfld
+      integer keyfce,kmax1,kmax2,kmax3,nhko,nlatt,ntpvdw,ntpmet,ksatms
+      integer i,j,k,m,n,nospl,multt,nneut,ntbond,ntangl,ntdihd,nsolva
+      integer isolva,ntinv,ntteth,ntshl,ntptbp,ntpfbp,ntpter,keyshl
+      integer keyfld,nbeads,nn,nsatm,ibase,nbase,numatm
+      integer fail(1:8)
       
       real(8) delr,dlrpot,engcpe,engsrp,epsq,rcut,rprim,rvdw
-      real(8) vircpe,virsrp,alpha,drewd,volm,engmet,virmet
+      real(8) vircpe,virsrp,alpha,drewd,volm,engmet,virmet,qfactor
       real(8) elrc,virlrc,rcuttb,engtbp,virtbp,rcutfb,engfbp,virfbp
       real(8) rctter,engter,virter,engbnd,virbnd,engang,virang,engdih
       real(8) virdih,enginv,virinv,engtet,virtet,engshl,virshl,engfld
       real(8) virfld,fmax,temp,shlke,engcfg,tmpeng,tmpvir,engord,virord
+      real(8) engcpt,engsrt,vircpt,virsrt,engrng,virrng,qmsbnd,engtmp
+      real(8) virtmp
+      
+      integer, allocatable :: lstbak(:,:),lenbak(:)
+      real(8), allocatable :: xxxbak(:),yyybak(:),zzzbak(:)
+      real(8), allocatable :: fxxbak(:),fyybak(:),fzzbak(:)
+      
+c     allocate storage arrays
+      
+      if(lpimd)then
+        
+        safe=.true.
+        fail(:)=0
+        allocate (xxxbak(1:natms),          stat=fail(1))
+        allocate (yyybak(1:natms),          stat=fail(2))
+        allocate (zzzbak(1:natms),          stat=fail(3))
+        allocate (fxxbak(1:natms),          stat=fail(4))
+        allocate (fyybak(1:natms),          stat=fail(5))
+        allocate (fzzbak(1:natms),          stat=fail(6))
+        allocate (lenbak(1:msatms),          stat=fail(7))
+        allocate (lstbak(1:msatms,1:mxlist), stat=fail(8))
+        if(any(fail.gt.0))safe=.false.
+        if(mxnode.gt.1)call gstate(safe)
+        if(.not.safe)call error(idnode,519)
+        
+      endif
       
       llsolva=.false.
+      nsatm=(natms-idnode-1)/mxnode+1
+      
+c     pimd factor for bead interactions
+      
+      qfactor=1.d0/dble(nbeads)
       
 c     initialize energy and virial accumulators
       
@@ -106,6 +142,8 @@ c     initialize energy and virial accumulators
       virmet=0.d0
       virord=0.0d0
       engord=0.0d0
+      engrng=0.d0
+      virrng=0.d0
       
       if(lmetadyn)then
         
@@ -168,87 +206,316 @@ c     initialise solvation and excitation arrays
         
       endif
       
-c     initialise the force arrays
-      
-      do i=1,natms
-        
-        fxx(i)=0.d0
-        fyy(i)=0.d0
-        fzz(i)=0.d0
-        
-      enddo
-      
 c     zero stress tensor
       
       if(nstep.gt.0)then
         
         do i=1,9
+          
           stress(i)=0.d0
+          
         enddo
         
       endif
       
-      if(keyfce.gt.0)then
+c     start of loop over pimd beads
+      
+      if(lpimd)then
         
+c     pimd: store original configuration data
+        
+        do i=1,natms
+          
+          xxxbak(i)=xxx(i)
+          yyybak(i)=yyy(i)
+          zzzbak(i)=zzz(i)
+          
+        enddo
+        
+        do n=1,nsatm
+          
+          lenbak(n)=lentry(n)
+          
+        enddo
+        
+        do n=1,nsatm
+          do j=1,lentry(n)
+            
+            lstbak(n,j)=list(n,j)
+            
+          enddo
+        enddo
+        
+      endif
+      
+c     cycle through the beads of the path integral ring polymer
+c     this applies only to interactions defined by atom types
+      
+      do k=1,nbeads
+        
+        engsrt=0.d0
+        virsrt=0.d0
+        engcpt=0.d0
+        vircpt=0.d0
+        
+c     initialise the force arrays
+        
+        do i=1,natms
+          
+          fxx(i)=0.d0
+          fyy(i)=0.d0
+          fzz(i)=0.d0
+          
+        enddo
+        
+c     select beads with identity k
+        
+        if(lpimd.and.k.gt.1)then
+          
+          ibase=(k-1)*natms
+          
+          do i=1,natms
+            
+            xxx(i)=xxx(i+ibase)
+            yyy(i)=yyy(i+ibase)
+            zzz(i)=zzz(i+ibase)
+            
+          enddo
+          
+          nbase=(k-1)*nsatm
+          
+          do n=1,nsatm
+            
+            lentry(n)=lentry(n+nbase)
+            
+          enddo
+            
+          do n=1,nsatm
+            do m=1,lentry(n)
+              
+              list(n,m)=list(n+nbase,m)-ibase
+              
+            enddo
+          enddo
+          
+        endif
+        
+        if(keyfce.gt.0)then
+          
 c     calculate pair forces, including coulombic forces
-        
-        if(lnsq)then
           
+          if(lnsq)then
+            
 c     multiple timestep - all-pairs
-          
-          call multiple_nsq
-     x      (lnsq,lgofr,lzeql,newlst,lsolva,lfree,lghost,idnode,
-     x      imcon,keyfce,multt,mxnode,natms,nstep,nstbgr,nsteql,
-     x      numrdf,nsolva,isolva,delr,dlrpot,engcpe,engsrp,epsq,
-     x      rcut,rprim,rvdw,vircpe,virsrp)
-          
-        elseif(.not.lneut)then         
-          
+            
+            call multiple_nsq
+     x        (lnsq,lgofr,lzeql,newlst,lsolva,lfree,lghost,idnode,
+     x        imcon,keyfce,multt,mxnode,natms,nstep,nstbgr,nsteql,
+     x        numrdf,nsolva,isolva,delr,dlrpot,engcpt,engsrt,epsq,
+     x        rcut,rprim,rvdw,vircpt,virsrt)
+            
+            engsrp=engsrp+engsrt*qfactor
+            engcpe=engcpe+engcpt*qfactor
+            virsrp=virsrp+virsrt*qfactor
+            vircpe=vircpe+vircpt*qfactor
+            
+          elseif(.not.lneut)then         
+            
 c     single timestep
-          
-          if(multt.eq.1)then
             
-            call forces
-     x        (loglnk,lgofr,lzeql,lsolva,lfree,lghost,idnode,imcon,
-     x        keyfce,kmax1,kmax2,kmax3,nhko,nlatt,mxnode,ntpvdw,
-     x        ntpmet,natms,nstbgr,nstep,nsteql,numrdf,nospl,nsolva,
-     x        isolva,alpha,dlrpot,drewd,engcpe,engsrp,epsq,rcut,rvdw,
-     x        vircpe,virsrp,volm,engmet,virmet)
+            if(multt.eq.1)then
+              
+              call forces
+     x          (loglnk,lgofr,lzeql,lsolva,lfree,lghost,idnode,imcon,
+     x          keyfce,kmax1,kmax2,kmax3,nhko,nlatt,mxnode,ntpvdw,
+     x          ntpmet,natms,nstbgr,nstep,nsteql,numrdf,nospl,nsolva,
+     x          isolva,alpha,dlrpot,drewd,engcpt,engsrt,epsq,rcut,rvdw,
+     x          vircpt,virsrt,volm,engmet,virmet)
+              
+              engsrp=engsrp+engsrt*qfactor
+              engcpe=engcpe+engcpt*qfactor
+              virsrp=virsrp+virsrt*qfactor
+              vircpe=vircpe+vircpt*qfactor
+              
+            else
+              
+              call multiple
+     x          (loglnk,lgofr,lzeql,newlst,lsolva,lfree,lghost,idnode,
+     x          imcon,keyfce,nlatt,kmax1,kmax2,kmax3,nhko,multt,
+     x          mxnode,natms,nstep,nstbgr,nsteql,numrdf,nospl,nsolva,
+     x          isolva,alpha,dlrpot,drewd,engcpt,engsrt,epsq,rcut,
+     x          rprim,rvdw,vircpt,virsrt,volm)
+              
+              engsrp=engsrp+engsrt*qfactor
+              engcpe=engcpe+engcpt*qfactor
+              virsrp=virsrp+virsrt*qfactor
+              vircpe=vircpe+vircpt*qfactor
+              
+            endif
             
-          else
+          elseif(lneut)then
             
-            call multiple
-     x        (loglnk,lgofr,lzeql,newlst,lsolva,lfree,lghost,idnode,
-     x        imcon,keyfce,nlatt,kmax1,kmax2,kmax3,nhko,multt,
-     x        mxnode,natms,nstep,nstbgr,nsteql,numrdf,nospl,nsolva,
-     x        isolva,alpha,dlrpot,drewd,engcpe,engsrp,epsq,rcut,rprim,
-     x        rvdw,vircpe,virsrp,volm)
-            
-          endif
-          
-        elseif(lneut)then
-          
 c     neutral groups
-          
-          if(multt.eq.1)then
             
-            call forces_neu
-     x        (lgofr,lzeql,lsolva,lfree,lghost,idnode,imcon,keyfce,
-     x        mxnode,natms,nneut,nstbgr,nstep,nsteql,numrdf,nsolva,
-     x        isolva,dlrpot,engcpe,engsrp,epsq,rcut,rvdw,alpha,
-     x        vircpe,virsrp)
-            
-          else
-            
-            call multiple_neu
-     x        (lgofr,lzeql,newlst,lsolva,lfree,lghost,idnode,imcon,
-     x        keyfce,multt,mxnode,natms,nneut,nstbgr,nstep,nsteql,
-     x        numrdf,nsolva,isolva,delr,dlrpot,engcpe,engsrp,epsq,
-     x        rprim,rcut,rvdw,alpha,vircpe,virsrp)
+            if(multt.eq.1)then
+              
+              call forces_neu
+     x          (lgofr,lzeql,lsolva,lfree,lghost,idnode,imcon,keyfce,
+     x          mxnode,natms,nneut,nstbgr,nstep,nsteql,numrdf,nsolva,
+     x          isolva,dlrpot,engcpt,engsrt,epsq,rcut,rvdw,alpha,
+     x          vircpt,virsrt)
+              
+              engsrp=engsrp+engsrt
+              engcpe=engcpe+engcpt
+              virsrp=virsrp+virsrt
+              vircpe=vircpe+vircpt
+              
+            else
+              
+              call multiple_neu
+     x          (lgofr,lzeql,newlst,lsolva,lfree,lghost,idnode,imcon,
+     x          keyfce,multt,mxnode,natms,nneut,nstbgr,nstep,nsteql,
+     x          numrdf,nsolva,isolva,delr,dlrpot,engcpt,engsrt,epsq,
+     x          rprim,rcut,rvdw,alpha,vircpt,virsrt)
+              
+              engsrp=engsrp+engsrt
+              engcpe=engcpe+engcpt
+              virsrp=virsrp+virsrt
+              vircpe=vircpe+vircpt
+              
+            endif
             
           endif
           
         endif
+        
+c     calculate intramolecular forces
+        
+        call intra_forces
+     x    (llsolva,lfree,lghost,idnode,mxnode,imcon,natms,nbeads,nstep,
+     x    keyfce,keyshl,ntbond,ntangl,ntdihd,ntinv,ntteth,ntshl,epsq,
+     x    engbnd,virbnd,engang,virang,engcpe,vircpe,engsrp,virsrp,
+     x    engdih,virdih,enginv,virinv,engtet,virtet,engshl,virshl,
+     x    dlrpot,rcut,rvdw,alpha)
+        
+c     external field
+        
+        if(keyfld.gt.0)then
+          
+          call extnfld
+     x      (idnode,imcon,keyfld,mxnode,natms,engtmp,virtmp)
+          
+          engfld=engtmp*qfactor
+          virfld=virtmp*qfactor
+          
+        endif
+        
+c     calculate three body forces
+        
+        if(ntptbp.gt.0)then
+          
+          call thbfrc
+     x      (llsolva,lfree,lghost,idnode,mxnode,natms,imcon,rcuttb,
+     x      engtmp,virtmp)
+          
+          engtbp=engtbp+engtmp*qfactor
+          virtbp=virtbp+virtmp*qfactor
+          
+        endif
+        
+c     calculate four body forces
+        
+        if(ntpfbp.gt.0)then
+          
+          call fbpfrc
+     x      (llsolva,lfree,lghost,idnode,mxnode,natms,imcon,rcutfb,
+     x      engfbp,virfbp)
+          
+          engfbp=engfbp+engtmp*qfactor
+          virfbp=virfbp+virtmp*qfactor
+          
+        endif
+        
+c     calculate tersoff potential forces
+        
+        if(ntpter.gt.0)then
+          
+          call tersoff
+     x      (idnode,mxnode,natms,imcon,rctter,engtmp,virtmp)
+          
+          engter=engter+engtmp*qfactor
+          virter=virter+virtmp*qfactor
+          
+        endif
+        
+        if(lpimd)then
+          
+          ibase=(k-1)*natms
+          
+          if(k.eq.1)then
+            
+c     store forces for bead 1
+            
+            do i=1,natms
+              
+              fxxbak(i)=fxx(i)*qfactor
+              fyybak(i)=fyy(i)*qfactor
+              fzzbak(i)=fzz(i)*qfactor
+              
+            enddo
+            
+          else
+            
+c     store forces for bead k>1
+            
+            ibase=(k-1)*natms
+            
+            do i=1,natms
+              
+              fxx(i+ibase)=fxx(i)*qfactor
+              fyy(i+ibase)=fyy(i)*qfactor
+              fzz(i+ibase)=fzz(i)*qfactor
+              
+            enddo
+            
+          endif
+          
+        endif
+        
+c     end loop over pimd beads
+        
+      enddo
+      
+c     restore original configuration data
+      
+      if(lpimd)then
+        
+        do i=1,natms
+          
+          xxx(i)=xxxbak(i)
+          yyy(i)=yyybak(i)
+          zzz(i)=zzzbak(i)
+          fxx(i)=fxxbak(i)
+          fyy(i)=fyybak(i)
+          fzz(i)=fzzbak(i)
+          
+        enddo
+        
+        do n=1,nsatm
+          
+          lentry(n)=lenbak(n)
+          
+        enddo
+        
+        do n=1,nsatm
+          do j=1,lentry(n)
+            
+            list(n,j)=lstbak(n,j)
+            
+          enddo
+        enddo
+        
+c     end of loop over pimd beads
         
       endif
       
@@ -259,82 +526,59 @@ c     add in long range corrections to energy and pressure
       engmet=engmet+elrcm(0)
       virmet=virmet+vlrcm(0)
       if(lfree)then
+        
         vdw_fre=vdw_fre+elrc_fre
         vdw_vir=vdw_vir+vlrc_fre
+        
       endif
       
-c     calculate three body forces
+c     deallocate arrays
       
-      if(ntptbp.gt.0)call thbfrc
-     x  (llsolva,lfree,lghost,idnode,mxnode,natms,imcon,rcuttb,
-     x  engtbp,virtbp)
+      if(lpimd)then
+
+        fail(:)=0
+        safe=.true.
+        deallocate(xxxbak,yyybak,zzzbak,stat=fail(1))
+        deallocate(fxxbak,fyybak,fzzbak,stat=fail(2))
+        deallocate(lstbak,lenbak,stat=fail(3))
+        if(any(fail.gt.0))safe=.false.
+        if(mxnode.gt.1)call gstate(safe)
+        if(.not.safe)call error(idnode,528)
+        
+      endif
       
-c     calculate four body forces
+c     pimd simulations: reduce stress tensor by bead number
       
-      if(ntpfbp.gt.0)call fbpfrc
-     x  (llsolva,lfree,lghost,idnode,mxnode,natms,imcon,rcutfb,
-     x  engfbp,virfbp)
-      
-c     calculate tersoff potential forces
-      
-      if(ntpter.gt.0)call tersoff
-     x  (idnode,mxnode,natms,imcon,rctter,engter,virter)
-      
-c     calculate bond forces
-      
-      if(ntbond.gt.0)call bndfrc
-     x  (llsolva,lfree,lghost,idnode,imcon,mxnode,ntbond,epsq,
-     x  engbnd,virbnd)
-      
-c     calculate valence angle forces
-      
-      if(ntangl.gt.0)call angfrc
-     x  (llsolva,lfree,lghost,idnode,imcon,mxnode,ntangl,engang,virang)
-      
-c     calculate dihedral forces
-      
-      if(ntdihd.gt.0)call dihfrc
-     x  (llsolva,lfree,lghost,idnode,imcon,mxnode,ntdihd,keyfce,dlrpot,
-     x  epsq,engcpe,engdih,engsrp,rcut,rvdw,alpha,vircpe,virdih,virsrp)
-      
-c     calculate inversion forces
-      
-      if(ntinv.gt.0)call invfrc
-     x  (llsolva,lfree,lghost,idnode,imcon,mxnode,ntinv,enginv,virinv)
-      
-c     calculate tethered atom forces
-      
-      if(ntteth.gt.0)call tethfrc
-     x  (idnode,mxnode,imcon,natms,nstep,ntteth,engtet,virtet)
-      
-c     calculate shell model forces
-      
-      if(keyshl.gt.0)call shlfrc
-     x  (llsolva,lfree,lghost,idnode,imcon,mxnode,ntshl,engshl,virshl)
-      
-c     external field
-      
-      if(keyfld.gt.0)call extnfld
-     x  (idnode,imcon,keyfld,mxnode,natms,engfld,virfld)
+      if(lpimd)stress(:)=stress(:)*qfactor
       
 c     metadynamics option : use potential energy as order parameter
       
       if(lmetadyn)then
         
         tmpeng=engsrp+engcpe+engbnd+engang+engdih+engfld+
-     x         engtbp+engfbp+engshl+enginv+engter+engmet
+     x    engtbp+engfbp+engshl+enginv+engter+engmet
         
         tmpvir=vircpe+virsrp+virbnd+virtbp+virter+virfld+
-     x         virang+virshl+virtet+virmet
+     x    virang+virshl+virtet+virmet
         
         call metafreeze_driver
      x    (imcon,natms,temp,nstep,tmpeng,tmpvir,engord,virord)
         
       endif
       
+c     calculate ring forces for pimd option
+      
+      if(lpimd)then
+        
+        call ring_forces
+     x    (idnode,mxnode,natms,temp,engrng,virrng,qmsbnd,stress)
+        
+      endif
+      
 c     global summation of force arrays (basic replicated data strategy)
       
-      call global_sum_forces(natms,mxnode,fxx,fyy,fzz)
+      numatm=nbeads*natms
+      call global_sum_forces(numatm,mxnode,fxx,fyy,fzz)
       
 c     global sum of stress arrays
       
@@ -354,7 +598,7 @@ c     cap forces in equilibration mode
 c     total configuration energy
       
       engcfg=engsrp+engcpe+engbnd+engang+engdih+engfld+engtbp+
-     x  engfbp+engshl+enginv+engter+engmet
+     x  engfbp+engshl+enginv+engter+engmet+engtet
       
 c     total derivative of the configurational free energy
       
@@ -398,6 +642,119 @@ c     add long range corrections to solvation terms
       
       return
       end subroutine force_manager
+
+      subroutine intra_forces
+     x  (llsolva,lfree,lghost,idnode,mxnode,imcon,natms,nbeads,nstep,
+     x  keyfce,keyshl,ntbond,ntangl,ntdihd,ntinv,ntteth,ntshl,epsq,
+     x  engbnd,virbnd,engang,virang,engcpe,vircpe,engsrp,virsrp,engdih,
+     x  virdih,enginv,virinv,engtet,virtet,engshl,virshl,dlrpot,rcut,
+     x  rvdw,alpha)
+      
+c***********************************************************************
+c     
+c     dl_poly subroutine for calculating intramolecular forces
+c     including: bonds, angles, dihedrals, inversions, tethers
+c     and core-shell forces
+c     
+c     parallel replicated data version
+c     
+c     copyright - daresbury laboratory
+c     author    - w. smith march 2016.
+c     
+c***********************************************************************
+
+      implicit none
+      
+      logical llsolva,lfree,lghost
+      integer idnode,mxnode,imcon,ntbond,ntangl,ntdihd,ntinv,ntteth
+      integer ntshl,natms,nbeads,nstep,keyfce,keyshl
+      real(8) epsq,qfactor,engtmp,virtmp,engbnd,virbnd,engang,virang
+      real(8) engcpe,vircpe,engsrp,virsrp,engdih,virdih,engcpt,vircpt
+      real(8) engsrt,virsrt,enginv,virinv,engtet,virtet,engshl,virshl
+      real(8) dlrpot,rcut,rvdw,alpha
+
+      qfactor=1.d0/dble(nbeads)
+      
+c     calculate bond forces
+      
+      if(ntbond.gt.0)then
+        
+        call bndfrc
+     x    (llsolva,lfree,lghost,idnode,imcon,mxnode,ntbond,epsq,
+     x    engtmp,virtmp)
+        
+        engbnd=engbnd+engtmp*qfactor
+        virbnd=virbnd+virtmp*qfactor
+        
+      endif
+      
+c     calculate valence angle forces
+      
+      if(ntangl.gt.0)then
+        
+        call angfrc
+     x    (llsolva,lfree,lghost,idnode,imcon,mxnode,ntangl,engtmp,
+     x    virtmp)
+        
+        engang=engang+engtmp*qfactor
+        virang=virang+virtmp*qfactor
+        
+      endif
+        
+c     calculate dihedral forces
+      
+      if(ntdihd.gt.0)then
+        
+        call dihfrc
+     x    (llsolva,lfree,lghost,idnode,imcon,mxnode,ntdihd,keyfce,
+     x    dlrpot,epsq,engcpt,engtmp,engsrt,rcut,rvdw,alpha,vircpt,
+     x    virtmp,virsrt)
+        
+        engcpe=engcpe+engcpt*qfactor
+        vircpe=vircpe+vircpt*qfactor
+        engsrp=engsrp+engsrt*qfactor
+        virsrp=virsrp+virsrt*qfactor
+        engdih=engdih+engtmp*qfactor
+        virdih=virdih+virtmp*qfactor
+        
+      endif
+      
+c     calculate inversion forces
+      
+      if(ntinv.gt.0)then
+        
+        call invfrc
+     x    (llsolva,lfree,lghost,idnode,imcon,mxnode,ntinv,engtmp,
+     x    virtmp)
+        
+        enginv=enginv+engtmp*qfactor
+        virinv=virinv+virtmp*qfactor
+        
+      endif
+      
+c     calculate tethered atom forces
+      
+      if(ntteth.gt.0)then
+        
+        call tethfrc
+     x    (idnode,mxnode,imcon,natms,nstep,ntteth,engtmp,virtmp)
+        
+        engtet=engtet+engtmp*qfactor
+        virtet=virtet+virtmp*qfactor
+        
+      endif
+      
+c     calculate shell model forces
+      
+      if(keyshl.gt.0)then
+        
+        call shlfrc
+     x    (llsolva,lfree,lghost,idnode,imcon,mxnode,ntshl,engshl,virshl)
+        
+      endif
+      
+      return
+      end subroutine intra_forces
       
       subroutine forces
      x  (loglnk,lgofr,lzeql,lsolva,lfree,lghost,idnode,imcon,keyfce,

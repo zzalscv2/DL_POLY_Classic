@@ -38,7 +38,7 @@ c***********************************************************************
       
       contains
       
-      subroutine alloc_pmf_arrays(idnode)
+      subroutine alloc_pmf_arrays(idnode,mxnode)
       
 c***********************************************************************
 c     
@@ -52,23 +52,28 @@ c***********************************************************************
       
       integer, parameter :: nnn=6
       
-      integer i,idnode,fail
+      logical safe
+      integer i,idnode,mxnode,fail
       dimension fail(nnn)
-      
-      do i=1,nnn
-        fail(i)=0
-      enddo
+
+      safe=.true.
+
+c     allocate arrays
+
+      fail(:)=0
       
       allocate (pmfwght(mxspmf),stat=fail(1))
       allocate (indpmf(mxspmf),stat=fail(2))
       allocate (numpmf(mxtmls),stat=fail(3))
-      allocate (listpm(mxpmf),stat=fail(4))
-      allocate (lstpmt(mxpmf),stat=fail(5))
+      allocate (listpm(mxatms),stat=fail(4))
+      allocate (lstpmt(mxatms),stat=fail(5))
       allocate (lstpmf(mxspmf,mspmf),stat=fail(6))
-      
-      do i=1,nnn
-        if(fail(i).ne.0)call error(idnode,1210)
-      enddo
+
+      if(any(fail.gt.0))safe=.false.            
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,1210)
+
+c     initialise array numpmf
       
       do i=1,mxtmls
         numpmf(i)=0
@@ -348,15 +353,19 @@ c     calculate mass terms for PMF units
         
         summas(ipmf)=0.d0
         pmfnrm(ipmf)=0.d0
-        
-        do i=1,npmf(ipmf)
+
+        if(nspmf.gt.0)then
           
-          jj=jj+1
-          ii=lstpmf(jj,1)
-          summas(ipmf)=summas(ipmf)+weight(ii)
-          pmfnrm(ipmf)=pmfnrm(ipmf)+pmfwght(jj)
-          
-        enddo
+          do i=1,npmf(ipmf)
+            
+            jj=jj+1
+            ii=lstpmf(jj,1)
+            summas(ipmf)=summas(ipmf)+weight(ii)
+            pmfnrm(ipmf)=pmfnrm(ipmf)+pmfwght(jj)
+            
+          enddo
+
+        endif
         
       enddo
       
@@ -1405,14 +1414,18 @@ c     calculate mass terms for PMF units
           summas(ipmf)=0.d0
           pmfnrm(ipmf)=0.d0
           
-          do i=1,npmf(ipmf)
+          if(nspmf.gt.0)then
             
-            jj=jj+1
-            i1=lstpmf(jj,1)
-            summas(ipmf)=summas(ipmf)+weight(i1)
-            pmfnrm(ipmf)=pmfnrm(ipmf)+pmfwght(jj)
-            
-          enddo
+            do i=1,npmf(ipmf)
+              
+              jj=jj+1
+              i1=lstpmf(jj,1)
+              summas(ipmf)=summas(ipmf)+weight(i1)
+              pmfnrm(ipmf)=pmfnrm(ipmf)+pmfwght(jj)
+              
+            enddo
+
+          endif
           
         enddo
         

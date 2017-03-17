@@ -28,7 +28,7 @@ c***********************************************************************
 
       contains
       
-      subroutine alloc_csh_arrays(idnode)
+      subroutine alloc_csh_arrays(idnode,mxnode)
 
 c***********************************************************************
 c     
@@ -40,21 +40,24 @@ c***********************************************************************
       
       implicit none
 
-      integer i,fail,idnode
+      logical safe
+      integer i,fail,idnode,mxnode
       dimension fail(4)
 
-      do i=1,4
-        fail(i)=0
-      enddo
+      safe=.true.
+      
+c     allocate arrays
+      
+      fail(:)=0
 
       allocate (prmshl(mxtshl,2),stat=fail(1))
       allocate (numshl(mxtmls),stat=fail(2))
       allocate (lstshl(mxtshl,2),stat=fail(3))
       allocate (listshl(mxshl,3),stat=fail(4))
-
-      do i=1,4
-        if(fail(i).gt.0)call error(idnode,1100)
-      enddo
+      
+      if(any(fail.gt.0))safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,1100)
 
       do i=1,mxtmls
          numshl(i)=0
@@ -225,30 +228,27 @@ c***********************************************************************
       implicit none
       
       integer, allocatable :: ltop(:)
-      integer  idnode,mxnode,ntshl,ishl1,ishl2,i,j,k,m,fail
+      integer  idnode,mxnode,ntshl,ishl1,ishl2,i,j,k,m,fail,mtshl
       
-c     allocate ltop array
-
-      allocate(ltop(ntshl),stat=fail)
-
 c     block indices
       
       ishl1=(idnode*ntshl)/mxnode+1
       ishl2=((idnode+1)*ntshl)/mxnode
+      mtshl=ishl2-ishl1+1
+      
+c     allocate ltop array
+
+      allocate(ltop(mtshl),stat=fail)
       
 c     zero ltop array
       
-      do i=1,ntshl
+      do i=1,mtshl
         ltop(i)=0
       enddo
 
 c     loop over all specified core-shell pairs
       
-      m=0
-      
-      do k=ishl1,ishl2
-        
-        m=m+1
+      do m=1,mtshl
         
 c     indices of atoms involved
         

@@ -54,9 +54,8 @@ c***********************************************************************
         if(kode.lt.50)then
           
           if(kode.eq. 0)then
-            
-c     dummy entry
-            
+            write(nrite,'(/,/,1x,a)')
+     x        'error - close down due to specified errors'
           elseif(kode.eq. 3)then
             write(nrite,'(/,/,1x,a)')
      x        'error - unknown directive found in CONTROL file'        
@@ -244,6 +243,9 @@ c     dummy entry
           elseif(kode.eq.73)then
             write(nrite,'(/,/,1x,a)')
      x        'error - too many inversion potentials specified'
+          elseif(kode.eq.74)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - work array allocation failed in minimiser'
           elseif(kode.eq.75)then
             write(nrite,'(/,/,1x,a)')
      x        'error - too many atoms in specified system'
@@ -295,6 +297,9 @@ c     dummy entry
           elseif(kode.eq.93)then
             write(nrite,'(/,/,1x,a)')
      x        'error - cannot use shell model with rigid molecules'
+          elseif(kode.eq.94)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - integration algorithm already selected'
           elseif(kode.eq.95)then
             write(nrite,'(/,/,1x,a)')
      x        'error - potential cutoff exceeds half-cell width'
@@ -314,9 +319,6 @@ c     dummy entry
           elseif(kode.eq.101)then
             write(nrite,'(/,/,1x,a)')
      x        'error - calculated 4-body potential index too large'
-          elseif(kode.eq.102)then
-            write(nrite,'(/,/,1x,a)')
-     x        'error - parameter mxproc exceeded in shake arrays'
           elseif(kode.eq.103)then
             write(nrite,'(/,/,1x,a)')
      x        'error - parameter mxlshp exceeded in shake arrays'
@@ -508,21 +510,18 @@ c     dummy entry
           elseif(kode.eq.388)then
             write(nrite,'(/,/,1x,a)')
      x        'error - npt incompatible with multiple timestep'
-          elseif(kode.eq.389)then
-            write(nrite,'(/,/,1x,a)')
-     x        'number of pimd beads not specified in field file'
           elseif(kode.eq.390)then
             write(nrite,'(/,/,1x,a)')
      x        'error - npt ensemble requested in non-periodic system'
-          elseif(kode.eq.391)then
-            write(nrite,'(/,/,1x,a)')
-     x        'error - incorrect number of pimd beads in config file'
           elseif(kode.eq.392)then
             write(nrite,'(/,/,1x,a)')
      x        'error - too many link cells requested'
           elseif(kode.eq.394)then
             write(nrite,'(/,/,1x,a)')
      x        'error - minimum image arrays exceeded'
+          elseif(kode.eq.395)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - cannot use pimd with multiple timestep'
           elseif(kode.eq.396)then
             write(nrite,'(/,/,1x,a)')
      x        'error - interpolation array exceeded'
@@ -761,6 +760,78 @@ c     dummy entry
           elseif(kode.eq.516)then
             write(nrite,'(/,/,1x,a)')
      x        'error - repeat of impact option specified'
+          elseif(kode.eq.518)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - cannot use pimd with the shell model'
+          elseif(kode.eq.519)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - pimd array allocation failure in forces'
+          elseif(kode.eq.520)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - cannot use pimd with constraint bonds'
+          elseif(kode.eq.522)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - cannot use pimd with rigid molecules'
+          elseif(kode.eq.523)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - pimd THEOLD file incompatible at restart'
+          elseif(kode.eq.524)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - cannot use pimd with neutral groups'
+          elseif(kode.eq.525)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - cannot use pimd with metadynamics'
+          elseif(kode.eq.526)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - cannot use pimd with solvation functions'
+          elseif(kode.eq.527)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - cannot use pimd in free energy calculations'
+          elseif(kode.eq.528)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - pimd array deallocation failure in forces'
+          elseif(kode.eq.529)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - cannot use pimd with frozen atoms'
+          elseif(kode.eq.530)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - read_thermostats allocation failure'
+          elseif(kode.eq.531)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - read_thermostats deallocation failure'
+          elseif(kode.eq.532)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - write_thermostats allocation failure'
+          elseif(kode.eq.533)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - write_thermostats deallocation failure'
+          elseif(kode.eq.534)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - alloc_pimd_arrays allocation failure'
+          elseif(kode.eq.535)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - dealloc_pimd_arrays deallocation failure'
+          elseif(kode.eq.536)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - thermo_chain_vv array allocation failure'
+          elseif(kode.eq.537)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - thermo_chain_vv array deallocation failure'
+          elseif(kode.eq.538)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - thermo_chain_sy array allocation failure'
+          elseif(kode.eq.539)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - thermo_chain_sy array deallocation failure'
+          elseif(kode.eq.540)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - alloc_sol_arrays array allocation failure'
+          elseif(kode.eq.541)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - alloc_free_arrays array allocation failure'
+          elseif(kode.eq.542)then
+            write(nrite,'(/,/,1x,a)')
+     x        'error - alloc_exi_arrays array allocation failure'
           endif
           
         elseif(kode.lt.650)then

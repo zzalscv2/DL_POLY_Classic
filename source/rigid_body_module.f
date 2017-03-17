@@ -34,18 +34,21 @@ c***********************************************************************
       
       contains
       
-      subroutine alloc_rgbdy_arrays(idnode)
+      subroutine alloc_rgbdy_arrays(idnode,mxnode)
       
       implicit none
       
       integer, parameter :: nnn=12
       
-      integer i,fail,idnode
+      logical safe
+      integer i,fail,idnode,mxnode
       dimension fail(nnn)
-      
-      do i=1,nnn
-        fail(i)=0
-      enddo
+
+      safe=.true.
+
+c     allocate arrays
+
+      fail(:)=0
       
       allocate (omx(mxgrp),omy(mxgrp),omz(mxgrp),stat=fail(1))
       allocate (gcmx(mxgrp),gcmy(mxgrp),gcmz(mxgrp),stat=fail(2))
@@ -59,9 +62,10 @@ c***********************************************************************
       allocate (listyp(mxungp),lstgst(mxungp,mxngp),stat=fail(10))
       allocate (lstfre(mxatms),lstme(mxatms),stat=fail(11))
       allocate (lstbod(mxatms),lstcsit(2*mxcons),stat=fail(12))
-      do i=1,nnn
-        if(fail(i).gt.0)call error(idnode,1013)
-      enddo
+
+      if(any(fail.gt.0))safe=.false.
+      if(mxnode.gt.1)call gstate(safe)
+      if(.not.safe)call error(idnode,1013)
       
       end subroutine alloc_rgbdy_arrays
       

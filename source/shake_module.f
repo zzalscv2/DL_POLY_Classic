@@ -26,18 +26,21 @@ c***********************************************************************
       
       contains
       
-      subroutine alloc_shake_arrays(idnode)
+      subroutine alloc_shake_arrays(idnode,mxnode)
       
       implicit none
       
       integer, parameter :: nnn=8
       
-      integer i,fail,idnode
+      logical safe
+      integer i,fail,idnode,mxnode
       dimension fail(nnn)
+
+      safe=.true.
+
+c     allocate arrays
       
-      do i=1,nnn
-        fail(i)=0
-      enddo
+      fail(:)=0
       
       allocate (prmcon(mxtcon),stat=fail(1))
       allocate (numcon(mxtmls),stat=fail(2))
@@ -45,12 +48,14 @@ c***********************************************************************
       allocate (listcon(mxcons,3),stat=fail(4))
       allocate (listme(mxatms),stat=fail(5))
       allocate (lishap(mxlshp),stat=fail(6))
-      allocate (lashap(mxproc),stat=fail(7))
+      allocate (lashap(mxnode),stat=fail(7))
       allocate (listot(mxatms),stat=fail(8))
       
-      do i=1,nnn
-        if(fail(i).gt.0)call error(idnode,1070)
-      enddo
+      if(any(fail.gt.0))safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,1070)
+
+c     initialise numcon array
       
       do i=1,mxtmls
         numcon(i)=0

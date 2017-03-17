@@ -350,7 +350,7 @@ c*********************************************************************
 
       logical lshmov
       integer idnode,mxnode,natms,nscons,i,j,k
-      integer lashap(mxproc),lishap(mxlshp),listme(mxatms)
+      integer lashap(mxnode),lishap(mxlshp),listme(mxatms)
       integer listin(mxatms),listot(mxatms),listcon(mxcons,3)
       integer lstfrz(mxatms)
       
@@ -399,13 +399,14 @@ c*********************************************************************
       implicit none
 
       integer idnode,mxnode,natms,nspmf,i,j,k
-      integer listpm(mxpmf),listin(mxatms),lstpmt(mxpmf)
+      integer listpm(mxatms),listin(mxatms),lstpmt(mxatms)
       integer lstpmf(mxspmf,mspmf),npmf(2)
 
-      if(mxpmf.lt.natms) call error(idnode,490)
-
       do i=1,natms
+        
         listpm(i)=0
+        lstpmt(i)=0
+        
       enddo
       
       do k=1,nspmf
@@ -413,24 +414,13 @@ c*********************************************************************
         do j = 1,npmf(1)+npmf(2)
 
           i=lstpmf(j,k)
-          listpm(i)= 1
+          listpm(i)=1
+          lstpmt(i)=1
           
         enddo
 
       enddo
 
-c     keep record of all atoms subject to pmf constraints
-      
-      do i=1,natms
-        
-        if(listpm(i).gt.0)then
-          lstpmt(i)=1
-        else
-          lstpmt(i)=0
-        endif
-        
-      enddo
-      
       return
       end
 
@@ -440,6 +430,7 @@ c     keep record of all atoms subject to pmf constraints
 
 c*********************************************************************
 c     
+
 c     dummy routine for serial DL_POLY
 c     copyright daresbury laboratory
 c     author - w.smith
@@ -527,3 +518,17 @@ c     lcnb flags bodies connected by constraints
       return
       end
 
+      subroutine pimd_merge(idnode,mxnode,natms,xxx,yyy,zzz)
+
+c*********************************************************************
+c     
+c     dummy routine for serial DL_POLY
+c
+c*********************************************************************
+      implicit none
+
+      integer idnode,mxnode,natms
+      real(8) xxx(*),yyy(*),zzz(*)
+
+      return
+      end

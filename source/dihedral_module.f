@@ -32,16 +32,19 @@ c***********************************************************************
       
       contains
       
-      subroutine alloc_dih_arrays(idnode)
+      subroutine alloc_dih_arrays(idnode,mxnode)
       
       implicit none
-      
-      integer i,fail,idnode
+
+      logical safe
+      integer i,fail,idnode,mxnode
       dimension fail(5)
       
-      do i=1,5
-        fail(i)=0
-      enddo
+      safe=.true.
+      
+c     allocate arrays
+      
+      fail(:)=0
       
       allocate (prmdih(mxtdih,mxpdih),stat=fail(1))
       allocate (numdih(mxtmls),stat=fail(2))
@@ -49,9 +52,11 @@ c***********************************************************************
       allocate (lstdih(mxtdih,4),stat=fail(4))
       allocate (listdih(mxdihd,5),stat=fail(5))
       
-      do i=1,5
-        if(fail(i).gt.0)call error(idnode,1011)
-      enddo
+      if(any(fail.gt.0))safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,1011)
+
+c     initialise numdih array
       
       do i=1,mxtmls
         numdih(i)=0
@@ -76,24 +81,27 @@ c***********************************************************************
       logical safe
       character*8 keyword
       character*1 message(80)
-      integer idnode,itmols,ndihed,nsite,ntmp,idih,idih1,i
+      integer idnode,itmols,ndihed,nsite,ntmp,idih,j,keytmp
       integer iatm1,iatm2,iatm3,iatm4,idum,isite1,isite2,isite3
-      integer isite4,ia,ja
-      real(8) engunit
+      integer isite4
+      real(8) engunit,parpot(mxpdih)
       
       ntmp=intstr(record,lenrec,idum)
       numdih(itmols)=numdih(itmols)+ntmp
+
       if(idnode.eq.0)then
         write(nrite,"(/,1x,'number of dihedral angles',
-     x    6x,i10)")ntmp
-        write(nrite,"(/,/,1x,'dihedral angle details:',
-     x    /,/,21x,7x,'key',5x,'index',5x,'index',5x,
-     x    'index',5x,'index',5x,'f-const',7x,'angle',
-     x    8x,'trig',4x,'1-4 elec',5x,'1-4 vdw',/)")
+     x    6x,i10)")numdih(itmols)
+        write(nrite,"(/,1x,'dihedral angle details:',
+     x    /,/,12x,'unit',5x,'key',5x,'index',5x,'index',5x,'index',
+     x    5x,'index',7x,'f-const',8x,'angle',9x,'trig',11x,
+     x    '1-4 elec',7x,'1-4 vdw',/)")
       endif
       
-      idih1=numdih(itmols)
-      do idih=1,idih1
+      do idih=1,ntmp
+        
+        ndihed=ndihed+1
+        if(ndihed.gt.mxtdih)call error(idnode,60)
         
 c     read dihedral bond angle potential parameters
         
@@ -103,86 +111,91 @@ c     read dihedral bond angle potential parameters
         call copystring(record,message,80)
         call lowcase(record,4)
         call getword(keyword,record,4,lenrec)
+
+        if(keyword(1:4).eq.'cos ')then
+          keytmp=1
+        elseif(keyword(1:4).eq.'harm')then
+          keytmp=2
+        elseif(keyword(1:4).eq.'hcos')then
+          keytmp=3
+        elseif(keyword(1:4).eq.'cos3')then
+          keytmp=4
+        elseif(keyword(1:4).eq.'ryck')then
+          keytmp=5
+        elseif(keyword(1:4).eq.'rbf')then 
+          keytmp=6
+        elseif(keyword(1:4).eq.'opls')then 
+          keytmp=7
+        else
+          if(idnode.eq.0)write(nrite,*)message
+          call error(idnode,448)
+        endif
+
         iatm1=intstr(record,lenrec,idum)
         iatm2=intstr(record,lenrec,idum)
         iatm3=intstr(record,lenrec,idum)
         iatm4=intstr(record,lenrec,idum)
-        
-c     test for frozen atom pairs
+        parpot(1)=dblstr(record,lenrec,idum)
+        parpot(2)=dblstr(record,lenrec,idum)
+        parpot(3)=dblstr(record,lenrec,idum)
+        parpot(4)=dblstr(record,lenrec,idum)
+        parpot(5)=dblstr(record,lenrec,idum)
         
         isite1=nsite-numsit(itmols)+iatm1
         isite2=nsite-numsit(itmols)+iatm2
         isite3=nsite-numsit(itmols)+iatm3
         isite4=nsite-numsit(itmols)+iatm4
-        
+          
+c     test for frozen atom pairs
+          
         if(lfzsit(isite1)*lfzsit(isite2)*
      x    lfzsit(isite3)*lfzsit(isite4).ne.0)then
           
           numdih(itmols)=numdih(itmols)-1
-          if(idnode.eq.0)write(nrite,'(14x,a16,40a1)')
-     x      '*** frozen *** ',(message(i),i=1,40)
+          if(idnode.eq.0)
+     x      write(nrite,"(4x,a8,i10,4x,a4,4i10,10f15.6)")
+     x      '*frozen*',idih,keyword(1:4),iatm1,iatm2,iatm3,iatm4,
+     x      (parpot(j),j=1,mxpdih)
           
         else
           
-          ndihed=ndihed+1
-          
-          if(ndihed.gt.mxtdih)call error(idnode,60)
-          
-          if(keyword(1:4).eq.'cos ')then
-            keydih(ndihed)=1
-          elseif(keyword(1:4).eq.'harm')then
-            keydih(ndihed)=2
-          elseif(keyword(1:4).eq.'hcos')then
-            keydih(ndihed)=3
-          elseif(keyword(1:4).eq.'cos3')then
-            keydih(ndihed)=4
-          elseif(keyword(1:4).eq.'ryck')then
-            keydih(ndihed)=5
-          elseif(keyword(1:4).eq.'rbf')then 
-            keydih(ndihed)=6
-          elseif(keyword(1:4).eq.'opls')then 
-            keydih(ndihed)=7
-          else
-            if(idnode.eq.0)write(nrite,*)message
-            call error(idnode,448)
-          endif
-          
-          lstdih(ndihed,1)=iatm1
-          lstdih(ndihed,2)=iatm2
-          lstdih(ndihed,3)=iatm3
-          lstdih(ndihed,4)=iatm4
-          prmdih(ndihed,1)=dblstr(record,lenrec,idum)
-          prmdih(ndihed,2)=dblstr(record,lenrec,idum)
-          prmdih(ndihed,3)=dblstr(record,lenrec,idum)
-          prmdih(ndihed,4)=dblstr(record,lenrec,idum)
-          prmdih(ndihed,5)=dblstr(record,lenrec,idum)
-          
           if(idnode.eq.0)
-     x      write(nrite,"(27x,a4,4i10,1p,e12.4,0p,9f12.6)")
-     x      keyword(1:4),(lstdih(ndihed,ia),ia=1,4),
-     x      (prmdih(ndihed,ja),ja=1,mxpdih)
+     x      write(nrite,"(12x,i10,4x,a4,4i10,10f15.6)")
+     x      idih,keyword(1:4),iatm1,iatm2,iatm3,iatm4,
+     x      (parpot(j),j=1,mxpdih)
+          
+        endif
+        
+        keydih(ndihed)=keytmp
+        lstdih(ndihed,1)=iatm1
+        lstdih(ndihed,2)=iatm2
+        lstdih(ndihed,3)=iatm3
+        lstdih(ndihed,4)=iatm4
+        prmdih(ndihed,1)=parpot(1)
+        prmdih(ndihed,2)=parpot(2)
+        prmdih(ndihed,3)=parpot(3)
+        prmdih(ndihed,4)=parpot(4)
+        prmdih(ndihed,5)=parpot(5)
           
 c     convert energies to internal units and angles to radians
           
-          prmdih(ndihed,1)=prmdih(ndihed,1)*engunit
+        prmdih(ndihed,1)=prmdih(ndihed,1)*engunit
+        
+        if(keytmp.eq.4)then
           
-          if(keydih(ndihed).eq.4)then
-            
-            prmdih(ndihed,2)=prmdih(ndihed,2)*engunit
-            prmdih(ndihed,3)=prmdih(ndihed,3)*engunit
-            
-          elseif(keydih(ndihed).eq.7)then
-            
-            prmdih(ndihed,2)=prmdih(ndihed,2)*engunit
-            prmdih(ndihed,3)=prmdih(ndihed,3)*engunit
-            prmdih(ndihed,4)=prmdih(ndihed,4)*engunit
-            prmdih(ndihed,5)=prmdih(ndihed,5)*(pi/180.d0)
-            
-          else
-            
-            prmdih(ndihed,2)=prmdih(ndihed,2)*(pi/180.d0)
-            
-          endif
+          prmdih(ndihed,2)=prmdih(ndihed,2)*engunit
+          prmdih(ndihed,3)=prmdih(ndihed,3)*engunit
+          
+        elseif(keytmp.eq.7)then
+          
+          prmdih(ndihed,2)=prmdih(ndihed,2)*engunit
+          prmdih(ndihed,3)=prmdih(ndihed,3)*engunit
+          prmdih(ndihed,4)=prmdih(ndihed,4)*engunit
+          prmdih(ndihed,5)=prmdih(ndihed,5)*(pi/180.d0)
+          
+        else
+          
+          prmdih(ndihed,2)=prmdih(ndihed,2)*(pi/180.d0)
           
         endif
         

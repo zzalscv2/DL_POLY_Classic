@@ -31,27 +31,32 @@ c***********************************************************************
       
       contains
       
-      subroutine alloc_ewald_arrays(idnode)
+      subroutine alloc_ewald_arrays(idnode,mxnode)
       
       implicit none
       
       integer, parameter :: nnn=6
       
-      integer i,fail,idnode
+      logical safe
+      integer i,fail,idnode,mxnode
       dimension fail(nnn)
       
-      do i=1,nnn
-        fail(i)=0
-      enddo
+      safe=.true.
+
+c     allocate arrays
+      
+      fail(:)=0
+      
       allocate (ckc(mxewld),cks(mxewld),stat=fail(1))
       allocate (clm(mxewld),slm(mxewld),stat=fail(2))
       allocate (elc(mxewld,0:1),els(mxewld,0:1),stat=fail(3))
       allocate (emc(mxewld,0:kmaxb),ems(mxewld,0:kmaxb),stat=fail(4))
       allocate (enc(mxewld,0:kmaxc),ens(mxewld,0:kmaxc),stat=fail(5))
       allocate (ewlbuf(mxebuf),erc(mxegrd),fer(mxegrd),stat=fail(6))
-      do i=1,nnn
-        if(fail(i).gt.0)call error(idnode,1240)
-      enddo
+
+      if(any(fail.gt.0))safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,1240)
       
       end subroutine alloc_ewald_arrays
       

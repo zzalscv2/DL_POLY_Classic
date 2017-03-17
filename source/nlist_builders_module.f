@@ -5,6 +5,7 @@ c
 c     dl_poly module for defining neighbourlist builder routines
 c     copyright - daresbury laboratory
 c     author    - w. smith    aug 2006
+c     pimd adaptation - w. smith jun 2016
 c     
 c***********************************************************************
       
@@ -18,8 +19,8 @@ c***********************************************************************
       contains
       
       subroutine nlist_driver
-     x  (newlst,lneut,lnsq,loglnk,ltad,natms,idnode,mxnode,imcon,
-     x  nneut,keyfce,rcut,delr,tstep)
+     x  (newlst,lneut,lnsq,loglnk,ltad,natms,nbeads,idnode,mxnode,
+     x  imcon,nneut,keyfce,rcut,delr,tstep)
       
 c*********************************************************************
 c     
@@ -34,13 +35,13 @@ c*********************************************************************
       implicit none
       
       logical newlst,lneut,lnsq,loglnk,newjob,ltad
-      integer natms,idnode,mxnode,imcon,nneut,keyfce
+      integer natms,idnode,mxnode,imcon,nneut,keyfce,nbeads
       real(8) rcut,delr,tstep
       
       save newjob
       
       data newjob/.true./
-      
+
 c     skip if no pair force calculations required
       
       if(keyfce.gt.0)then
@@ -53,7 +54,7 @@ c     test for updating the Verlet list
           
         else
           
-          call vertest(newlst,idnode,mxnode,natms,delr,tstep)
+          call vertest(newlst,idnode,mxnode,natms,nbeads,delr,tstep)
           
         endif
         
@@ -69,19 +70,20 @@ c     set up nonbonded interaction (verlet) list
               
 c     calculate distant interactions explicitly
               
-              call parlst_nsq(newlst,natms,idnode,mxnode,imcon,rcut)
+              call parlst_nsq
+     x          (newlst,natms,nbeads,idnode,mxnode,imcon,rcut)
               
             elseif(loglnk)then
               
 c     ignore real space distant interactions
               
               call parlink
-     x          (newlst,natms,idnode,mxnode,imcon,rcut,delr)
+     x          (newlst,natms,nbeads,idnode,mxnode,imcon,rcut,delr)
               
             else
               
               call parlst
-     x          (newlst,natms,idnode,mxnode,imcon,rcut,delr)
+     x          (newlst,natms,nbeads,idnode,mxnode,imcon,rcut,delr)
               
             endif
             
@@ -90,14 +92,12 @@ c     ignore real space distant interactions
             if(.not.loglnk)then 
               
               call parneulst
-     x          (newlst,lneut,nneut,idnode,mxnode,imcon,rcut,
-     x          delr)
+     x          (newlst,lneut,nneut,idnode,mxnode,imcon,rcut,delr)
               
             else
               
               call parlinkneu
-     x          (newlst,natms,nneut,idnode,mxnode,imcon,
-     x          rcut,delr)
+     x          (newlst,natms,nneut,idnode,mxnode,imcon,rcut,delr)
               
             endif
             
@@ -112,7 +112,8 @@ c     ignore real space distant interactions
       return
       end subroutine nlist_driver
       
-      subroutine parlst(newlst,natms,idnode,mxnode,imcon,rcut,delr)
+      subroutine parlst
+     x  (newlst,natms,nbeads,idnode,mxnode,imcon,rcut,delr)
       
 c***********************************************************************
 c     
@@ -130,11 +131,10 @@ c***********************************************************************
       
       implicit none
       
-      logical lchk,newlst,lfrzi,ldo
-      integer natms,idnode,mxnode,imcon,ibig,last,mpm2
-      integer npm2,idum,i,m,ii,j
+      logical lchk,newlst,ldo,lfrzi
+      integer natms,nbeads,idnode,mxnode,imcon,ibig,last,nsatm
+      integer mpm2,npm2,idum,i,j,k,m,n,ib,jb,nb,kbase,nbase
       real(8) rcut,delr,rclim,rsq
-      
       
       if(newlst)then
         
@@ -143,120 +143,147 @@ c***********************************************************************
 c     check size of work array
         
         if(mxxdf.lt.(natms+1)/2)then
-          if(idnode.eq.0) write(nrite,*) 'mxxdf must be greater than ',
+          
+          if(idnode.eq.0) write(nrite,*) 'mxxdf must be at least ',
      x      (natms+1)/2
           call  error(idnode,474)
+          
         endif
         
 c     set control variables
         
-        last=natms
+        kbase=0
+        nbase=0
         lchk=.true.
         mpm2=natms/2
         npm2=(natms-1)/2
+        nsatm=(natms-idnode-1)/mxnode+1
         
 c     set cutoff radius
         
         rclim=(rcut+delr)**2
         
-c     construct pair force neighbour list
+c     initialise neighbour list entry count
         
-        do i=1,msatms
+        do i=1,mslist
           
           lentry(i)=0
-          noxatm(i)=1
           
         enddo
         
-c     outer loop over atoms
+c     loop over pimd beads
         
-        do m=1,mpm2
+        do k=1,nbeads
           
-          if(m.gt.npm2)last=mpm2
+          last=natms
           
-c     inner loop over atoms
+c     initialise excluded atom target counter
           
-          ii=0
-          
-          do i=idnode+1,last,mxnode
+          do i=1,msatms
             
-c     calculate atom indices
-            
-            j=i+m
-            if(j.gt.natms)j=j-natms
-            
-            ii=ii+1
-            xdf(ii)=xxx(i)-xxx(j)
-            ydf(ii)=yyy(i)-yyy(j)
-            zdf(ii)=zzz(i)-zzz(j)
+            noxatm(i)=1
             
           enddo
+        
+c     outer loop over atoms
           
-c     apply minimum image convention
-          
-          call images(imcon,0,1,ii,cell,xdf,ydf,zdf)
-          
-c     allocate atoms to neighbour list
-          
-          ii=0
-          
-          do i=idnode+1,last,mxnode
+          do m=1,mpm2
             
-            lfrzi=(lstfrz(i).ne.0)
+            if(m.gt.npm2)last=mpm2
             
+c     inner loop over atoms
+            
+            n=0
+            
+            do i=idnode+1,last,mxnode
+              
 c     calculate atom indices
+              
+              j=i+m
+              if(j.gt.natms)j=j-natms
+              ib=i+kbase
+              jb=j+kbase
+              
+c     calculate interatomic displacements
+              
+              n=n+1
+              xdf(n)=xxx(ib)-xxx(jb)
+              ydf(n)=yyy(ib)-yyy(jb)
+              zdf(n)=zzz(ib)-zzz(jb)
+              
+            enddo
             
-            j=i+m
-            if(j.gt.natms)j=j-natms
+c     apply minimum image convention
             
-            ii=ii+1
+            call images(imcon,0,1,n,cell,xdf,ydf,zdf)
             
+c     allocate atoms to neighbour list
+            
+            n=0
+            
+            do i=idnode+1,last,mxnode
+              
+c     calculate atom indices
+              
+              n=n+1
+              j=i+m
+              if(j.gt.natms)j=j-natms
+              ib=i+kbase
+              jb=j+kbase
+              nb=n+nbase
+
+c     identify frozen atom
+              
+              lfrzi=(lstfrz(ib).ne.0)
+              
 c     reject atoms in excluded pair list
-            
-            if((nexatm(ii).gt.0).and.(lexatm(ii,noxatm(ii)).eq.j))
-     x        then
               
-              noxatm(ii)=min(noxatm(ii)+1,nexatm(ii))
-              
+              if((nexatm(n).gt.0).and.(lexatm(n,noxatm(n)).eq.j))
+     x          then
+                
+                noxatm(n)=min(noxatm(n)+1,nexatm(n))
+                
+              else
+                
 c     reject frozen atom pairs
-              
-            else
-              
-              ldo=.true.
-              if(lfrzi)ldo=(lstfrz(j).eq.0)
-              
-              if(ldo)then
                 
+                ldo=.true.
+                if(lfrzi)ldo=(lstfrz(jb).eq.0)
+                
+                if(ldo)then
+                  
 c     calculate interatomic distance
-                
-                if(imcon.eq.6)then
                   
-                  rsq=xdf(ii)*xdf(ii)+ydf(ii)*ydf(ii)
-                  
-                else
-                  
-                  rsq=xdf(ii)*xdf(ii)+ydf(ii)*ydf(ii)+zdf(ii)*zdf(ii)
-                  
-                endif
-                
-c     running check of neighbour list array capacity
-                
-                if(rsq.lt.rclim)then
-                  
-                  lentry(ii)=lentry(ii)+1
-                  
-                  if(lentry(ii).gt.mxlist)then
+                  if(imcon.eq.6)then
                     
-                    lchk=.false.
-                    ibig=max(lentry(ii),ibig)
+                    rsq=xdf(n)*xdf(n)+ydf(n)*ydf(n)
+                    
+                  else
+                    
+                    rsq=xdf(n)*xdf(n)+ydf(n)*ydf(n)+zdf(n)*zdf(n)
                     
                   endif
                   
-c     compile neighbour list array
+c     running check of neighbour list array capacity
                   
-                  if(lchk)then
+                  if(rsq.lt.rclim)then
                     
-                    list(ii,lentry(ii))=j
+                    lentry(nb)=lentry(nb)+1
+                    
+                    if(lentry(nb).gt.mxlist)then
+                      
+                      lchk=.false.
+                      ibig=max(lentry(nb),ibig)
+                      
+                    endif
+                    
+c     compile neighbour list array
+                    
+                    if(lchk)then
+                      
+                      list(nb,lentry(nb))=jb
+                      
+                    endif
                     
                   endif
                   
@@ -264,37 +291,41 @@ c     compile neighbour list array
                 
               endif
               
-            endif
+            enddo
             
           enddo
           
-        enddo
-        
+          nbase=nbase+nsatm
+          kbase=kbase+natms
+          
 c     terminate job if neighbour list array exceeded
-        
-        if(mxnode.gt.1) call gstate(lchk)
-        
-        if(.not.lchk)then
           
-          call gimax(ibig,1,idum)
-          if(idnode.eq.0)then
-            write(nrite,*) ' mxlist must be at least  ',ibig
-            write(nrite,*) ' mxlist is currently ',mxlist
+          if(mxnode.gt.1) call gstate(lchk)
+          
+          if(.not.lchk)then
+            
+            call gimax(ibig,1,idum)
+            
+            if(idnode.eq.0)then
+              write(nrite,*) ' mxlist must be at least  ',ibig
+              write(nrite,*) ' mxlist is currently ',mxlist
+            endif
+            
+            call error(idnode,110)
+            
           endif
-          call error(idnode,110)
           
-        endif
-        
+        enddo
+                
 c     check all excluded atoms are accounted for
         
-        do i=1,ii
+        do i=1,nsatm
           
           if(nexatm(i).gt.0.and.noxatm(i).ne.nexatm(i))lchk=.false.
           
         enddo
         
         if(mxnode.gt.1) call gstate(lchk)
-        
         if(.not.lchk) call error(idnode,160)
         
       endif
@@ -302,7 +333,8 @@ c     check all excluded atoms are accounted for
       return
       end subroutine parlst
       
-      subroutine parlink(newlst,natms,idnode,mxnode,imcon,rcut,delr)
+      subroutine parlink
+     x  (newlst,natms,nbeads,idnode,mxnode,imcon,rcut,delr)
       
 c***********************************************************************
 c     
@@ -321,9 +353,10 @@ c***********************************************************************
       implicit none
       
       logical lchk,newlst,linc,newjob,lfrzi,ldo
-      integer natms,idnode,mxnode,imcon,idum,nix,niy,niz,fail
-      integer i,ibig,irat,nsbcll,ilx,ily,ilz,ncells,ix,iy,iz,j,icell
-      integer ic,ii,kc,ik,jx,jy,jz,jc,ixl
+      integer natms,nbeads,idnode,mxnode,imcon,idum,nix,niy,niz
+      integer i,ibig,nsbcll,ilx,ily,ilz,ncells,ix,iy,iz,j,icell
+      integer ic,n,kc,ik,jx,jy,jz,jc,ixl,numatm,fail,nbase,ibase
+      integer nsatm,k,irat
       real(8) rcut,delr,rcsq,xm,ym,zm,det,xdc,ydc,zdc,tx,ty,tz
       real(8) cx,cy,cz,sxd,syd,szd,xd,yd,zd,rsq
       
@@ -393,10 +426,8 @@ c***********************************************************************
       
       data fail/0/
       
-c     allocate work arrays
-      
-      allocate (uxx(mxatms),uyy(mxatms),uzz(mxatms),stat=fail)
-      if(fail.ne.0)call error(idnode,1890)
+      numatm=nbeads*natms
+      nsatm=(natms-idnode-1)/mxnode+1
       
       if(newlst)then
         
@@ -404,20 +435,11 @@ c     allocate work arrays
      x    call error(idnode,300)
         lchk=.true.
         ibig=0
-        
-c     zero link arrays
-        
-        do i=1,natms
-          link(i)=0
-        enddo
-        
-c     construct pair force neighbour list
-        
-        do i=1,msatms
-          
-          lentry(i)=0
-          
-        enddo
+
+c     allocate work arrays
+
+        allocate (uxx(natms),uyy(natms),uzz(natms),stat=fail)
+        if(fail.ne.0)call error(idnode,1890)
         
 c     real space cut off 
         
@@ -433,7 +455,7 @@ c     find maximum x,y,z postions
           ym=0.d0
           zm=0.d0
           
-          do i=1,natms
+          do i=1,numatm
             
             xm=max(xm,abs(xxx(i)))
             ym=max(ym,abs(yyy(i)))
@@ -461,38 +483,23 @@ c     find maximum x,y,z postions
         call dcell(cell,celprp)
         call invert(cell,rcell,det)
         
-c     ratio of link cell length to cut off diameter - max value is 5
-        
-c     irat=nint((rcut+delr)/rlink)
-c     irat=min(max(irat,1),5)
+c     number of neighbour subcells
         
         irat=1
-        
-        
-c     number of subcells
-        
         if (irat.eq.1)then 
-          
           nsbcll=14
-          
         elseif(irat.eq.2)then
-          
           nsbcll=63
-          
         elseif(irat.eq.3)then
-          
           nsbcll=156
-          
         elseif(irat.eq.4)then
-          
           nsbcll=307
-          
         elseif(irat.eq.5)then
-          
           nsbcll=508
-          
         endif
         
+c     link cell numbers in principal directions
+
         ilx=int(celprp(7)*dble(irat)/(rcut+delr))
         ily=int(celprp(8)*dble(irat)/(rcut+delr))
         ilz=int(celprp(9)*dble(irat)/(rcut+delr))
@@ -507,204 +514,227 @@ c     check there are enough link cells
         ncells=ilx*ily*ilz
         if(ncells.gt.mxcell) call error(idnode,392)
         
-c     calculate link cell indices
-        
-        do i=1,ncells
-          
-          lct(i)=0
-          
-        enddo
-        
 c     link-cell cutoff for reduced space
         
         xdc=dble(ilx)
         ydc=dble(ily)
         zdc=dble(ilz)
         
-c     reduced space coordinates
+c     ensure all atoms in MD cell on first pass
+        
         if(newjob)then
           
           newjob=.false.
-          call images(imcon,idnode,mxnode,natms,cell,xxx,yyy,zzz)
+          call images(imcon,idnode,mxnode,numatm,cell,xxx,yyy,zzz)
           
           if(mxnode.gt.1)  call merge
-     x      (idnode,mxnode,natms,mxbuff,xxx,yyy,zzz,buffer)
+     x      (idnode,mxnode,numatm,mxbuff,xxx,yyy,zzz,buffer)
           
         endif
-        
-        do i=1,natms
+
+c     loop over pimd beads
+
+        do k=1,nbeads
+
+          ibase=(k-1)*natms
+          nbase=(k-1)*nsatm
           
-          tx=xxx(i)
-          ty=yyy(i)
-          tz=zzz(i)
+c     zero last entry in neighbour list
           
-          uxx(i)=(rcell(1)*tx+rcell(4)*ty+rcell(7)*tz)+0.5d0
-          uyy(i)=(rcell(2)*tx+rcell(5)*ty+rcell(8)*tz)+0.5d0
-          uzz(i)=(rcell(3)*tx+rcell(6)*ty+rcell(9)*tz)+0.5d0
+          do i=1,mslist
+            lentry(i)=0
+          enddo
           
-        enddo
-        
+c     zero head of link cell chain
+          
+          do i=1,ncells
+            lct(i)=0
+          enddo
+          
+c     zero link array
+          
+          do i=1,natms
+            link(i)=0
+          enddo
+          
+c     calculate reduced space coordinates
+          
+          do i=1,natms
+            
+            tx=xxx(i+ibase)
+            ty=yyy(i+ibase)
+            tz=zzz(i+ibase)
+            
+            uxx(i)=(rcell(1)*tx+rcell(4)*ty+rcell(7)*tz)+0.5d0
+            uyy(i)=(rcell(2)*tx+rcell(5)*ty+rcell(8)*tz)+0.5d0
+            uzz(i)=(rcell(3)*tx+rcell(6)*ty+rcell(9)*tz)+0.5d0
+            
+          enddo
+          
 c     link neighbours 
-        
-        do i=1,natms
           
-          ix=min(int(xdc*uxx(i)),ilx-1)
-          iy=min(int(ydc*uyy(i)),ily-1)
-          iz=min(int(zdc*uzz(i)),ilz-1)
+          do i=1,natms
+            
+            ix=min(int(xdc*uxx(i)),ilx-1)
+            iy=min(int(ydc*uyy(i)),ily-1)
+            iz=min(int(zdc*uzz(i)),ilz-1)
+            
+            icell=1+ix+ilx*(iy+ily*iz)
+            
+            j=lct(icell)
+            lct(icell)=i
+            link(i)=j
+            
+          enddo
           
-          icell=1+ix+ilx*(iy+ily*iz)
-          
-          j=lct(icell)
-          lct(icell)=i
-          link(i)=j
-          
-        enddo
-        
 c     set control variables for loop over subcells
-        
-        ix=1
-        iy=1
-        iz=1
-        
-c     primary loop over subcells
-        
-        do ic=1,ncells
           
-          ii=lct(ic)
-          if(ii.gt.0)then
+          ix=1
+          iy=1
+          iz=1
+          
+c     primary loop over subcells
+          
+          do ic=1,ncells
             
+            n=lct(ic)
+            if(n.gt.0)then
+              
 c     secondary loop over subcells
-            
-            ik=0
-            
-            do kc=1,nsbcll
               
-              i=ii
+              ik=0
               
-              cx=0.d0
-              cy=0.d0
-              cz=0.d0
-              jx=ix+nix(kc)
-              jy=iy+niy(kc)
-              jz=iz+niz(kc)
-              
+              do kc=1,nsbcll
+                
+                i=n
+                
+                cx=0.d0
+                cy=0.d0
+                cz=0.d0
+                jx=ix+nix(kc)
+                jy=iy+niy(kc)
+                jz=iz+niz(kc)
+                
 c     minimum image convention
-              
-              if(jx.gt.ilx)then
                 
-                jx=jx-ilx
-                cx=1.d0
+                if(jx.gt.ilx)then
+                  
+                  jx=jx-ilx
+                  cx=1.d0
+                  
+                elseif(jx.lt.1)then
+                  
+                  jx=jx+ilx
+                  cx=-1.d0
+                  
+                endif
                 
-              elseif(jx.lt.1)then
+                if(jy.gt.ily)then
+                  
+                  jy=jy-ily
+                  cy=1.d0
+                  
+                elseif(jy.lt.1)then
+                  
+                  jy=jy+ily
+                  cy=-1.d0
+                  
+                endif
                 
-                jx=jx+ilx
-                cx=-1.d0
+                if(jz.gt.ilz)then
+                  
+                  jz=jz-ilz
+                  cz=1.d0
+                  
+                elseif(jz.lt.1)then
+                  
+                  jz=jz+ilz
+                  cz=-1.d0
+                  
+                endif
                 
-              endif
-              
-              if(jy.gt.ily)then
-                
-                jy=jy-ily
-                cy=1.d0
-                
-              elseif(jy.lt.1)then
-                
-                jy=jy+ily
-                cy=-1.d0
-                
-              endif
-              
-              if(jz.gt.ilz)then
-                
-                jz=jz-ilz
-                cz=1.d0
-                
-              elseif(jz.lt.1)then
-                
-                jz=jz+ilz
-                cz=-1.d0
-                
-              endif
-              
 c     index of neighbouring cell
-              
-              jc=jx+ilx*((jy-1)+ily*(jz-1))
-              j=lct(jc)
-              
-c     ignore if empty
-              
-              if(j.gt.0)then
                 
-                do while(i.ne.0)
+                jc=jx+ilx*((jy-1)+ily*(jz-1))
+                j=lct(jc)
+                
+c     ignore if empty
+                
+                if(j.gt.0)then
                   
+                  do while(i.ne.0)
+                    
 c     test if site is of interest to this node
-                  
-                  if(mod(i-1,mxnode).eq.idnode)then
                     
-                    
-c     i's index for this processor
-                    ik=((i-1)/mxnode)+1
-                    
-c     test if i is a frozen atom
-                    
-                    lfrzi=(lstfrz(i).ne.0)
-                    
-                    if(ic.eq.jc) j=link(i)
-                    if(j.gt.0)then
+                    if(mod(i-1,mxnode).eq.idnode)then
                       
-                      do while(j.ne.0)
+c     i's index for this processor
+                      
+                      ik=(i-1)/mxnode+nbase+1
+                      
+c     test if i is a frozen atom
+                      
+                      lfrzi=(lstfrz(i).ne.0)
+                      
+                      if(ic.eq.jc)j=link(i)
+                      if(j.gt.0)then
                         
+                        do while(j.ne.0)
+                          
 c     test of frozen atom pairs
-                        
-                        ldo=.true.
-                        if(lfrzi)ldo=(lstfrz(j).eq.0)
-                        
-                        if(ldo)then
                           
+                          ldo=.true.
+                          if(lfrzi)ldo=(lstfrz(j).eq.0)
+                          
+                          if(ldo)then
+                            
 c     distance in real space : minimum image applied
-                          
-                          sxd=uxx(j)-uxx(i)+cx
-                          syd=uyy(j)-uyy(i)+cy
-                          szd=uzz(j)-uzz(i)+cz
-                          
-                          xd=cell(1)*sxd+cell(4)*syd+cell(7)*szd
-                          yd=cell(2)*sxd+cell(5)*syd+cell(8)*szd
-                          zd=cell(3)*sxd+cell(6)*syd+cell(9)*szd
-                          
-                          if(imcon.eq.6)then
                             
-                            rsq=xd**2+yd**2
+                            sxd=uxx(j)-uxx(i)+cx
+                            syd=uyy(j)-uyy(i)+cy
+                            szd=uzz(j)-uzz(i)+cz
                             
-                          else
+                            xd=cell(1)*sxd+cell(4)*syd+cell(7)*szd
+                            yd=cell(2)*sxd+cell(5)*syd+cell(8)*szd
+                            zd=cell(3)*sxd+cell(6)*syd+cell(9)*szd
                             
-                            rsq=xd**2+yd**2+zd**2
-                            
-                          endif
-                          
-c     test of distance
-                          if(rcsq.gt.rsq)then
-                            
-c     test for excluded atom 
-                            
-                            linc=.true.
-                            do ixl=1,nexatm(ik)
+                            if(imcon.eq.6)then
                               
-                              if(lexatm(ik,ixl).eq.j) linc=.false.
+                              rsq=xd**2+yd**2
                               
-                            enddo
+                            else
+                              
+                              rsq=xd**2+yd**2+zd**2
+                              
+                            endif
                             
-                            if(linc)then
+c     cut-off test
+                            
+                            if(rcsq.gt.rsq)then
                               
-                              lentry(ik)=lentry(ik)+1
+c     excluded atom test
                               
-                              if(lentry(ik).gt.mxlist)then
+                              linc=.true.
+                              do ixl=1,nexatm(ik)
                                 
-                                ibig=max(ibig,lentry(ik))
-                                lchk=.false.
+                                if(lexatm(ik,ixl).eq.j) linc=.false.
                                 
-                              else
+                              enddo
+                              
+                              if(linc)then
                                 
-                                list(ik,lentry(ik))=j
+                                lentry(ik)=lentry(ik)+1
+                                
+                                if(lentry(ik).gt.mxlist)then
+                                  
+                                  ibig=max(ibig,lentry(ik))
+                                  lchk=.false.
+                                  
+                                else
+                                  
+                                  list(ik,lentry(ik))=j
+                                  
+                                endif
                                 
                               endif
                               
@@ -712,70 +742,72 @@ c     test for excluded atom
                             
                           endif
                           
-                        endif
+                          j=link(j)
+                          
+                        enddo
                         
-                        j=link(j)
-                        
-                      enddo
+                      endif
                       
                     endif
                     
-                  endif
+                    j=lct(jc)
+                    i=link(i)
+                    
+                  enddo
                   
-                  j=lct(jc)
-                  i=link(i)
-                  
-                enddo
+                endif
                 
-              endif
-              
-            enddo
-            
-          endif
-          
-          ix=ix+1
-          if(ix.gt.ilx)then
-            
-            ix=1
-            iy=iy+1
-            
-            if(iy.gt.ily)then
-              
-              iy=1
-              iz=iz+1
+              enddo
               
             endif
             
+            ix=ix+1
+            if(ix.gt.ilx)then
+              
+              ix=1
+              iy=iy+1
+              
+              if(iy.gt.ily)then
+                
+                iy=1
+                iz=iz+1
+                
+              endif
+              
+            endif
+            
+          enddo
+          
+c     terminate job if neighbour list array exceeded
+          
+          if(mxnode.gt.1) call gstate(lchk)
+          
+          if(.not.lchk)then
+            
+            call gimax(ibig,1,idum)
+            if(idnode.eq.0)then
+              write(nrite,*) ' mxlist must be >=  ',ibig
+              write(nrite,*) ' mxlist is currenty ',mxlist
+            endif
+            call error(idnode,106)
+            
           endif
+
+c     end of loop over pimd beads
           
         enddo
         
-c     terminate job if neighbour list array exceeded
+c     deallocate work arrays
         
-        if(mxnode.gt.1) call gstate(lchk)
-        
-        if(.not.lchk)then
-          
-          call gimax(ibig,1,idum)
-          if(idnode.eq.0)then
-            write(nrite,*) ' mxlist must be >=  ',ibig
-            write(nrite,*) ' mxlist is currenty ',mxlist
-          endif
-          call error(idnode,106)
-          
-        endif
+        deallocate (uxx,uyy,uzz,stat=fail)
         
       endif
-      
-c     deallocate work arrays
-      
-      deallocate (uxx,uyy,uzz,stat=fail)
       
       return
       end subroutine parlink
       
-      subroutine parneulst(newlst,lneut,nneut,idnode,mxnode,imcon,
-     x  rcut,delr)
+      subroutine parneulst
+     x  (newlst,lneut,nneut,idnode,mxnode,imcon,rcut,delr)
       
 c***********************************************************************
 c     
@@ -828,12 +860,11 @@ c     set cutoff radius
         
 c     construct pair force neighbour list: neutral groups
         
-        do i=1,msatms
+        do i=1,mslist
           
           lentry(i)=0
           
         enddo
-        
         
 c     outer loop over groups
         
@@ -1137,7 +1168,7 @@ c***********************************************************************
       
       logical lchk,newlst,linc,newjob,lfrzi,ldo,swop
       integer natms,nneut,idnode,mxnode,imcon,idum,fail,ibig
-      integer nix,niy,niz,i,irat,nsbcll,ilx,ily,ilz,ncells,ix,iy,iz
+      integer nix,niy,niz,i,nsbcll,ilx,ily,ilz,ncells,ix,iy,iz
       integer icell,j,ic,ii,kc,jx,jy,jz,jc,ineu,ik,jneu,ineua,jneua
       integer ika,jneua1,i1,j1
       real(8) rcut,delr,rcsq,xm,ym,zm,det,xdc,ydc,zdc,tx,ty,tz
@@ -1177,7 +1208,7 @@ c     zero link arrays
         
 c     construct pair force neighbour list
         
-        do i=1,msatms
+        do i=1,mslist
           
           lentry(i)=0
           
@@ -1225,24 +1256,20 @@ c     find maximum x,y,z postions
         call dcell(cell,celprp)
         call invert(cell,rcell,det)
         
-c     ratio of link cell length to cut off diameter 
-        
-        irat=1
-        
 c     number of subcells
         
         nsbcll=14
         
-        ilx=int(celprp(7)*dble(irat)/(rcut+delr))
-        ily=int(celprp(8)*dble(irat)/(rcut+delr))
-        ilz=int(celprp(9)*dble(irat)/(rcut+delr))
+        ilx=int(celprp(7)/(rcut+delr))
+        ily=int(celprp(8)/(rcut+delr))
+        ilz=int(celprp(9)/(rcut+delr))
 c     
 c     check there are enough link cells
         
         linc=.false.
-        if(ilx.lt.2*irat+1) linc=.true.
-        if(ily.lt.2*irat+1) linc=.true.
-        if(ilz.lt.2*irat+1) linc=.true.
+        if(ilx.lt.3)linc=.true.
+        if(ily.lt.3)linc=.true.
+        if(ilz.lt.3)linc=.true.
         if(linc) call error(idnode,305)
         
         ncells=ilx*ily*ilz
@@ -1268,6 +1295,7 @@ c     link-cell cutoff for reduced space
         zdc=dble(ilz)
         
 c     reduced space coordinates
+        
         if(newjob)then
           
           newjob=.false.
@@ -1590,7 +1618,7 @@ c     deallocate work arrays
       end subroutine parlinkneu
       
       subroutine parlst_nsq
-     x  (newlst,natms,idnode,mxnode,imcon,rcut)
+     x  (newlst,natms,nbeads,idnode,mxnode,imcon,rcut)
       
 c***********************************************************************
 c     
@@ -1613,10 +1641,10 @@ c***********************************************************************
       implicit none
       
       logical lchk,newlst
-      integer natms,idnode,mxnode,imcon,ibig,i,last,mpm2
-      integer npm2,m,ii,j,idum
-      real(8) rcut,rclim,rsq,rrr
-      
+      integer natms,nbeads,idnode,mxnode,imcon,ibig,last,nsatm
+      integer mpm2,npm2,idum,i,j,k,m,n,ib,jb,nb,kbase,nbase
+      real(8) rcut,rclim,rsq
+
       if(newlst)then
         
         ibig=0
@@ -1624,138 +1652,178 @@ c***********************************************************************
 c     check size of work array
         
         if(mxxdf.lt.(natms+1)/2)then
+          
           if(idnode.eq.0) write(nrite,*) 'mxxdf must be greater than ',
      x      (natms+1)/2
           call  error(idnode,475)
+          
         endif
         
 c     set control variables
         
-        last=natms
+        kbase=0
+        nbase=0
         lchk=.true.
         mpm2=natms/2
         npm2=(natms-1)/2
+        nsatm=(natms-idnode-1)/mxnode+1
         
 c     set cutoff radius - ignore border width
         
-        rclim=(rcut)**2
+        rclim=rcut**2
         
 c     construct pair force neighbour list
         
-        do i=1,msatms
+        do i=1,mslist
           
           lentry(i)=0
-          noxatm(i)=1
           
         enddo
         
-c     outer loop over atoms
-        
-        do m=1,mpm2
+c     loop over pimd beads
+
+        do k=1,nbeads
           
-          if(m.gt.npm2)last=mpm2
-          
-c     inner loop over atoms
-          
-          ii=0
-          
-          do i=idnode+1,last,mxnode
+          last=natms
+
+c     initialise excluded atom target counter
+
+          do i=1,msatms
             
-c     calculate atom indices
-            
-            j=i+m
-            if(j.gt.natms)j=j-natms
-            
-c     calculate interatomic displacements
-            
-            ii=ii+1
-            xdf(ii)=xxx(i)-xxx(j)
-            ydf(ii)=yyy(i)-yyy(j)
-            zdf(ii)=zzz(i)-zzz(j)
-            
+            noxatm(i)=1
+
           enddo
+
+c     outer loop over atoms
           
-c     apply minimum image convention
-          
-          call images(imcon,0,1,ii,cell,xdf,ydf,zdf)
-          
-c     allocate atoms to neighbour list
-          
-          ii=0
-          
-          do i=idnode+1,last,mxnode
+          do m=1,mpm2
             
+            if(m.gt.npm2)last=mpm2
+            
+c     inner loop over atoms
+            
+            n=0
+            
+            do i=idnode+1,last,mxnode
+              
 c     calculate atom indices
+              
+              j=i+m
+              if(j.gt.natms)j=j-natms
+              ib=i+kbase
+              jb=j+kbase
+              
+c     calculate interatomic displacements
+              
+              n=n+1
+              xdf(n)=xxx(ib)-xxx(jb)
+              ydf(n)=yyy(ib)-yyy(jb)
+              zdf(n)=zzz(ib)-zzz(jb)
+              
+            enddo
             
-            j=i+m
-            if(j.gt.natms)j=j-natms
+c     apply minimum image convention
             
-            ii=ii+1
-            if((nexatm(ii).gt.0).and.(lexatm(ii,noxatm(ii)).eq.j))
-     x        then
+            call images(imcon,0,1,n,cell,xdf,ydf,zdf)
+            
+c     allocate atoms to neighbour list
+            
+            n=0
+            
+            do i=idnode+1,last,mxnode
               
-              noxatm(ii)=min(noxatm(ii)+1,nexatm(ii))
+c     calculate atom indices
               
-            elseif(lstfrz(i).eq.0.or.lstfrz(j).eq.0)then
+              n=n+1
+              j=i+m
+              if(j.gt.natms)j=j-natms
+              ib=i+kbase
+              jb=j+kbase
+              nb=n+nbase
               
-c     reject frozen atoms and calculate interatomic distance
+c     reject atoms in excluded pair list
               
-              rsq=xdf(ii)**2+ydf(ii)**2+zdf(ii)**2
-              
-c     running check of neighbour list array capacity
-              
-              if(rsq.lt.rclim)then
+              if((nexatm(n).gt.0).and.(lexatm(n,noxatm(n)).eq.j))
+     x          then
                 
-                lentry(ii)=lentry(ii)+1
+                noxatm(n)=min(noxatm(n)+1,nexatm(n))
                 
-                if(lentry(ii).gt.mxlist)then
+c     reject frozen atom pairs
+                
+              elseif(lstfrz(ib).eq.0.or.lstfrz(jb).eq.0)then
+                
+c     calculate interatomic distance
+                
+                if(imcon.eq.6)then
                   
-                  ibig=max(ibig,lentry(ii))
-                  lchk=.false.
+                  rsq=xdf(n)**2+ydf(n)**2
+                  
+                else
+                  
+                  rsq=xdf(n)**2+ydf(n)**2+zdf(n)**2
                   
                 endif
                 
-c     compile neighbour list array
+c     running check of neighbour list array capacity
                 
-                if(lchk)then
+                if(rsq.lt.rclim)then
                   
-                  list(ii,lentry(ii))=j
+                  lentry(nb)=lentry(nb)+1
+                  
+                  if(lentry(nb).gt.mxlist)then
+                    
+                    ibig=max(ibig,lentry(nb))
+                    lchk=.false.
+                    
+                  endif
+                  
+c     compile neighbour list array
+                  
+                  if(lchk)then
+                    
+                    list(nb,lentry(nb))=jb
+                    
+                  endif
                   
                 endif
                 
               endif
               
-            endif
+            enddo
             
           enddo
           
-        enddo
-        
+          nbase=nbase+nsatm
+          kbase=kbase+natms
+          
 c     terminate job if neighbour list array exceeded
-        
-        if(mxnode.gt.1)call gstate(lchk)
-        
-        if(.not.lchk)then
           
-          call gisum(ibig,1,idum)
-          if(idnode.eq.0)then
-            write(nrite,*) ' mxlist must be >=  ',ibig
-            write(nrite,*) ' mxlist is currenty ',mxlist
+          if(mxnode.gt.1)call gstate(lchk)
+          
+          if(.not.lchk)then
+            
+            call gimax(ibig,1,idum)
+            
+            if(idnode.eq.0)then
+              write(nrite,*) ' mxlist must be >=  ',ibig
+              write(nrite,*) ' mxlist is currenty ',mxlist
+            endif
+            
+            call error(idnode,109)
+            
           endif
-          call error(idnode,109)
           
-        endif
+        enddo
         
 c     check all excluded atoms are accounted for
         
-        do i=1,ii
+        do i=1,nsatm
           
           if(nexatm(i).gt.0.and.noxatm(i).ne.nexatm(i))lchk=.false.
           
         enddo
         
         if(mxnode.gt.1)call gstate(lchk)
-        
         if(.not.lchk) call error(idnode,160)
         
       endif  
@@ -1777,49 +1845,57 @@ c*********************************************************************
       
       implicit none
       
-      integer idnode,mxnode,natms,imcon,ii,k,j,i
+      integer idnode,mxnode,natms,imcon,i,j,k,n
       real(8) rprim,rprim2,rsq
       
       rprim2=rprim*rprim
-      ii=0
+
+      n=0
       
       do i=1+idnode,natms,mxnode
         
-        ii=ii+1
+        n=n+1
         
-        do j=1,lentry(ii)
+        do k=1,lentry(n)
           
-          k=iabs(list(ii,j))
-          xdf(j)=xxx(i)-xxx(k)
-          ydf(j)=yyy(i)-yyy(k)
-          zdf(j)=zzz(i)-zzz(k)
+          j=iabs(list(n,k))
+          xdf(k)=xxx(i)-xxx(j)
+          ydf(k)=yyy(i)-yyy(j)
+          zdf(k)=zzz(i)-zzz(j)
           
         enddo           
         
 c     apply minimum image convention
         
-        call images(imcon,0,1,lentry(ii),cell,xdf,ydf,zdf)
+        call images(imcon,0,1,lentry(n),cell,xdf,ydf,zdf)
         
 c     assign atoms as primary or secondary
         
-        
-        do j=1,lentry(ii)
+        do j=1,lentry(n)
           
 c     calculate interatomic distance
+
+          if(imcon.eq.6)then
           
-          rsq=xdf(j)**2+ydf(j)**2+zdf(j)**2
+            rsq=xdf(j)**2+ydf(j)**2
+
+          else
+
+            rsq=xdf(j)**2+ydf(j)**2+zdf(j)**2
+
+          endif
           
           if(rsq.lt.rprim2)then
             
 c     compile primary neighbour list array  : -ve indices
             
-            list(ii,j)=-iabs(list(ii,j))
+            list(n,j)=-iabs(list(n,j))
             
           else
             
 c     compile secondary neighbour list array : +ve indices
             
-            list(ii,j)=iabs(list(ii,j))
+            list(n,j)=iabs(list(n,j))
             
           endif
           
@@ -1848,7 +1924,7 @@ c***********************************************************************
       implicit none
       
       logical newlst,lchk,ldo
-      integer imcon,idnode,mxnode,nneut,ineu,ia,jj,ibig,ii
+      integer imcon,idnode,mxnode,nneut,ineu,ia,jj,ibig,n
       integer jj0,jneu,j,i,idum
       real(8) rprim,rclim,xi,yi,zi,rrr
       
@@ -1885,7 +1961,7 @@ c     loop over neutral group ineu sites
           
           ia=ia+1
           
-          ii=0
+          n=0
           do i=neulst(ineu),neulst(ineu+1)-1
             
             xi=xxx(i)
@@ -1903,14 +1979,14 @@ c     loop over jneu sites
               
               do j=jj0,neulst(jneu+1)-1
                 
-                ii=ii+1
-                if(ii.le.mxxdf)then
-                  xdf(ii)=xi-xxx(j)
-                  ydf(ii)=yi-yyy(j)
-                  zdf(ii)=zi-zzz(j)
+                n=n+1
+                if(n.le.mxxdf)then
+                  xdf(n)=xi-xxx(j)
+                  ydf(n)=yi-yyy(j)
+                  zdf(n)=zi-zzz(j)
                 else
                   lchk=.false.
-                  ibig=ii
+                  ibig=n
                 endif
                 
               enddo
@@ -1921,13 +1997,13 @@ c     loop over jneu sites
           
 c     apply minimum image convention
           
-          ii=min(ii,mxxdf)
-          call images(imcon,0,1,ii,cell,xdf,ydf,zdf)
+          n=min(n,mxxdf)
+          call images(imcon,0,1,n,cell,xdf,ydf,zdf)
           
 c     allocate groups to primary or secondary shell
 c     on basis of closest atom-atom interactions
           
-          ii=0
+          n=0
           do i=neulst(ineu),neulst(ineu+1)-1
             
             do jj=1,lentry(ia)
@@ -1945,15 +2021,15 @@ c     loop over jneu sites
                   
                   if(ldo)then 
                     
-                    ii=min(ii+1,mxxdf)
+                    n=min(n+1,mxxdf)
                     
-                    if(abs(xdf(ii)).lt.rprim)then
-                      if(abs(ydf(ii)).lt.rprim)then
-                        if(abs(zdf(ii)).lt.rprim)then
+                    if(abs(xdf(n)).lt.rprim)then
+                      if(abs(ydf(n)).lt.rprim)then
+                        if(abs(zdf(n)).lt.rprim)then
                           
 c     calculate interatomic distance
                           
-                          rrr=xdf(ii)**2+ydf(ii)**2+zdf(ii)**2
+                          rrr=xdf(n)**2+ydf(n)**2+zdf(n)**2
                           
 c     put in primary list if found any interaction close enough
                           
@@ -1995,7 +2071,7 @@ c     put in primary list if found any interaction close enough
       return
       end subroutine prneulst
       
-      subroutine vertest(newlst,idnode,mxnode,natms,delr,tstep)
+      subroutine vertest(newlst,idnode,mxnode,natms,nbeads,delr,tstep)
       
 c*********************************************************************
 c     
@@ -2010,7 +2086,7 @@ c*********************************************************************
       implicit none
       
       logical newlst,newjob
-      integer idnode,mxnode,natms,i,j,k,moved,ibuff,fail
+      integer idnode,mxnode,natms,nbeads,numatm,i,j,k,moved,ibuff,fail
       real(8) rmax,dr,delr,tstep
       
       real(8), allocatable :: xold(:),yold(:),zold(:)
@@ -2019,17 +2095,19 @@ c*********************************************************************
       
       data newjob/.true./,fail/0/
       
-      if((natms+mxnode-1)/mxnode.gt.msatms) call error(idnode,112)
+      numatm=nbeads*natms
+      
+      if((numatm-1)/mxnode+1.gt.mslist) call error(idnode,112)
       
       if(newjob)then
         
 c     set up initial arrays 
         
-        allocate (xold(msatms),yold(msatms),zold(msatms),stat=fail)
+        allocate (xold(mslist),yold(mslist),zold(mslist),stat=fail)
         if(fail.ne.0)call error(idnode,1930)
         
         j=0
-        do i=idnode+1,natms,mxnode
+        do i=idnode+1,numatm,mxnode
           
           j=j+1
           xold(j)=0.d0
@@ -2046,7 +2124,7 @@ c     set up initial arrays
 c     integrate velocities 
         
         j=0
-        do i=idnode+1,natms,mxnode
+        do i=idnode+1,numatm,mxnode
           
           j=j+1
           xold(j)=xold(j)+vxx(i)

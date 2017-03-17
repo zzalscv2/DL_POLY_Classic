@@ -40,7 +40,7 @@ c***********************************************************************
       
       contains
       
-      subroutine alloc_config_arrays(idnode)
+      subroutine alloc_config_arrays(idnode,mxnode)
 
 c***********************************************************************
 c     
@@ -52,48 +52,54 @@ c***********************************************************************
       
       integer, parameter :: nnn=27
 
-      integer i,fail,idnode
+      logical safe
+      integer i,fail,idnode,mxnode,numatm
       dimension fail(nnn)
 
-      do i=1,nnn
-        fail(i)=0
-      enddo
-
-      allocate (xxx(mxatms),stat=fail(1))
-      allocate (yyy(mxatms),stat=fail(2))
-      allocate (zzz(mxatms),stat=fail(3))
-      allocate (vxx(mxatms),stat=fail(4))
-      allocate (vyy(mxatms),stat=fail(5))
-      allocate (vzz(mxatms),stat=fail(6))
-      allocate (fxx(mxatms),stat=fail(7))
-      allocate (fyy(mxatms),stat=fail(8))
-      allocate (fzz(mxatms),stat=fail(9))
-      allocate (weight(mxatms),stat=fail(11))
-      allocate (chge(mxatms),stat=fail(12))
-      allocate (ltype(mxatms),stat=fail(13))
-      allocate (lstfrz(mxatms),stat=fail(14))
-      allocate (flx(mxatms),stat=fail(15))
-      allocate (fly(mxatms),stat=fail(16))
-      allocate (flz(mxatms),stat=fail(17))
-      allocate (atmnam(mxatms),stat=fail(18))
+      safe=.true.
+      numatm=mxatms*nbeads
+      
+c     allocate arrays
+      
+      fail(:)=0
+      
+      allocate (xxx(numatm),stat=fail(1))
+      allocate (yyy(numatm),stat=fail(2))
+      allocate (zzz(numatm),stat=fail(3))
+      allocate (vxx(numatm),stat=fail(4))
+      allocate (vyy(numatm),stat=fail(5))
+      allocate (vzz(numatm),stat=fail(6))
+      allocate (fxx(numatm),stat=fail(7))
+      allocate (fyy(numatm),stat=fail(8))
+      allocate (fzz(numatm),stat=fail(9))
+      allocate (weight(numatm),stat=fail(11))
+      allocate (chge(numatm),stat=fail(12))
+      allocate (ltype(numatm),stat=fail(13))
+      allocate (lstfrz(numatm),stat=fail(14))
+      allocate (flx(numatm),stat=fail(15))
+      allocate (fly(numatm),stat=fail(16))
+      allocate (flz(numatm),stat=fail(17))
+      allocate (atmnam(numatm),stat=fail(18))
       allocate (neulst(mxneut),stat=fail(19))
-      allocate (lstneu(mxatms),stat=fail(20))
-      allocate (lstout(mxatms),stat=fail(21))
-      allocate (lentry(msatms),stat=fail(22))
-      allocate (list(msatms,mxlist),stat=fail(23))
-      allocate (link(mxatms),stat=fail(24))
+      allocate (lstneu(numatm),stat=fail(20))
+      allocate (lstout(numatm),stat=fail(21))
+      allocate (lentry(mslist),stat=fail(22))
+      allocate (list(mslist,mxlist),stat=fail(23))
+      allocate (link(numatm),stat=fail(24))
       allocate (lct(mxcell),stat=fail(25))
       allocate (lst(mxcell),stat=fail(26))
-      allocate (rmass(mxatms),stat=fail(27))
+      allocate (rmass(numatm),stat=fail(27))
       allocate (buffer(mxbuff),stat=fail(10))
 
-      do i=1,nnn
-        if(fail(i).gt.0)then
-          if(idnode.eq.0)write(nrite,'(10i5)')fail
-          call error(idnode,1000)
-        endif
-      enddo
+      if(any(fail.gt.0))safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)then
+        
+        if(idnode.eq.0)write(nrite,'(10i5)')fail
+        call error(idnode,1000)
 
+      endif
+      
       end subroutine alloc_config_arrays
 
       end module config_module

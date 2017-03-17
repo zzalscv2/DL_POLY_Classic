@@ -978,7 +978,7 @@ c     Convert into internal units
       
 c---------------------------------------------------------------------
 c     Purge the METADYNAMICS file or re-open and read if this is a 
-c     restart. N.B. we assume a restart if REVOLD if present and 
+c     restart. N.B. we assume a restart if REVOLD is present and 
 c     ignore keyres.
 c---------------------------------------------------------------------
       

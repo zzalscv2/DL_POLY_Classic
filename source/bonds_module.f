@@ -5,11 +5,9 @@ c
 c     dl_poly module for defining bond potential arrays
 c     copyright - daresbury laboratory
 c     
-c     author    - w. smith    sep 2003
-c     adapted for solvation, free energy and excitation
-c               - p.-a. cazade oct 2007
-c     adapted for metadynamics
-c               - d. quigley 2006
+c     author    - w. smith     sep 2003
+c     modified  - p.-a.cazade  oct 2007 : solvation etc.
+c     modified  - d. quigley       2010 : metadynamics
 c     
 c***********************************************************************
       
@@ -32,12 +30,15 @@ c***********************************************************************
       
       contains
       
-      subroutine alloc_bnd_arrays(idnode)
+      subroutine alloc_bnd_arrays(idnode,mxnode)
       
       implicit none
-      
-      integer i,fail,idnode
+
+      logical safe
+      integer i,fail,idnode,mxnode
       dimension fail(5)
+
+      safe=.true.
       
       do i=1,5
         fail(i)=0
@@ -49,9 +50,11 @@ c***********************************************************************
       allocate (lstbnd(mxtbnd,3),stat=fail(4))
       allocate (listbnd(mxbond,4),stat=fail(5))
       
-      do i=1,5
-        if(fail(i).gt.0)call error(idnode,1030)
-      enddo
+      if(any(fail.gt.0))safe=.false.
+      if(mxnode.gt.1)call gstate(safe)
+      if(.not.safe)call error(idnode,1030)
+      
+c     initialse numbonds array
       
       do i=1,mxtmls
         numbonds(i)=0
@@ -76,118 +79,126 @@ c***********************************************************************
       logical safe
       character*8 keyword
       character*1 message(80)
-      integer idnode,itmols,nbonds,nsite,ntmp,ibond,ibond1
-      integer iatm1,iatm2,isite1,isite2,idum,i,j
-      real(8) engunit
+      integer idnode,itmols,nbonds,nsite,ntmp,ibond,keytmp
+      integer iatm1,iatm2,isite1,isite2,idum,j
+      real(8) engunit,parpot(mxpbnd)
       
       ntmp=intstr(record,lenrec,idum)
       numbonds(itmols)=numbonds(itmols)+ntmp
+
       if(idnode.eq.0)then
         write(nrite,"(/,1x,'number of chemical bonds',
-     x    7x,i10)")ntmp
+     x    7x,i10)")numbonds(itmols)
         write(nrite,"(/,/,1x,'chemical bond details:',
-     x    /,/,21x,7x,'key',5x,'index',5x,'index',28x,
+     x    /,/,18x,'unit',5x,'key',5x,'index',5x,'index',28x,
      x    'parameters', /)")
       endif
       
-      ibond1=numbonds(itmols)
-      do ibond=1,ibond1
-        
+      do ibond=1,ntmp
+
+        nbonds=nbonds+1
+        if(nbonds.gt.mxtbnd)call error(idnode,30)
+
+c     read bond potential parameters
+
         call getrec(safe,idnode,nfield)
         if(.not.safe)return
         
         call copystring(record,message,80)
         call lowcase(record,4)
         call getword(keyword,record,4,lenrec)
-        call strip(keyword,4)
+
+        if(keyword(1:4).eq.'harm')then
+          keytmp=1
+        elseif(keyword(1:4).eq.'-hrm')then
+          keytmp=-1
+        elseif(keyword(1:4).eq.'mors')then
+          keytmp=2
+        elseif(keyword(1:4).eq.'-mrs')then
+          keytmp=-2
+        elseif(keyword(1:4).eq.'12-6')then
+          keytmp=3
+        elseif(keyword(1:4).eq.'-126')then
+          keytmp=-3
+        elseif(keyword(1:4).eq.'rhrm')then
+          keytmp=4
+        elseif(keyword(1:4).eq.'-rhm')then
+          keytmp=-4
+        elseif(keyword(1:4).eq.'quar')then
+          keytmp=5
+        elseif(keyword(1:4).eq.'-qur')then
+          keytmp=-5
+        elseif(keyword(1:4).eq.'buck')then
+          keytmp=6
+        elseif(keyword(1:4).eq.'-bck')then
+          keytmp=-6
+        elseif(keyword(1:4).eq.'fene')then
+          keytmp=7
+        elseif(keyword(1:4).eq.'-fen')then
+          keytmp=-7
+        elseif(keyword(1:4).eq.'coul')then
+          keytmp=8
+        elseif(keyword(1:4).eq.'-cou')then
+          keytmp=-8
+        elseif(keyword(1:2).eq.'lj')then
+          keytmp=9
+        elseif(keyword(1:3).eq.'-lj')then
+          keytmp=-9
+        else
+          if(idnode.eq.0)write(nrite,*)message
+          call error(idnode,444)
+        endif
+
         iatm1=intstr(record,lenrec,idum)
         iatm2=intstr(record,lenrec,idum)
-        
-c     test for frozen atom pairs
+        parpot(1)=dblstr(record,lenrec,idum)
+        parpot(2)=dblstr(record,lenrec,idum)
+        parpot(3)=dblstr(record,lenrec,idum)
+        parpot(4)=dblstr(record,lenrec,idum)
         
         isite1=nsite-numsit(itmols)+iatm1
         isite2=nsite-numsit(itmols)+iatm2
         
+c     test for frozen atom pairs
+        
         if(lfzsit(isite1)*lfzsit(isite2).ne.0)then
           
           numbonds(itmols)=numbonds(itmols)-1
-          if(idnode.eq.0)write(nrite,'(12x,a16,40a1)')
-     x      '*** frozen *** ',(message(i),i=1,40)
+          if(idnode.eq.0)
+     x      write(nrite,"(4x,a8,i10,4x,a4,2i10,2x,10f15.6)")
+     x      '*frozen*',ibond,keyword(1:4),iatm1,iatm2,
+     x      (parpot(j),j=1,mxpbnd)
           
         else
           
-          nbonds=nbonds+1
-          if(nbonds.gt.mxtbnd)call error(idnode,30)
-          
-          if(keyword(1:4).eq.'harm')then
-            keybnd(nbonds)=1
-          elseif(keyword(1:4).eq.'-hrm')then
-            keybnd(nbonds)=-1
-          elseif(keyword(1:4).eq.'mors')then
-            keybnd(nbonds)=2
-          elseif(keyword(1:4).eq.'-mrs')then
-            keybnd(nbonds)=-2
-          elseif(keyword(1:4).eq.'12-6')then
-            keybnd(nbonds)=3
-          elseif(keyword(1:4).eq.'-126')then
-            keybnd(nbonds)=-3
-          elseif(keyword(1:4).eq.'rhrm')then
-            keybnd(nbonds)=4
-          elseif(keyword(1:4).eq.'-rhm')then
-            keybnd(nbonds)=-4
-          elseif(keyword(1:4).eq.'quar')then
-            keybnd(nbonds)=5
-          elseif(keyword(1:4).eq.'-qur')then
-            keybnd(nbonds)=-5
-          elseif(keyword(1:4).eq.'buck')then
-            keybnd(nbonds)=6
-          elseif(keyword(1:4).eq.'-bck')then
-            keybnd(nbonds)=-6
-          elseif(keyword(1:4).eq.'fene')then
-            keybnd(nbonds)=7
-          elseif(keyword(1:4).eq.'-fen')then
-            keybnd(nbonds)=-7
-          elseif(keyword(1:4).eq.'coul')then
-            keybnd(nbonds)=8
-          elseif(keyword(1:4).eq.'-cou')then
-            keybnd(nbonds)=-8
-          elseif(keyword(1:2).eq.'lj')then
-            keybnd(nbonds)=9
-          elseif(keyword(1:3).eq.'-lj')then
-            keybnd(nbonds)=-9
-          else
-            if(idnode.eq.0)write(nrite,*)message
-            call error(idnode,444)
-          endif
-          
-          lstbnd(nbonds,1)=iatm1
-          lstbnd(nbonds,2)=iatm2
-          prmbnd(nbonds,1)=dblstr(record,lenrec,idum)
-          prmbnd(nbonds,2)=dblstr(record,lenrec,idum)
-          prmbnd(nbonds,3)=dblstr(record,lenrec,idum)
-          prmbnd(nbonds,4)=dblstr(record,lenrec,idum)
-          
           if(idnode.eq.0)
-     x      write(nrite,"(27x,a4,2i10,2x,1p,10e15.6)")
-     x      keyword(1:4),lstbnd(nbonds,1),
-     x      lstbnd(nbonds,2),(prmbnd(nbonds,j),j=1,mxpbnd)
-c     
+     x      write(nrite,"(12x,i10,4x,a4,2i10,2x,10f15.6)")
+     x      ibond,keyword(1:4),iatm1,iatm2,(parpot(j),j=1,mxpbnd)
+          
+        endif
+        
+        keybnd(nbonds)=keytmp
+        lstbnd(nbonds,1)=iatm1
+        lstbnd(nbonds,2)=iatm2
+        prmbnd(nbonds,1)=parpot(1)
+        prmbnd(nbonds,2)=parpot(2)
+        prmbnd(nbonds,3)=parpot(3)
+        prmbnd(nbonds,4)=parpot(4)
+        
 c     convert energy units to internal units
-          
-          if(abs(keybnd(nbonds)).eq.3)then
-            prmbnd(nbonds,2)=prmbnd(nbonds,2)*engunit
-          endif
-          if(abs(keybnd(nbonds)).eq.5)then
-            prmbnd(nbonds,3)=prmbnd(nbonds,3)*engunit
-            prmbnd(nbonds,4)=prmbnd(nbonds,4)*engunit
-          endif
-          if(abs(keybnd(nbonds)).eq.6)then
-            prmbnd(nbonds,3)=prmbnd(nbonds,3)*engunit
-          endif
-          
-          if(abs(keybnd(nbonds)).ne.8)
-     x      prmbnd(nbonds,1)=prmbnd(nbonds,1)*engunit
-          
+        
+        if(abs(keytmp).eq.3)then
+          prmbnd(nbonds,2)=prmbnd(nbonds,2)*engunit
+        endif
+        if(abs(keytmp).eq.5)then
+          prmbnd(nbonds,3)=prmbnd(nbonds,3)*engunit
+          prmbnd(nbonds,4)=prmbnd(nbonds,4)*engunit
+        endif
+        if(abs(keytmp).eq.6)then
+          prmbnd(nbonds,3)=prmbnd(nbonds,3)*engunit
+        endif
+        if(abs(keytmp).ne.8)then
+          prmbnd(nbonds,1)=prmbnd(nbonds,1)*engunit
         endif
         
       enddo
@@ -228,12 +239,15 @@ c***********************************************************************
       real(8) rab,rrab,omega,gamma,fx,fy,fz,engbnd,virbnd,epsq
       real(8), allocatable :: xdab(:),ydab(:),zdab(:)
       
-      allocate (xdab(msbad),ydab(msbad),zdab(msbad),stat=fail)
-      if(fail.ne.0)call error(idnode,1040)
-      
-c     flag for undefined potential
-      
       safe=.true.
+      
+c     allocate work arrays
+      
+      fail=0
+      allocate (xdab(msbad),ydab(msbad),zdab(msbad),stat=fail)
+      if(fail.ne.0)safe=.false.
+      if(mxnode.gt.1)call gstate(safe)
+      if(.not.safe)call error(idnode,1040)
       
 c     check size of work arrays
       
@@ -392,7 +406,7 @@ c     coulomb bond potential
           gamma=-omega*rrab*rrab
           
         else if(keyb.eq.9)then
-          
+                    
 c     lennard-jones potential
           
           omega=4.d0*prmbnd(kk,1)*(prmbnd(kk,2)/rab)**6*

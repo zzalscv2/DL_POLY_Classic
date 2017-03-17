@@ -28,19 +28,22 @@ c***********************************************************************
 
       contains
       
-      subroutine alloc_met_arrays(idnode)
-
+      subroutine alloc_met_arrays(idnode,mxnode)
+      
       implicit none
-
+      
+      logical safe
       integer, parameter :: nnn=8
-      integer i,fail,idnode
-
+      integer i,fail,idnode,mxnode
+      
       dimension fail(nnn)
-
-      do i=1,nnn
-        fail(i)=0
-      enddo
-
+      
+      safe=.true.
+      
+c     allocate arrays
+      
+      fail(:)=0
+      
       allocate (ltpmet(mxmet),stat=fail(1))
       allocate (lstmet(mxmet),stat=fail(2))
       allocate (prmmet(mxmet,mxpmet),stat=fail(3))
@@ -49,11 +52,11 @@ c***********************************************************************
       allocate (rho(mxatms),stat=fail(6))
       allocate (elrcm(0:mxsmet),stat=fail(7))
       allocate (vlrcm(0:mxsmet),stat=fail(8))
-
-      do i=1,nnn
-        if(fail(i).gt.0)call error(idnode,1280)
-      enddo
-
+      
+      if(any(fail.gt.0))safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,1280)
+      
       end subroutine alloc_met_arrays
 
       subroutine define_metals

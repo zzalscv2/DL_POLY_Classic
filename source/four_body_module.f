@@ -30,28 +30,31 @@ c***********************************************************************
 
       contains
       
-      subroutine alloc_fbp_arrays(idnode)
+      subroutine alloc_fbp_arrays(idnode,mxnode)
 
       implicit none
 
-      integer i,fail,idnode
+      logical safe
+      integer i,fail,idnode,mxnode
       dimension fail(6)
-
-      do i=1,6
-        fail(i)=0
-      enddo
-
+      
+      safe=.true.
+      
+c     allocate arrays
+      
+      fail(:)=0
+      
       allocate (prmfbp(mxfbp,mxpfbp),stat=fail(1))
       allocate (rcut4b(mxfbp),stat=fail(2))
       allocate (lstfbp(mxfbp),stat=fail(3))
       allocate (ltpfbp(mxfbp),stat=fail(4))
       allocate (latfbp(mxatms),stat=fail(5))
       allocate (filter(mxsite),stat=fail(6))
-
-      do i=1,6
-        if(fail(i).gt.0)call error(idnode,1140)
-      enddo
-
+      
+      if(any(fail.gt.0))safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,1140)
+      
       end subroutine alloc_fbp_arrays
 
       subroutine define_four_body

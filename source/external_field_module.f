@@ -22,16 +22,23 @@ c***********************************************************************
       
       contains
       
-      subroutine alloc_fld_arrays(idnode)
+      subroutine alloc_fld_arrays(idnode,mxnode)
       
       implicit none
       
-      integer fail,idnode
+      logical safe
+      integer fail,idnode,mxnode
       
-      data fail/0/
+      safe=.true.
+      
+c     allocate arrays
+      
+      fail=0
       
       allocate (prmfld(mxfld),stat=fail)
-      if(fail.ne.0)call error(idnode,1200)
+      if(fail.gt.0 )safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,1200)
       
       end subroutine alloc_fld_arrays
       

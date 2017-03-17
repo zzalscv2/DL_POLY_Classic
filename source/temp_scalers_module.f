@@ -195,74 +195,74 @@ c
 c***********************************************************************
 
       implicit none
-
+      
       integer idnode,imcon,mxnode,natms,ngrp,fail,ig,jr,id
       integer igrp1,igrp2,i,j
       real(8) rot,wxx,wyy,wzz
-
+      
       dimension rot(9)
       real(8), allocatable :: xxt(:),yyt(:),zzt(:)
-
+      
       data fail/0/
       
 c     allocate work arrays 
-
+      
       allocate (xxt(mxatms),yyt(mxatms),zzt(mxatms),stat=fail)
       if(fail.ne.0)call error(idnode,1780)
-
+      
 c     block indices for groups
-
+      
       igrp1=(idnode*ngrp)/mxnode+1
       igrp2=((idnode+1)*ngrp)/mxnode
-
+      
 c     translate atomic velocites to com velocity & angular velocity
-
+      
       jr=0
       do ig=igrp1,igrp2
-
+        
         gvxx(ig)=0.d0
         gvyy(ig)=0.d0
         gvzz(ig)=0.d0
         omx(ig)=0.d0
         omy(ig)=0.d0
         omz(ig)=0.d0
-
+        
         id=lstgtp(ig)
-
+        
         do j=1,numgsit(id)
-
+          
           jr =jr+1
           i =lstrgd(jr)
-
+          
 c     centre of mass momentum
-
+          
           gvxx(ig)=gvxx(ig)+weight(i)*vxx(i)
           gvyy(ig)=gvyy(ig)+weight(i)*vyy(i)
           gvzz(ig)=gvzz(ig)+weight(i)*vzz(i)
-
+          
 c     distance to c.o.m of molecule
-
+          
           xxt(jr)=xxx(i)-gcmx(ig)
           yyt(jr)=yyy(i)-gcmy(ig)
           zzt(jr)=zzz(i)-gcmz(ig)
-
+          
         enddo
-
+        
 c     centre of mass velocity
-
+        
         gvxx(ig)=gvxx(ig)/gmass(id)
         gvyy(ig)=gvyy(ig)/gmass(id)
         gvzz(ig)=gvzz(ig)/gmass(id)
-
+        
       enddo
-
+      
       call images(imcon,0,1,jr,cell,xxt,yyt,zzt)
-
+      
       jr=0
       do ig=igrp1,igrp2
-
+        
 c     rotational matrix
-
+        
         rot(1)=q0(ig)**2+q1(ig)**2-q2(ig)**2-q3(ig)**2
         rot(2)=2.d0*(q1(ig)*q2(ig)-q0(ig)*q3(ig))
         rot(3)=2.d0*(q1(ig)*q3(ig)+q0(ig)*q2(ig))
@@ -274,7 +274,7 @@ c     rotational matrix
         rot(9)=q0(ig)**2-q1(ig)**2-q2(ig)**2+q3(ig)**2
         
 c     angular momentum accumulators
-
+        
         wxx=0.d0
         wyy=0.d0
         wzz=0.d0
@@ -282,18 +282,18 @@ c     angular momentum accumulators
         id=lstgtp(ig)
 
         do j=1,numgsit(id)
-
+          
           jr =jr+1
           i =lstrgd(jr)
-
+          
           wxx=wxx+weight(i)*(yyt(jr)*vzz(i)-zzt(jr)*vyy(i))
           wyy=wyy+weight(i)*(zzt(jr)*vxx(i)-xxt(jr)*vzz(i))
           wzz=wzz+weight(i)*(xxt(jr)*vyy(i)-yyt(jr)*vxx(i))
-
+          
         enddo
-
+        
 c     angular velocity in body fixed frame
-
+        
         omx(ig)=(rot(1)*wxx+rot(4)*wyy+rot(7)*wzz)*rotinx(id,2)
         omy(ig)=(rot(2)*wxx+rot(5)*wyy+rot(8)*wzz)*rotiny(id,2)
         omz(ig)=(rot(3)*wxx+rot(6)*wyy+rot(9)*wzz)*rotinz(id,2)
@@ -305,31 +305,31 @@ c     angular velocity in body fixed frame
           i=lstrgd(jr)
           
 c     site velocity in body frame 
-
+          
           wxx=omy(ig)*gzz(id,j)-omz(ig)*gyy(id,j)
           wyy=omz(ig)*gxx(id,j)-omx(ig)*gzz(id,j)
           wzz=omx(ig)*gyy(id,j)-omy(ig)*gxx(id,j)
-
+          
 c     new atomic velocites in lab frame
-
+          
           vxx(i)=rot(1)*wxx+rot(2)*wyy+rot(3)*wzz+gvxx(ig)
           vyy(i)=rot(4)*wxx+rot(5)*wyy+rot(6)*wzz+gvyy(ig)
           vzz(i)=rot(7)*wxx+rot(8)*wyy+rot(9)*wzz+gvzz(ig)
-
+          
         enddo
-
+        
       enddo
-
+      
       if(mxnode.gt.1)then
-
+        
         call merge(idnode,mxnode,ngrp,mxbuff,gvxx,gvyy,gvzz,buffer)
         call merge(idnode,mxnode,ngrp,mxbuff,omx,omy,omz,buffer)
         call merge1(idnode,mxnode,natms,lstme,vxx,vyy,vzz,buffer)
-
+        
       endif
-
+      
 c     deallocate work arrays
-
+      
       deallocate (xxt,yyt,zzt,stat=fail)
       
       return
@@ -354,18 +354,18 @@ c
 c*********************************************************************
       
       implicit none
-
+      
       integer idnode,mxnode,imcon,natms,ngrp,iatm1,iatm2,i
       real(8) sigma,roti,rotinv,cmx,cmy,cmz,cmvx,cmvy,cmvz,sysmas
       real(8) amx,amy,amz,det,scale,rsq,wxx,wyy,wzz,sumke
-
+      
       dimension roti(9),rotinv(9)
-
+      
 c     block indices
-
+      
       iatm1=(idnode*natms)/mxnode+1
       iatm2=((idnode+1)*natms)/mxnode
-
+      
 c     calculate centre of mass position and motion of the system
       
       cmx=0.d0
@@ -379,7 +379,7 @@ c     calculate centre of mass position and motion of the system
       do i=iatm1,iatm2
         
         if(lstfrz(i).eq.0.and.weight(i).gt.1.d-6)then
-
+          
           cmx=cmx+weight(i)*xxx(i)
           cmy=cmy+weight(i)*yyy(i)
           cmz=cmz+weight(i)*zzz(i)
@@ -389,7 +389,7 @@ c     calculate centre of mass position and motion of the system
           cmvz=cmvz+vzz(i)*weight(i)
           
         endif
-
+        
       enddo
       
       if(mxnode.gt.1)then
@@ -409,7 +409,7 @@ c     calculate centre of mass position and motion of the system
         cmvy=buffer(13) 
         cmvz=buffer(14) 
       endif
-
+      
       cmx=cmx/sysmas
       cmy=cmy/sysmas
       cmz=cmz/sysmas
@@ -423,25 +423,25 @@ c     remove centre of mass motion
       do i=1,natms
         
         if(lstfrz(i).eq.0.and.weight(i).gt.1.d-6)then
-
+          
           vxx(i)=vxx(i)-cmvx
           vyy(i)=vyy(i)-cmvy
           vzz(i)=vzz(i)-cmvz
           
         else
-
+          
           vxx(i)=0.d0
           vyy(i)=0.d0
           vzz(i)=0.d0
-
+          
         endif
-
+        
       enddo
       
 c     zero angular momentum about centre of mass - non-periodic system
       
       if(imcon.eq.0)then
-
+        
 c     move to centre of mass origin
         
         do i=1,natms
@@ -457,11 +457,13 @@ c     angular momentum accumulators
         amx=0.d0
         amy=0.d0
         amz=0.d0
-
+        
 c     rotational inertia accumulators
         
         do i=1,9
+          
           roti(i)=0.d0
+          
         enddo
         
         do i=iatm1,iatm2
@@ -479,15 +481,15 @@ c     rotational inertia accumulators
           roti(9)=roti(9)+weight(i)*(zzz(i)*zzz(i)-rsq)
           
         enddo
-
+        
 c     complete rotational inertia matrix
         
         roti(4)=roti(2)
         roti(7)=roti(3)
         roti(8)=roti(6)
-
+        
 c     global sum
-
+        
         if(mxnode.gt.1)then
           buffer(13)=amx
           buffer(14)=amy
@@ -503,31 +505,31 @@ c     global sum
             roti(i)=buffer(15+i)
           enddo
         endif
-
+        
 c     invert rotational inertia matrix
         
         call invert (roti,rotinv,det)
-
+        
 c     correction to angular velocity
         
         wxx=rotinv(1)*amx+rotinv(2)*amy+rotinv(3)*amz
         wyy=rotinv(4)*amx+rotinv(5)*amy+rotinv(6)*amz
         wzz=rotinv(7)*amx+rotinv(8)*amy+rotinv(9)*amz
-
+        
 c     correction to linear velocity
         
         do i=1,natms
-
+          
           if(lstfrz(i).eq.0.and.weight(i).gt.1.d-6)then
-
+            
             vxx(i)=vxx(i)+(wyy*zzz(i)-wzz*yyy(i))
             vyy(i)=vyy(i)+(wzz*xxx(i)-wxx*zzz(i))
             vzz(i)=vzz(i)+(wxx*yyy(i)-wyy*xxx(i))
             
           endif
-
+          
         enddo
-
+        
 c     reset positions to original reference frame
         
         do i=1,natms
@@ -539,29 +541,38 @@ c     reset positions to original reference frame
         enddo
         
       endif
-
+      
 c     calculate temperature 
-
+      
       sumke=0.d0
       
       do i=iatm1,iatm2
-
+        
         sumke=sumke+weight(i)*
      x    (vxx(i)**2+vyy(i)**2+vzz(i)**2)
-
+        
       enddo
-
+      
       sumke=0.5d0*sumke
       if(mxnode.gt.1)then
+        
         buffer(1)=sumke
         call gdsum(buffer(1),1,buffer(2))
         sumke=buffer(1)
+        
       endif
-
+      
 c     apply temperature scaling
       
-      scale=1.d0
-      if(sumke.gt.1.d-6)scale=sqrt(sigma/sumke)
+      if(sumke.gt.1.d-6)then
+
+        scale=sqrt(sigma/sumke)
+
+      else
+        
+        scale=1.d0
+        
+      endif
       
       do i=1,natms
         
@@ -572,8 +583,9 @@ c     apply temperature scaling
       enddo
 
       if(ngrp.gt.0)then
+        
         call quatqnch(idnode,imcon,mxnode,natms,ngrp)
-
+        
       endif
       
       return

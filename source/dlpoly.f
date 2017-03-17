@@ -21,8 +21,8 @@ c
 c     authors: w.smith and t.r.forester 1995
 c     copyright daresbury laboratory 1995
 c     
-c                       DL_POLY CLASSIC VERSION 1.9
-c
+c                         DL_POLY CLASSIC VERSION 1.10
+c     
 c***********************************************************************
       
 c     declare required modules
@@ -47,6 +47,7 @@ c     declare required modules
       use metafreeze_module
       use nlist_builders_module
       use pair_module
+      use pimd_module
       use pmf_module
       use property_module
       use rigid_body_module
@@ -61,17 +62,20 @@ c     declare required modules
       use three_body_module
       use utility_module
       use vdw_module
+      use vv_pimd_module
       
       implicit none
       
       character*1 hms,dec
       character*8 seek
-      
+c     remove next line
+      logical safe
+
       logical ltscal,lzeql,loptim,ltraj,lgofr,lpgr,lfcap,recycle
       logical newlst,lneut,loglnk,lnsq,lzden,lshmov,lcnb,ltad,lneb
       logical stropt,lzero,nolink,newgau,lminim,lminnow,lhit,lbpd
       logical prechk,tadall,lexcite,lsolva,lfree,lfrmas,lswitch
-      logical lghost,llswitch,lnfic,nebgo,lpsoc,redirect
+      logical lghost,llswitch,lnfic,nebgo,lpsoc,redirect,lpimd
       
       integer npage,lines,idnode,mxnode,memr,intsta,istraj,nsbzdn
       integer keyens,keyfce,keyres,keytrj,kmax1,kmax2,kmax3,multt
@@ -82,7 +86,7 @@ c     declare required modules
       integer ntteth,ntshl,nstep,numacc,numrdf,nzden,nscons,i,k
       integer ntpter,keyshl,isw,keyver,keystr,keytol,numgau,khit
       integer nhit,keybpd,ntrack,nblock,blkout,numneb,nturn,mode
-      integer natms2,ntghost,nsolva,isolva,nofic
+      integer natms2,ntghost,nsolva,isolva,nofic,iadd
       
       real(8) alpha,delr,epsq,fmax,press,quattol,rcut,rprim,rvdw,taup
       real(8) taut,temp,timcls,timjob,tolnce,tstep,tzero,dlrpot,drewd
@@ -95,8 +99,9 @@ c     declare required modules
       real(8) stpeng,stpeth,stpprs,stptmp,stpvir,stpvol,width,zlen
       real(8) timelp,engmet,virmet,pass0,pass1,pass2,rlxtol,opttol
       real(8) catchrad,sprneb,deltad,tlow,engtke,ehit,xhit,yhit,zhit
-      real(8) ebias,vmin,hyp_units,estar,chit_shl,sigma_shl
-      real(8) engord,virord
+      real(8) ebias,vmin,hyp_units,estar,chit_shl,sigma_shl,engthe,chi
+      real(8) engord,virord,engqpi,engqvr,engrng,virrng,qmsrgr,qmsbnd
+      real(8) uuu(102),gaumom(0:5)
       real(8), allocatable :: tbuffer(:)
       
       data timelp/0.d0/,lminnow/.false./,ntrack/10/
@@ -104,6 +109,7 @@ c     declare required modules
       data pass0/0.d0/,pass1/0.d0/,pass2/0.d0/
       data delr,epsq,press,quattol,rprim,rvdw/6*0.d0/
       data temp,timcls,timjob,tolnce,rlxtol/5*0.d0/
+      data gaumom/6*0.d0/
       
 c     set up the communications
       
@@ -113,10 +119,10 @@ c     set up the communications
 c     determine processor identities
       
       call machine(idnode,mxnode)
-            
+      
 c     activate for limited-life executable
       
-CBOMB      call bomb(idnode,2008,6,30)
+c$$$      call bomb(idnode,2020,6,26)
       
       allocate (tbuffer(10),stat=memr)
       
@@ -126,38 +132,39 @@ c     open main printing file
       
       if(.not.redirect.and.idnode.eq.0)open(nrite,file='OUTPUT')
       if(idnode.eq.0) write (nrite,
-     x  "(/,20x,'DL_POLY Classic 1.9',
-     x  /,/,30x,'Running on ',i4,' nodes',/,/)") mxnode
+     x  "(/,20x,'DL_POLY Classic 1.10',
+     x   /,/,30x,'Running on ',i4,' nodes',/,/)") mxnode
 
 c     allocate arrays for each function
       
-      call alloc_ang_arrays(idnode)
-      call alloc_bnd_arrays(idnode)
-      call alloc_config_arrays(idnode)
-      call alloc_csh_arrays(idnode)
-      call alloc_dih_arrays(idnode)
-      call alloc_ewald_arrays(idnode)
-      call alloc_exc_arrays(idnode)
-      call alloc_exi_arrays(idnode)
-      call alloc_fbp_arrays(idnode)
-      call alloc_fld_arrays(idnode)
-      call alloc_free_arrays(idnode)
-      call alloc_hke_arrays(idnode)
-      call alloc_hyper_arrays(idnode)
-      call alloc_inv_arrays(idnode)
-      call alloc_met_arrays(idnode)
-      call alloc_pair_arrays(idnode)
-      call alloc_pmf_arrays(idnode)
-      call alloc_prp_arrays(idnode)
-      call alloc_rgbdy_arrays(idnode)
-      call alloc_shake_arrays(idnode)
-      call alloc_site_arrays(idnode)
-      call alloc_sol_arrays(idnode)
-      call alloc_spme_arrays(idnode)
-      call alloc_tbp_arrays(idnode)
-      call alloc_ter_arrays(idnode)
-      call alloc_tet_arrays(idnode)
-      call alloc_vdw_arrays(idnode)
+      call alloc_ang_arrays(idnode,mxnode)
+      call alloc_bnd_arrays(idnode,mxnode)
+      call alloc_config_arrays(idnode,mxnode)
+      call alloc_csh_arrays(idnode,mxnode)
+      call alloc_dih_arrays(idnode,mxnode)
+      call alloc_ewald_arrays(idnode,mxnode)
+      call alloc_exc_arrays(idnode,mxnode)
+      call alloc_exi_arrays(idnode,mxnode)
+      call alloc_fbp_arrays(idnode,mxnode)
+      call alloc_fld_arrays(idnode,mxnode)
+      call alloc_free_arrays(idnode,mxnode)
+      call alloc_hke_arrays(idnode,mxnode)
+      call alloc_hyper_arrays(idnode,mxnode)
+      call alloc_inv_arrays(idnode,mxnode)
+      call alloc_met_arrays(idnode,mxnode)
+      call alloc_pair_arrays(idnode,mxnode)
+      call alloc_pimd_arrays(idnode,mxnode)
+      call alloc_pmf_arrays(idnode,mxnode)
+      call alloc_prp_arrays(idnode,mxnode)
+      call alloc_rgbdy_arrays(idnode,mxnode)
+      call alloc_shake_arrays(idnode,mxnode)
+      call alloc_site_arrays(idnode,mxnode)
+      call alloc_sol_arrays(idnode,mxnode)
+      call alloc_spme_arrays(idnode,mxnode)
+      call alloc_tbp_arrays(idnode,mxnode)
+      call alloc_ter_arrays(idnode,mxnode)
+      call alloc_tet_arrays(idnode,mxnode)
+      call alloc_vdw_arrays(idnode,mxnode)
       
 c     start clock
       
@@ -169,29 +176,36 @@ c     input the control parameters defining the simulation
      x  (seek,lfcap,lgofr,lnsq,loptim,lzero,lminim,lpgr,ltraj,ltscal,
      x  lzeql,lzden,nolink,newgau,lhit,lbpd,ltad,lneb,prechk,tadall,
      x  lsolva,lfree,lfrmas,lexcite,lswitch,lghost,lnfic,nebgo,lpsoc,
-     x  idnode,minstp,intsta,istraj,keybpd,keyens,keyfce,keyres,keyver,
-     x  keytrj,kmax1,kmax2,kmax3,multt,nstack,nstbgr,nsbzdn,nstbpo,
-     x  nhko,nlatt,nstbts,nsteql,nstraj,nstrun,nospl,keytol,numgau,
-     x  khit,nhit,nblock,ntrack,blkout,numneb,mode,nsolva,isolva,nofic,
-     x  alpha,delr,epsq,fmax,press,quattol,rcut,rprim,rvdw,taup,taut,
-     x  temp,timcls,timjob,tolnce,tstep,rlxtol,opttol,zlen,ehit,xhit,
-     x  yhit,zhit,ebias,vmin,catchrad,sprneb,deltad,tlow,hyp_units)
+     x  lpimd,idnode,minstp,intsta,istraj,keybpd,keyens,keyfce,
+     x  keyres,keyver,keytrj,kmax1,kmax2,kmax3,multt,nstack,nstbgr,
+     x  nsbzdn,nstbpo,nhko,nlatt,nstbts,nsteql,nstraj,nstrun,nospl,
+     x  keytol,numgau,khit,nhit,nblock,ntrack,blkout,numneb,mode,nsolva,
+     x  isolva,nofic,nbeads,nchain,alpha,delr,epsq,fmax,press,quattol,
+     x  rcut,rprim,rvdw,taup,taut,temp,timcls,timjob,tolnce,tstep,
+     x  rlxtol,opttol,zlen,ehit,xhit,yhit,zhit,ebias,vmin,catchrad,
+     x  sprneb,deltad,tlow,hyp_units,chi)
       
 c     input the system force field
       
       call sysdef
-     x  (lneut,lnsq,lsolva,lfree,lexcite,lswitch,lghost,idnode,keyfce,
-     x  keyfld,natms,ngrp,ntpatm,ntpmls,ntpvdw,ntptbp,ntpmet,ntpfbp,
-     x  ntpter,nshels,keyshl,ntghost,keyver,dlrpot,engunit,rvdw,rcuttb,
-     x  rctter,rcutfb)
+     x  (lneut,lnsq,lsolva,lfree,lexcite,lswitch,lghost,lpimd,idnode,
+     x  keyfce,keyfld,natms,ngrp,ntpatm,ntpmls,ntpvdw,ntptbp,ntpmet,
+     x  ntpfbp,ntpter,nshels,keyshl,ntghost,keyver,dlrpot,engunit,
+     x  rvdw,rcuttb,rctter,rcutfb)
       
       if(ntpmet.gt.0.and.multt.gt.1)call error(idnode,153)
       
 c     construct initial configuration of system
       
       call sysgen
-     x  (loglnk,lneut,nolink,lfree,lfrmas,idnode,imcon,keyens,
-     x  keyfce,keyres,levcfg,multt,mxnode,ntpmls,delr,rcut,volm)
+     x  (loglnk,lneut,nolink,lfree,lfrmas,lpimd,idnode,imcon,keyens,
+     x  keyfce,keyres,levcfg,multt,mxnode,ntpmls,nbeads,delr,rcut,
+     x  temp,volm,uuu)
+      
+c     determine system dimensions
+      
+      call dcell(cell,celprp)
+      width=min(celprp(7),celprp(8),celprp(9))
       
 c     construct initial bookkeeping arrays
       
@@ -200,6 +214,10 @@ c     construct initial bookkeeping arrays
      x  mxnode,natms,nneut,ngrp,nscons,ntangl,ntbond,ntcons,
      x  ntdihd,ntinv,ntpmls,ntpmf,nspmf,ntfree,ntteth,ntshl,
      x  ntghost,degfre,degrot)
+      
+c     amend number of free atoms for pimd system
+      
+      if(lpimd)ntfree=nbeads*ntfree
       
 c     reset atom numbers for excitation simulation
       
@@ -212,27 +230,29 @@ c     reset atom numbers for excitation simulation
 c     set initial system temperature
       
       call systemp
-     x  (idnode,imcon,keyres,mxnode,natms2,ngrp,nscons,ntcons,
-     x  ntfree,ntshl,levcfg,keyshl,degfre,degshl,degrot,temp,
-     x  tolnce)
+     x  (lpimd,idnode,imcon,keyres,mxnode,natms2,nbeads,ngrp,nscons,
+     x  ntcons,ntfree,ntshl,levcfg,keyshl,keyens,degfre,degshl,
+     x  degrot,engke,tolnce,temp,sigma,uuu)
       
 c     read thermodynamic and structural data from restart file
       
       call sysinit
-     x  (lgofr,lzden,lsolva,lfree,lghost,lpsoc,idnode,imcon,keyfce,
-     x  keyres,mxnode,natms,ntshl,nstep,numacc,numrdf,ntpatm,
-     x  ntpmet,ntpvdw,nzden,chip,chit,conint,elrc,engunit,virlrc,
-     x  rvdw,volm,virtot,vircom,tboost,chit_shl)
+     x  (lgofr,lzden,lsolva,lfree,lghost,lpsoc,lpimd,idnode,imcon,
+     x  keyfce,keyres,mxnode,natms,nbeads,ntshl,nstep,numacc,numrdf,
+     x  ntpatm,ntpmet,ntpvdw,nzden,chip,chit,conint,elrc,engunit,
+     x  virlrc,rvdw,volm,virtot,vircom,tboost,chit_shl,engthe,gaumom)
       
 c     metadynamics by d. quigley
       
       if(lmetadyn) then
-
-c        make copy of excluded atom list for use by metadynamics
-         call exclude_copy_mtd(idnode)
-
-c        initialise metadynamics, read order parameter definitions etc.
-         call define_metadynamics(idnode,mxnode,natms,ntpatm,temp)   
+        
+c     make copy of excluded atom list for use by metadynamics
+        
+        call exclude_copy_mtd(idnode)
+        
+c     initialise metadynamics, read order parameter definitions etc.
+        
+        call define_metadynamics(idnode,mxnode,natms,ntpatm,temp)   
 
       end if
 
@@ -257,26 +277,14 @@ c     synchronise LRC, SIC and system charge terms for switching
       
 c     zero long range component of stress
       
-      do i=1,9
-        stresl(i)=0.d0
-      enddo
+      stresl(:)=0.d0
       
 c     zero contraint terms
       
       vircon=0.d0
       virpmf=0.d0
-      if(lminim.or.loptim.or.ntcons.eq.0)then
+      if(lminim.or.loptim.or.ntcons.eq.0)strcns(:)=0.d0
 
-        do i=1,9
-          strcns(i)=0.d0
-        enddo
-
-      endif
-
-c     define target kinetic energy
-      
-      sigma=temp*boltz*degfre*0.5d0
-      
 c     metadynamics by d. quigley
       
       sigma_shl=boltz*degshl*0.5d0      
@@ -293,7 +301,7 @@ c     convert BPD parameters to internal units
 c     time check
 
       call timchk(1,tzero)
-
+      
 c     control variable for structure optimizer
       
       keystr=0
@@ -317,43 +325,35 @@ c     first step of minimisation programme
      x    virang,virbnd,vircpe,virdih,virfbp,virfld,virinv,virlrc,
      x    virmet,virshl,virsrp,virtbp,virter,virtet,volm,engmet,
      x    virtot,sigma,tolnce,engunit,engord,virord)
-      
+        
+      elseif((lpimd.or.keyver.gt.0).and.nstep.eq.0)then
+        
 c     calculate initial conditions for velocity verlet
-      
-      elseif(keyver.eq.1.and.nstep.eq.0)then
-        
-c     kinetic stress tensor at start
-        
-        call dcell(cell,celprp)
-        width=min(celprp(7),celprp(8),celprp(9))
-        call kinstress(natms,idnode,mxnode,stress)
-        engke=0.5d0*(stress(1)+stress(5)+stress(9))
-        do i=1,9
-          stress(i)=stress(i)/dble(mxnode)
-        enddo
-        
-c     calculate initial forces
         
         call molecular_dynamics
-     x    (lfcap,lgofr,lneut,lnsq,loglnk,loptim,lzeql,lzero,
-     x    newlst,stropt,recycle,ltad,lsolva,lfree,lghost,
-     x    idnode,imcon,keyfce,keyfld,keyshl,keystr,keytol,kmax1,
-     x    kmax2,kmax3,multt,mxnode,natms,ngrp,nhko,nlatt,nneut,
-     x    nospl,nscons,nstbgr,nstep,nsteql,ntangl,ntbond,ntdihd,
-     x    ntfree,ntinv,ntpfbp,ntpmet,ntptbp,ntpter,ntpvdw,ntshl,
-     x    ntteth,ntcons,numrdf,nsolva,isolva,alpha,delr,dlrpot,
-     x    drewd,elrc,engang,engbnd,engcpe,engdih,engfbp,engfld,
-     x    enginv,engshl,engsrp,engtbp,engter,engtet,epsq,fmax,
-     x    opttol,rctter,rcut,rcutfb,rcuttb,rprim,rvdw,shlke,
-     x    engcfg,temp,tstep,virang,virbnd,vircpe,virdih,
-     x    virfbp,virfld,virinv,virlrc,virmet,virshl,virsrp,
-     x    virtbp,virter,virtet,volm,engmet,virtot,engord,virord)
+     x    (lfcap,lgofr,lneut,lnsq,loglnk,loptim,lzeql,lzero,newlst,
+     x    stropt,recycle,ltad,lsolva,lfree,lghost,lpimd,idnode,imcon,
+     x    keyfce,keyfld,keyshl,keystr,keytol,kmax1,kmax2,kmax3,multt,
+     x    mxnode,natms,ngrp,nhko,nlatt,nneut,nospl,nscons,nstbgr,nstep,
+     x    nsteql,ntangl,ntbond,ntdihd,ntfree,ntinv,ntpfbp,ntpmet,
+     x    ntptbp,ntpter,ntpvdw,ntshl,ntteth,ntcons,numrdf,nsolva,
+     x    isolva,nbeads,alpha,delr,dlrpot,drewd,elrc,engang,engbnd,
+     x    engcpe,engdih,engfbp,engfld,enginv,engshl,engsrp,engtbp,
+     x    engter,engtet,epsq,fmax,opttol,rctter,rcut,rcutfb,rcuttb,
+     x    rprim,rvdw,shlke,engcfg,temp,tstep,virang,virbnd,vircpe,
+     x    virdih,virfbp,virfld,virinv,virlrc,virmet,virshl,virsrp,
+     x    virtbp,virter,virtet,volm,engmet,virtot,engord,virord,
+     x    engrng,virrng,qmsbnd)
         
 c     bias potential dynamics option - reset forces
         
         if(lbpd)call bpd_forces(natms,keybpd,vmin,ebias,temp,engcfg)
         
       endif
+      
+c     stage initial forces for pimd
+      
+      if(lpimd)call stage_forces(idnode,mxnode,natms)
       
       if(ltad.or.(lbpd.and.keybpd.eq.2))then
         
@@ -372,7 +372,7 @@ c     construct the first reference state
       endif
       
 c     perform selected NEB calculation
-        
+      
       if(lneb)then
         
         do i=1,numneb
@@ -409,7 +409,7 @@ c     bypass the MD cycle for this option
         recycle=.false.
         
       endif
-        
+      
 c***********************************************************************
 c     start of molecular dynamics calculations
 c***********************************************************************
@@ -477,7 +477,7 @@ c     energy accumulators
           
           engke=0.d0
           engrot=0.d0
-        
+          
         endif
         
 c     calculate volume of simulation cell
@@ -522,7 +522,14 @@ c     activate the impact option at designated time step
         
 c     integrate equations of motion stage 1 of velocity verlet
         
-        if(keyver.gt.0)then
+        if(lpimd)then
+          
+          isw=1
+          call pimd_integrate
+     x      (isw,idnode,mxnode,imcon,natms,keyens,nstep,tstep,
+     x      taut,temp,engke,engthe,chi,uuu,gaumom)
+          
+        elseif(keyver.gt.0)then
           
           isw=1
           if(.not.loptim)then
@@ -530,11 +537,11 @@ c     integrate equations of motion stage 1 of velocity verlet
             if(llswitch)call copy_force(idnode,mxnode)
             
             call vv_integrate
-     x      (lcnb,lshmov,lnfic,isw,idnode,mxnode,imcon,natms2,nstep,
-     x      ngrp,keyens,nscons,ntcons,ntpatm,ntfree,nspmf,ntpmf,mode,
-     x      nofic,ntshl,keyshl,tstep,engke,engrot,tolnce,vircon,vircom,
-     x      virtot,temp,press,volm,sigma,taut,taup,chit,chip,consv,
-     x      conint,elrc,virlrc,virpmf,chit_shl,sigma_shl)
+     x        (lcnb,lshmov,lnfic,isw,idnode,mxnode,imcon,natms2,nstep,
+     x        ngrp,keyens,nscons,ntcons,ntpatm,ntfree,nspmf,ntpmf,mode,
+     x        nofic,ntshl,keyshl,tstep,engke,engrot,tolnce,vircon,
+     x        vircom,virtot,temp,press,volm,sigma,taut,taup,chit,chip,
+     x        consv,conint,elrc,virlrc,virpmf,chit_shl,sigma_shl,gaumom)
             
             if(lghost)call update_ghost(idnode,mxnode)
             
@@ -568,23 +575,24 @@ c     scale t=0 tether reference positions (constant pressure only)
      x      virang,virbnd,vircpe,virdih,virfbp,virfld,virinv,virlrc,
      x      virmet,virshl,virsrp,virtbp,virter,virtet,volm,engmet,
      x      virtot,sigma,tolnce,engunit,engord,virord)
-        
+          
         elseif(loptim.or.keyshl.ne.2)then
           
           call molecular_dynamics
      x      (lfcap,lgofr,lneut,lnsq,loglnk,loptim,lzeql,lzero,
-     x      newlst,stropt,recycle,ltad,lsolva,lfree,lghost,
+     x      newlst,stropt,recycle,ltad,lsolva,lfree,lghost,lpimd,
      x      idnode,imcon,keyfce,keyfld,keyshl,keystr,keytol,kmax1,
      x      kmax2,kmax3,multt,mxnode,natms,ngrp,nhko,nlatt,nneut,
      x      nospl,nscons,nstbgr,nstep,nsteql,ntangl,ntbond,ntdihd,
      x      ntfree,ntinv,ntpfbp,ntpmet,ntptbp,ntpter,ntpvdw,ntshl,
-     x      ntteth,ntcons,numrdf,nsolva,isolva,alpha,delr,dlrpot,
-     x      drewd,elrc,engang,engbnd,engcpe,engdih,engfbp,engfld,
-     x      enginv,engshl,engsrp,engtbp,engter,engtet,epsq,fmax,
-     x      opttol,rctter,rcut,rcutfb,rcuttb,rprim,rvdw,shlke,
+     x      ntteth,ntcons,numrdf,nsolva,isolva,nbeads,alpha,delr,
+     x      dlrpot,drewd,elrc,engang,engbnd,engcpe,engdih,engfbp,
+     x      engfld,enginv,engshl,engsrp,engtbp,engter,engtet,epsq,
+     x      fmax,opttol,rctter,rcut,rcutfb,rcuttb,rprim,rvdw,shlke,
      x      engcfg,temp,tstep,virang,virbnd,vircpe,virdih,
      x      virfbp,virfld,virinv,virlrc,virmet,virshl,virsrp,
-     x      virtbp,virter,virtet,volm,engmet,virtot,engord,virord)
+     x      virtbp,virter,virtet,volm,engmet,virtot,engord,virord,
+     x      engrng,virrng,qmsbnd)
           
         else
           
@@ -604,6 +612,10 @@ c     scale t=0 tether reference positions (constant pressure only)
           
         endif
         
+c     stage forces for pimd
+        
+        if(lpimd)call stage_forces(idnode,mxnode,natms)
+        
 c     bias potential dynamics option - reset forces
         
         if(lbpd)call bpd_forces(natms,keybpd,vmin,ebias,temp,engcfg)
@@ -614,7 +626,14 @@ c     switching option for excitation simulation
         
 c     integrate equations of motion
         
-        if(keyver.eq.0)then
+        if(lpimd)then
+          
+          isw=2
+          call pimd_integrate
+     x      (isw,idnode,mxnode,imcon,natms,keyens,nstep,tstep,
+     x      taut,temp,engke,engthe,chi,uuu,gaumom)
+          
+        elseif(keyver.eq.0)then
           
 c     integrate equations of motion by leapfrog verlet
           
@@ -623,7 +642,7 @@ c     integrate equations of motion by leapfrog verlet
      x      keyens,nscons,ntcons,ntpatm,ntfree,nspmf,ntpmf,mode,nofic,
      x      tstep,engke,engrot,tolnce,quattol,vircon,vircom,virtot,
      x      temp,press,volm,sigma,taut,taup,chit,chip,consv,conint,
-     x      elrc,virlrc,virpmf)
+     x      elrc,virlrc,virpmf,gaumom)
           
         else if(keyver.gt.0)then
           
@@ -635,7 +654,7 @@ c     integrate equations of motion by velocity verlet (stage 2)
      x      ngrp,keyens,nscons,ntcons,ntpatm,ntfree,nspmf,ntpmf,mode,
      x      nofic,ntshl,keyshl,tstep,engke,engrot,tolnce,vircon,vircom,
      x      virtot,temp,press,volm,sigma,taut,taup,chit,chip,consv,
-     x      conint,elrc,virlrc,virpmf,chit_shl,sigma_shl)
+     x      conint,elrc,virlrc,virpmf,chit_shl,sigma_shl,gaumom)
           
         endif
         
@@ -671,18 +690,18 @@ c     application of transition analysis procedures
         endif
         
 c     reset average boost factor in BPD during equilibration
-      
-      if(lbpd.and.keybpd.eq.1)then
-      
-        if(lzeql.and.nstep.le.nsteql)then
+        
+        if(lbpd.and.keybpd.eq.1)then
           
-          numbpd=0
-          tboost=0.d0
+          if(lzeql.and.nstep.le.nsteql)then
+            
+            numbpd=0
+            tboost=0.d0
+            
+          endif
           
         endif
         
-      endif
-      
 c     calculate shell kinetic energy
         
         if(keyshl.eq.1)then
@@ -707,22 +726,18 @@ c     apply temperature scaling
           chit=0.d0
           chit_shl=0.d0
           chip=0.d0
-          do i=1,9
-            eta(i)=0.d0
-          enddo
+          eta(:)=0.d0
           
           if(keyshl.eq.1) then
             
             do k=1,4
-              
               call vscaleg(idnode,mxnode,imcon,natms2,ngrp,sigma)
               call shlqnch(idnode,mxnode,ntshl,temp)
-              
             enddo
             
           else
             
-            call vscaleg(idnode,mxnode,imcon,natms2,ngrp,sigma)
+            call vscaleg(idnode,mxnode,imcon,natms2*nbeads,ngrp,sigma)
             
           endif
           
@@ -733,22 +748,38 @@ c     reset atom velocities at intervals if required
         if(newgau)then
           
           if(mod(nstep,numgau).eq.0)call regauss
-     x      (idnode,imcon,mxnode,natms2,ngrp,nscons,ntcons,
+     x      (idnode,imcon,mxnode,natms2*nbeads,ngrp,nscons,ntcons,
      x      ntshl,keyshl,sigma,temp,tolnce)
+          
+        endif
+        
+c     calculate quantum energy
+        
+        if(lpimd)then
+          
+          call quantum_energy
+     x      (idnode,mxnode,natms,temp,engke,engcfg,engrng,engqpi,
+     x      engqvr,qmsrgr)
+          engcfg=engcfg+engrng
           
         endif
         
 c     calculate physical quantities
         
         if(nstep.gt.0)call static
-     x    (lbpd,lzeql,idnode,intsta,imcon,keyens,natms,nstack,
+     x    (lbpd,lzeql,lpimd,idnode,intsta,imcon,keyens,natms,nstack,
      x    nstep,nsteql,ntpatm,numacc,mxnode,nblock,keybpd,numbpd,
      x    consv,degfre,degrot,engang,engbnd,engcpe,engdih,enginv,
      x    engke,engrot,engsrp,engunit,engcfg,stpeng,stpeth,stpprs,
      x    stptmp,stpvir,stpvol,tstep,virbnd,engfbp,vircom,vircon,
      x    vircpe,virsrp,engfld,virfld,engtbp,virtbp,virpmf,virshl,
      x    engshl,engtet,virtet,degshl,shlke,virang,width,engmet,
-     x    virmet,engter,virter,boost,tboost)
+     x    virmet,engter,virter,boost,tboost,engqpi,engqvr,engrng,
+     x    virrng,qmsrgr,qmsbnd,engthe)
+
+c     reset moment accumulators in equilbration period
+        
+        if(nstep.eq.nsteql)gaumom(0)=0.d0
         
 c     z density calculation
         
@@ -764,9 +795,17 @@ c     terminate program if boundary conditions violated
           
           levcfg=2
           call revive
-     x      (lgofr,lzden,idnode,imcon,mxnode,natms,levcfg,nstep,nzden,
-     x      numacc,numrdf,chip,chit,conint,tstep,engcfg,virtot,vircom,
-     x      tboost,chit_shl)
+     x      (lgofr,lzden,lpimd,idnode,imcon,mxnode,natms,nbeads,levcfg,
+     x      nstep,nzden,numacc,numrdf,chip,chit,conint,tstep,engcfg,
+     x      virtot,vircom,tboost,chit_shl,gaumom)
+          
+          if(lpimd)then
+            
+            call write_thermostats(idnode,mxnode,natms,temp)
+            if(keyens.eq.41)call save_rnd_cfg(idnode,mxnode,uuu)
+            
+          endif
+          
           call error(idnode,95)
           
         endif
@@ -780,8 +819,8 @@ c     line-printer output every nstbpo steps
             
             call get_prntime(hms,timelp,prntim)
             call get_simtime(dec,nstep,tstep,simtim)
-            if(mod(lines,npage).eq.0)
-     x        write(nrite,"(1x,120('-'),
+            if(mod(lines,npage).eq.0)then
+              write(nrite,"(1x,120('-'),
      x        /,/,1x,'    step',5x,'eng_tot',4x,'temp_tot',5x,
      x        'eng_cfg',5x,'eng_vdw',5x,'eng_cou',5x,'eng_bnd',
      x        5x,'eng_ang',5x,'eng_dih',5x,'eng_tet',/,1x,
@@ -790,94 +829,110 @@ c     line-printer output every nstbpo steps
      x        5x,'vir_con',5x,'vir_tet',/,1x,'cpu time',6x,
      x        'volume',4x,'temp_shl',5x,'eng_shl',5x,'vir_shl',
      x        7x,'alpha',8x,'beta',7x,'gamma',5x,'vir_pmf',
-     x        7x,'press',/,/,
-     x        1x,120('-'))")
+     x        7x,'press')")
+              if(lpimd)write(nrite,"(1x,'pimd    ',5x,'eng_qpi',5x,
+     x        'eng_qvr',5x,'eng_rng',5x,'vir_rng',5x,'qms_rgr',5x,
+     x        'qms_bnd',5x,'eng_the')")
+              write(nrite,"(/,/,1x,120('-'))")
+            endif
             write(nrite,"(1x,i8,1p,9e12.4,/,1x,0p,f7.3,a1,1p,9e12.4,
      x        /,1x,0p,f7.3,a1,1p,9e12.4)")
-     x        nstep,(stpval(i),i=1,9),
-     x        simtim,dec,(stpval(i),i=10,18),
-     x        prntim,hms,(stpval(i),i=19,27)
-            write(nrite,"(/,1x,' rolling',1p,9e12.4,/,1x,'averages',
+     x      nstep,(stpval(i),i=1,9),
+     x      simtim,dec,(stpval(i),i=10,18),
+     x      prntim,hms,(stpval(i),i=19,27)
+          iadd=mxnstk-7
+          if(lpimd)write(nrite,"(9x,1p,9e12.4)")
+     x      (stpval(iadd+i),i=1,7)
+          write(nrite,"(/,1x,' rolling',1p,9e12.4,/,1x,'averages',
      x        1p,9e12.4,/,9x,1p,9e12.4)") (ravval(i),i=1,27)
-            write(nrite,"(1x,120('-'))")
-            
-          endif
-          
-          lines=lines+1
+          if(lpimd)write(nrite,"(9x,1p,9e12.4)")
+     x      (ravval(iadd+i),i=1,7)
+          write(nrite,"(1x,120('-'))")
           
         endif
         
+        lines=lines+1
+        
+      endif
+      
 c     report end of equilibration period
+      
+      if((.not.loptim).and.(.not.lzero).and.(nstep.ge.nsteql))then
         
-        if((.not.loptim).and.(.not.lzero).and.(nstep.ge.nsteql))then
-          
-          if((ltscal.and.idnode.eq.0).and.(nstep.eq.nsteql))
-     x      write(nrite,"(/,/,1x,'switching off temperature ',
-     x      'scaling at step ',i6,/,/,/,1x,120('-'))") nstep
-          ltscal=.false.
-          
-        endif
+        if((ltscal.and.idnode.eq.0).and.(nstep.eq.nsteql))
+     x    write(nrite,"(/,/,1x,'switching off temperature ',
+     x        'scaling at step ',i6,/,/,/,1x,120('-'))") nstep
+        ltscal=.false.
         
+      endif
+      
 c     write trajectory data
-        
-        if(ltraj.and.nstep.ge.nstraj) then
-          if(idnode.eq.0.and.mod(nstep-nstraj,istraj).eq.0)then
-            
-            call traject
-     x        (ltraj,idnode,imcon,istraj,keytrj,natms,
-     x        nstraj,nstep,tstep)
-            
-          endif
+      
+      if(ltraj.and.nstep.ge.nstraj) then
+        if(idnode.eq.0.and.mod(nstep-nstraj,istraj).eq.0)then
+          
+          call traject
+     x      (ltraj,idnode,imcon,istraj,keytrj,natms*nbeads,
+     x      nstraj,nstep,tstep)
           
         endif
         
+      endif
+      
 c     write solvation energy file
+      
+      if(lsolva.and.nstep.ge.nsolva)then
         
-        if(lsolva.and.nstep.ge.nsolva)then
+        if(mod(nstep-nsolva,isolva).eq.0)then
           
-          if(mod(nstep-nsolva,isolva).eq.0)then
-            
-            call solva_temp(idnode,mxnode,natms2,keyver)
-            call solvation_write(lexcite,lswitch,idnode,natms,
-     x        nstep,nsolva,isolva,tstep,engunit,elrc)
-            
-          endif
+          call solva_temp(idnode,mxnode,natms2,keyver)
+          call solvation_write(lexcite,lswitch,idnode,natms,
+     x      nstep,nsolva,isolva,tstep,engunit,elrc)
           
         endif
         
+      endif
+      
 c     write free energy file
+      
+      if(lfree.and.nstep.ge.nfrn)then
         
-        if(lfree.and.nstep.ge.nfrn)then
+        if(mod(nstep-nfrn,ifrn).eq.0)then
           
-          if(mod(nstep-nfrn,ifrn).eq.0)then
-            
-            call free_kinetic(lfrmas,idnode,mxnode,keyver)
-            call free_energy_write(idnode,nstep,engunit)
-          
-          endif
+          call free_kinetic(lfrmas,idnode,mxnode,keyver)
+          call free_energy_write(idnode,nstep,engunit)
           
         endif
         
+      endif
+      
 c     save restart data in event of system crash
+      
+      if(mod(nstep,ndump).eq.0.and.nstep.ne.nstrun)then
         
-        if(mod(nstep,ndump).eq.0.and.nstep.ne.nstrun)then
+        levcfg=2
+        call revive
+     x    (lgofr,lzden,lpimd,idnode,imcon,mxnode,natms,nbeads,levcfg,
+     x    nstep,nzden,numacc,numrdf,chip,chit,conint,tstep,engcfg,
+     x    virtot,vircom,tboost,chit_shl,gaumom)
+        
+        if(ltad.or.lbpd)
+     x    call hyper_close(ltad,idnode,mxnode,natms,nsteql)
+        
+        if(lpimd)then
           
-          levcfg=2
-          call revive
-     x      (lgofr,lzden,idnode,imcon,mxnode,natms,levcfg,nstep,nzden,
-     x      numacc,numrdf,chip,chit,conint,tstep,engcfg,virtot,vircom,
-     x      tboost,chit_shl)
-          
-          if(ltad.or.lbpd)
-     x      call hyper_close(ltad,idnode,mxnode,natms,nsteql)
+          call write_thermostats(idnode,mxnode,natms,temp)
+          if(keyens.eq.41)call save_rnd_cfg(idnode,mxnode,uuu)
           
         endif
         
+      endif
+      
 c     cycle time check
-        
-        call timchk(0,timelp)
-        recycle=(recycle.and.timjob-timelp.gt.timcls)
-        
+      
+      call timchk(0,timelp)
+      recycle=(recycle.and.timjob-timelp.gt.timcls)
+      
       enddo
       
 c***********************************************************************
@@ -885,12 +940,12 @@ c     end of molecular dynamics calculations
 c***********************************************************************
       
 c     last time check
-        
+      
       call timchk(0,timelp)
       call get_prntime(hms,timjob,prntim)
       if(idnode.eq.0)write(nrite,
      x  "(/,/,1x,'run terminating. elapsed cpu time = ',1p,e13.5,
-     x  ', job time = ',0p,f7.3,a1,', close time = ',f7.2,'s',/)")
+     x   ', job time = ',0p,f7.3,a1,', close time = ',f7.2,'s',/)")
      x  timelp,prntim,hms,timcls
       
 c     shell relaxation convergence statistics
@@ -899,33 +954,44 @@ c     shell relaxation convergence statistics
         
         if(idnode.eq.0)write(nrite,
      x    "(/,/,1x,'shell relaxation statistics : average cycles = ',
-     x    f8.3,' maximum cycles = ',f8.3)")pass1,pass2
-      
+     xf8.3,' maximum cycles = ',f8.3)")pass1,pass2
+        
       endif
-
+      
 c     produce summary of simulation
       
       levcfg=2
       if(loptim)levcfg=0
       if(.not.lneb)call result
-     x  (ltad,lbpd,lgofr,lpgr,lzden,idnode,imcon,keyens,mxnode,natms,
-     x  levcfg,nzden,nstep,ntpatm,numacc,numrdf,keybpd,chip,chit,
-     x  conint,rcut,tstep,engcfg,volm,virtot,vircom,zlen,tboost,
-     x  chit_shl)
+     x  (ltad,lbpd,lgofr,lpgr,lzden,lpimd,idnode,imcon,keyens,mxnode,
+     x  natms,nbeads,levcfg,nzden,nstep,ntpatm,numacc,numrdf,keybpd,
+     x  chip,chit,conint,rcut,tstep,engcfg,volm,virtot,vircom,zlen,
+     x  tboost,chit_shl,gaumom)
       
 c     write hyperdynamics restart file
       
       if(ltad.or.lbpd)
      x  call hyper_close(ltad,idnode,mxnode,natms,nsteql)
       
+c     write pimd thermostats file
+      
+      if(lpimd)then
+        
+        call write_thermostats(idnode,mxnode,natms,temp)
+        if(keyens.eq.41)call save_rnd_cfg(idnode,mxnode,uuu)
+        
+      endif
+      
 c     close output channels
       
-      if(idnode.eq.0) then
+      if(idnode.eq.0)then
         
         close (nrite)
         close (nstats)
         close (nhist)
         close (nevnt)
+        close (ntherm)
+        close (npuni)
         
       endif
       

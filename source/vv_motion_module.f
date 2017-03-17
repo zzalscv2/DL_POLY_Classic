@@ -497,7 +497,7 @@ c     update velocities for first and second stages
 c     first stage of velocity verlet algorithm
 
       if(isw.eq.1)then
-
+        
 c     update positions
         
         do i=iatm0,iatm1
@@ -512,7 +512,7 @@ c     merge position data
         
         if(mxnode.gt.1)
      x    call merge(idnode,mxnode,natms,mxbuff,xxx,yyy,zzz,buffer)
-
+        
 c     apply shake corrections to bond constraints
 
         if(ntcons.gt.0)then
@@ -530,9 +530,9 @@ c     apply shake corrections to bond constraints
         endif
 
 c     second stage of velocity verlet algorithm
-
+        
       else
-
+        
 c     merge velocity data
 
         if(mxnode.gt.1)
@@ -3028,4 +3028,3 @@ c     deallocate working arrays
       end subroutine nstvv_h1
       
       end module vv_motion_module
-

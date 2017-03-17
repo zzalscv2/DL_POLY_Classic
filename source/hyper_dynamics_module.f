@@ -65,7 +65,7 @@ c***********************************************************************
       
       contains
       
-      subroutine alloc_hyper_arrays(idnode)
+      subroutine alloc_hyper_arrays(idnode,mxnode)
       
 c***********************************************************************
 c     
@@ -81,9 +81,11 @@ c***********************************************************************
       
       integer, parameter :: nnn=16
       
-      integer i,fail,idnode,nebmax
+      logical safe
+      integer i,fail,idnode,mxnode,nebmax
       dimension fail(nnn)
-      
+
+      safe=.true.
       nebmax=msatms*(mxneb+1)
       
 c     initialise control variables
@@ -109,9 +111,7 @@ c     initialise control variables
       
 c     allocate working arrays
 
-      do i=1,nnn
-        fail(i)=0
-      enddo
+      fail(:)=0
       
       allocate (xbas(msatms),ybas(msatms),zbas(msatms),stat=fail(1))
       allocate (xchk(msatms),ychk(msatms),zchk(msatms),stat=fail(2))
@@ -132,12 +132,9 @@ c     allocate working arrays
       allocate (hxneb(nebmax),hyneb(nebmax),hzneb(nebmax),stat=fail(15))
       allocate (optk(5,0:mxneb),stat=fail(16))
       
-      do i=1,nnn
-        if(fail(i).gt.0)then
-          if(idnode.eq.0)write(nrite,'(10i5)')fail
-          call error(idnode,1115)
-        endif
-      enddo
+      if(any(fail.gt.0))safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,1115)
       
       end subroutine alloc_hyper_arrays
       
@@ -173,10 +170,8 @@ c***********************************************************************
       real(8) virlrc,cvgerr,dum,otol,cgerr,sigma,hyp_units
       
 c     allocate track array for BPD
-
-      if(lbpd)then
-        allocate (track(0:nblock/ntrack),stat=fail)
-      endif
+      
+      allocate (track(0:nblock/ntrack),stat=fail)
       
 c     block indices
       
@@ -802,9 +797,9 @@ c***********************************************************************
       implicit none
 
       logical lfcap,nogofr,lneut,lnsq,loglnk,stropt,lzeql
-      logical newlst,ltad,lsolva,lfree,lexcite
+      logical newlst,ltad,lsolva,lfree,lexcite,lpimd
 
-      integer idnode,imcon,keyfce,keyfld,keyshl,keytol
+      integer idnode,imcon,keyfce,keyfld,keyshl,keytol,nbeads
       integer keystr,kmax1,kmax2,kmax3,multt,mxnode,natms,ngrp
       integer nhko,nlatt,nneut,nospl,nscons,nstbgr,nstep,nsteql
       integer ntangl,ntbond,ntdihd,ntfree,ntinv,ntpfbp,ntpmet
@@ -819,6 +814,7 @@ c***********************************************************************
       real(8) virfld,virinv,virlrc,virmet,virshl,virsrp
       real(8) virtbp,virter,virtet,volm,engmet,cfgold,cvgerr
       real(8) hnorm,grad0,grad1,ff1,sgn,engord,virord
+      real(8) engrng,virrng,qmsbnd
       
       data mxpass/1000/
       
@@ -834,9 +830,11 @@ c     control variables
       
 c     dummy variables
       
+      lpimd=.false.
       lsolva=.false.
       lfree=.false.
       lexcite=.false.
+      nbeads=1
       nsolva=0
       isolva=1
       engord=0.d0
@@ -853,23 +851,23 @@ c     relax the current structure
 c     construct verlet neighbour list
         
         call nlist_driver
-     x    (newlst,lneut,lnsq,loglnk,ltad,natms,idnode,mxnode,imcon,
-     x    nneut,keyfce,rcut,delr,tstep)
+     x    (newlst,lneut,lnsq,loglnk,ltad,natms,nbeads,idnode,mxnode,
+     x    imcon,nneut,keyfce,rcut,delr,tstep)
         
 c     calculate atomic forces
         
         call force_manager
      x    (newlst,lneut,lnsq,nogofr,lzeql,loglnk,lfcap,lsolva,lfree,
-     x    lexcite,idnode,mxnode,natms,imcon,mstep,nstbgr,nsteql,
+     x    lexcite,lpimd,idnode,mxnode,natms,imcon,mstep,nstbgr,nsteql,
      x    numrdf,keyfce,kmax1,kmax2,kmax3,nhko,nlatt,ntpvdw,
      x    ntpmet,nospl,multt,nneut,ntptbp,ntpfbp,ntpter,keyshl,
      x    keyfld,ntbond,ntangl,ntdihd,ntinv,ntteth,ntshl,nsolva,
-     x    isolva,delr,dlrpot,engcpe,engsrp,epsq,rcut,rprim,rvdw,
+     x    isolva,nbeads,delr,dlrpot,engcpe,engsrp,epsq,rcut,rprim,rvdw,
      x    vircpe,virsrp,alpha,drewd,volm,engmet,virmet,elrc,virlrc,
      x    rcuttb,engtbp,virtbp,rcutfb,engfbp,virfbp,rctter,engter,
      x    virter,engbnd,virbnd,engang,virang,engdih,virdih,enginv,
      x    virinv,engtet,virtet,engshl,shlke,virshl,engfld,virfld,
-     x    engcfg,fmax,temp,engord,virord)
+     x    engcfg,fmax,temp,engord,virord,engrng,virrng,qmsbnd)
         
 c     frozen atoms option
         
@@ -1455,7 +1453,7 @@ c     read data for second reference structure
         
       endif
       
-c     construct initial `bead' configurations in chain
+c     construct initial configurations in chain
       
       k=0
       do n=0,mxneb
@@ -1469,7 +1467,7 @@ c     construct linear mix of cell vectors
           celneb(i,n)=(1.d0-fac)*celbas(i)+fac*celchk(i)
         enddo
         
-c     construct beads by linear interpolation
+c     construct configurations by linear interpolation
         
         do i=iatm0,iatm1
           
@@ -1497,7 +1495,7 @@ c     start of NEB optimisation
         safe=.true.
         mstep=nstep+pass
         
-c     calculate system forces on all beads
+c     calculate system forces on all chain configurations
         
         call neb_system_forces
      x    (lfcap,lneut,lnsq,loglnk,lzeql,newlst,idnode,mxnode,
@@ -1512,21 +1510,21 @@ c     calculate system forces on all beads
      x    virtet,engshl,shlke,virshl,engfld,virfld,engcfg,fmax,
      x    temp,tstep)
         
-c     calculate spring forces on all beads
+c     calculate spring forces on all chain configurations
         
         call neb_spring_forces(idnode,mxnode,natms,nkinks,sprneb)
         
-c     energy minimisation of each bead
+c     energy minimisation of each chain configuration
         
         do n=0,mxneb
           
-c     construct cell vectors for nth bead
+c     construct cell vectors for nth chain configuration
           
           do i=1,9
             cell(i)=celneb(i,n)
           enddo
           
-c     construct coordinate and force arrays for nth bead
+c     construct coordinate and force arrays for nth chain configuration
           
           k=n*iatm2
           do i=iatm0,iatm1
@@ -1577,7 +1575,7 @@ c     structure optimisation
           safe=safe.and.stropt
           stropt=.false.
           
-c     update coordinate arrays for nth bead
+c     update coordinate arrays for nth chain configuration
           
           k=n*iatm2
           do i=iatm0,iatm1
@@ -1671,19 +1669,19 @@ c***********************************************************************
       implicit none
       
       logical newlst,lneut,lnsq,nogofr,lzeql,loglnk,lfcap,ltad
-      logical lsolva,lfree,lexcite
+      logical lsolva,lfree,lexcite,lpimd
       integer idnode,mxnode,natms,imcon,nstbgr,nsteql,mstep
       integer numrdf,keyfce,kmax1,kmax2,kmax3,nhko,nlatt,ntpvdw
       integer ntpmet,nospl,multt,nneut,ntptbp,ntpfbp,ntpter,keyshl
       integer keyfld,ntbond,ntangl,ntdihd,ntinv,ntteth,ntshl
-      integer iatm0,iatm1,iatm2,i,k,n,nsolva,isolva
+      integer iatm0,iatm1,iatm2,i,k,n,nsolva,isolva,nbeads
       real(8) delr,dlrpot,engcpe,engsrp,epsq,rcut,rprim,rvdw
       real(8) vircpe,virsrp,alpha,drewd,volm,engmet,virmet
       real(8) elrc,virlrc,rcuttb,engtbp,virtbp,rcutfb,engfbp,virfbp
       real(8) rctter,engter,virter,engbnd,virbnd,engang,virang
       real(8) engdih,virdih,enginv,virinv,engtet,virtet,engshl
       real(8) shlke,virshl,engfld,virfld,engcfg,fmax,temp,tstep
-      real(8) engord,virord
+      real(8) engord,virord,engrng,virrng,qmsbnd
       
       numrdf=0
       ltad=.true.
@@ -1691,9 +1689,11 @@ c***********************************************************************
       
 c     dummy variables
       
+      lpimd=.false.
       lsolva=.false.
       lfree=.false.
       lexcite=.false.
+      nbeads=1
       nsolva=0
       isolva=1
       engord=0.d0
@@ -1705,17 +1705,17 @@ c     block indices
       iatm1=((idnode+1)*natms)/mxnode
       iatm2=iatm1-iatm0+1
       
-c     calculate system forces for all beads
+c     calculate system forces for all chain configurations
       
       do n=0,mxneb
         
-c     construct cell vectors for one bead
+c     construct cell vectors for one chain configuration
         
         do i=1,9
           cell(i)=celneb(i,n)
         enddo
         
-c     construct coordinate array for one bead
+c     construct coordinate array for one chain configuration
         
         k=n*iatm2
         do i=iatm0,iatm1
@@ -1735,25 +1735,25 @@ c     form complete global arrays
 c     construct verlet neighbour list
         
         call nlist_driver
-     x    (newlst,lneut,lnsq,loglnk,ltad,natms,idnode,mxnode,imcon,
-     x    nneut,keyfce,rcut,delr,tstep)
+     x    (newlst,lneut,lnsq,loglnk,ltad,natms,nbeads,idnode,mxnode,
+     x    imcon,nneut,keyfce,rcut,delr,tstep)
         
-c     calculate atomic forces for one bead
+c     calculate atomic forces for one chain configuration
         
         call force_manager
      x    (newlst,lneut,lnsq,nogofr,lzeql,loglnk,lfcap,lsolva,lfree,
-     x    lexcite,idnode,mxnode,natms,imcon,mstep,nstbgr,nsteql,
+     x    lexcite,lpimd,idnode,mxnode,natms,imcon,mstep,nstbgr,nsteql,
      x    numrdf,keyfce,kmax1,kmax2,kmax3,nhko,nlatt,ntpvdw,
      x    ntpmet,nospl,multt,nneut,ntptbp,ntpfbp,ntpter,keyshl,
      x    keyfld,ntbond,ntangl,ntdihd,ntinv,ntteth,ntshl,nsolva,
-     x    isolva,delr,dlrpot,engcpe,engsrp,epsq,rcut,rprim,rvdw,
+     x    isolva,nbeads,delr,dlrpot,engcpe,engsrp,epsq,rcut,rprim,rvdw,
      x    vircpe,virsrp,alpha,drewd,volm,engmet,virmet,elrc,virlrc,
      x    rcuttb,engtbp,virtbp,rcutfb,engfbp,virfbp,rctter,engter,
      x    virter,engbnd,virbnd,engang,virang,engdih,virdih,enginv,
      x    virinv,engtet,virtet,engshl,shlke,virshl,engfld,virfld,
-     x    engcfg,fmax,temp,engord,virord)
+     x    engcfg,fmax,temp,engord,virord,engrng,virrng,qmsbnd)
         
-c     store configuration energy of bead
+c     store configuration energy of chain configuration
         
         engneb(n)=engcfg
         
@@ -1761,7 +1761,7 @@ c     frozen atoms option
         
         call freeze(natms)
         
-c     allocate forces to bead atoms
+c     allocate forces to atoms of chain configuration
         
         k=n*iatm2
         do i=iatm0,iatm1
@@ -1810,7 +1810,7 @@ c     energies of first and last basins
       engneb(0)=engbsn(1)
       engneb(mxneb)=engbsn(2)
       
-c     calculate spring tangents for all beads
+c     calculate spring tangents for all chain configurations
       
       nkinks=0
       do n=1,mxneb-1
@@ -2021,13 +2021,13 @@ c     determine true new state from first maximum
         enddo
         n=-ktrn(i)
         
-c     construct cell vectors for nth bead
+c     construct cell vectors for nth chain configuration
         
         do i=1,9
           cell(i)=celneb(i,n)
         enddo
         
-c     construct coordinate force arrays for nth bead
+c     construct coordinate force arrays for nth chain configuration
         
         k=n*iatm2
         do i=iatm0,iatm1

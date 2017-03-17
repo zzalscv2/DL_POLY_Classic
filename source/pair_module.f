@@ -21,26 +21,33 @@ c***********************************************************************
 
       contains
 
-      subroutine alloc_pair_arrays(idnode)
-
+      subroutine alloc_pair_arrays(idnode,mxnode)
+      
       implicit none
-
+      
       integer, parameter :: nnn=6
-
-      integer i,fail,idnode
+      
+      logical safe
+      integer i,fail,idnode,mxnode
       dimension fail(nnn)
-
+      
+      safe=.true.
+      
+c     allocate arrays
+      
+      fail(:)=0
+      
       allocate (ilist(mxxdf),stat=fail(1))
       allocate (jlist(mxxdf),stat=fail(2))
       allocate (xdf(mxxdf),stat=fail(3))
       allocate (ydf(mxxdf),stat=fail(4))
       allocate (zdf(mxxdf),stat=fail(5))
       allocate (rsqdf(mxxdf),stat=fail(6))
-
-      do i=1,nnn
-        if(fail(i).gt.0)call error(idnode,1940)
-      enddo
-
+      
+      if(any(fail.gt.0))safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,1940)
+      
       end subroutine alloc_pair_arrays
 
       end module pair_module

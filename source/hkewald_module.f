@@ -32,18 +32,22 @@ c***********************************************************************
 
       contains
       
-      subroutine alloc_hke_arrays(idnode)
-
+      subroutine alloc_hke_arrays(idnode,mxnode)
+      
       implicit none
-
+      
       integer, parameter :: nnn=9
 
-      integer i,fail,idnode
+      logical safe
+      integer i,fail,idnode,mxnode
       dimension fail(nnn)
 
-      do i=1,nnn
-        fail(i)=0
-      enddo
+      safe=.true.
+
+c     allocate arrays
+
+      fail(:)=0
+      
       allocate (ahk(0:mxhko),crn(0:mxhko,0:mxhko),stat=fail(1))
       allocate (elc(mxewld,0:1),els(mxewld,0:1),stat=fail(2))
       allocate (emc(mxewld,0:kmaxb),ems(mxewld,0:kmaxb),stat=fail(3))
@@ -53,10 +57,11 @@ c***********************************************************************
       allocate (fon(mxegrd,0:7),zgc(0:2*mxhko),stat=fail(7))
       allocate (ckc(mxewld),cks(mxewld),stat=fail(8))
       allocate (pp(2*mxhko),sss(mxxdf),stat=fail(9))
-      do i=1,nnn
-        if(fail(i).gt.0)call error(idnode,1730)
-      enddo
-
+      
+      if(any(fail.gt.0))safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,1730)
+      
       end subroutine alloc_hke_arrays
 
       subroutine hkgen(idnode,nhko,nlatt,alpha,drewd,rcut)

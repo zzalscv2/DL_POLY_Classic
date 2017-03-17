@@ -474,7 +474,122 @@ c     calculate random number
       
       return
       end function duni
+      
+      function puni(key,uuu)
 
+c*********************************************************************
+c     
+c     dl_poly random number generator based on the universal
+c     random number generator of marsaglia, zaman and tsang
+c     (stats and prob. lett. 8 (1990) 35-39.) it must be
+c     called once to initialise parameters u,c,cd,cm
+c     
+c     copyright daresbury laboratory 1992
+c     author -  w.smith         july 1992
+c     
+c     parallel version - w.smith sep 2016
+c
+c     set key=0 to return a random number
+c     set key=1 to initialise random number generator
+c     set key=2 to reload control variables at restart
+c     set key=3 to return control variables for saving
+c     
+c*********************************************************************
+      
+      implicit none
+      
+      integer ir,jr,i,j,k,l,m,ii,jj,key,idnode,mynode
+      real(4) s,t,c,cd,cm,uni
+      real(8) puni,uuu(102)
+      real(4) u(97)
+      save u,c,cd,cm,uni,ir,jr
+      
+      if(key.eq.1)then
+        
+c     initialise random number generator
+c     initial values of i,j,k must be in range 1 to 178 (not all 1)
+c     initial value of l must be in range 0 to 168.
+        
+        idnode=mynode()
+        i=mod(11+idnode,178)+1
+        j=mod(33+idnode,178)+1
+        k=mod(55+idnode,178)+1
+        l=mod(77+idnode,168)+1
+        if(i.eq.1.and.j.eq.1.and.k.eq.1)then
+          j=13
+          k=131
+        endif
+        
+        ir=97
+        jr=33
+        
+        do ii=1,97
+          s=0.0
+          t=0.5
+          do jj=1,24
+            m=mod(mod(i*j,179)*k,179)
+            i=j
+            j=k
+            k=m
+            l=mod(53*l+1,169)
+            if(mod(l*m,64).ge.32)s=s+t
+            t=0.5*t
+          enddo
+          u(ii)=s
+        enddo
+        
+        c =  362436.0/16777216.0
+        cd= 7654321.0/16777216.0
+        cm=16777213.0/16777216.0
+        
+      else if(key.eq.2)then
+        
+c     reload control variables at restart
+        
+        do ii=1,97
+          u(ii)=uuu(ii)
+        enddo
+        c=uuu(98)
+        cd=uuu(99)
+        cm=uuu(100)
+        ir=nint(uuu(101))
+        jr=nint(uuu(102))
+        
+      else if(key.eq.3)then
+        
+c     return control variables for saving
+        
+        do ii=1,97
+          uuu(ii)=u(ii)
+        enddo
+        uuu(98)=c
+        uuu(99)=cd
+        uuu(100)=cm
+        uuu(101)=dble(ir)
+        uuu(102)=dble(jr)
+        
+      else
+        
+c     generate random number
+        
+        uni=u(ir)-u(jr)
+        if(uni.lt.0.0)uni=uni+1.0
+        u(ir)=uni
+        ir=ir-1
+        if(ir.eq.0)ir=97
+        jr=jr-1
+        if(jr.eq.0)jr=97
+        c=c-cd
+        if(c.lt.0.0)c=c+cm
+        uni=uni-c
+        if(uni.lt.0.0)uni=uni+1.0
+        puni=dble(uni)
+        
+      endif
+      
+      return
+      end function puni
+      
       subroutine ele_prd(nnn,aaa,bbb,ccc)
 
 c**********************************************************************

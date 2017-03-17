@@ -29,28 +29,31 @@ c***********************************************************************
 
       contains
       
-      subroutine alloc_tbp_arrays(idnode)
-
+      subroutine alloc_tbp_arrays(idnode,mxnode)
+      
       implicit none
 
-      integer i,fail,idnode
+      logical safe
+      integer i,fail,idnode,mxnode
       dimension fail(6)
+      
+      safe=.true.
 
-      do i=1,6
-        fail(i)=0
-      enddo
+c     allocate arrays
 
+      fail(:)=0
+      
       allocate (prmtbp(mxtbp,mxptbp),stat=fail(1))
       allocate (rcut3b(mxtbp),stat=fail(2))
       allocate (lsttbp(mxtbp),stat=fail(3))
       allocate (ltptbp(mxtbp),stat=fail(4))
       allocate (lattbp(mxatms),stat=fail(5))
       allocate (filter(mxsite),stat=fail(6))
-
-      do i=1,6
-        if(fail(i).gt.0)call error(idnode,1170)
-      enddo
-
+      
+      if(any(fail.gt.0))safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,1170)
+      
       end subroutine alloc_tbp_arrays
 
       subroutine define_three_body

@@ -19,7 +19,7 @@ c*********************************************************************
       implicit none
 
       integer idnode,mxnode,natms,nbuff,nsize,ierr,iatm1,iatm2
-      integer j,i,k,jdnode,kdnode,katm1,katm2,iatm,katm
+      integer j,i,k,jdnode,kdnode,katm0,katm1
       real*8 xxx(natms),yyy(natms),zzz(natms),buffer(nbuff)
 
       include "comms.inc"
@@ -44,8 +44,6 @@ c     set up this nodes atoms
       iatm1 = (idnode*natms)/mxnode + 1
       iatm2 = ((idnode+1)*natms)/mxnode
 
-      iatm = iatm2-iatm1+1
-	
       do i=iatm1,iatm2
 
          buffer(j+1)=xxx(i)
@@ -70,9 +68,8 @@ c     identity of node of origin of incoming data
 
 c     identity of incoming  atoms
 
-         katm1 = (kdnode*natms)/mxnode + 1
-         katm2 = ((kdnode+1)*natms)/mxnode
-         katm = katm2-katm1 + 1
+         katm0 = (kdnode*natms)/mxnode + 1
+         katm1 = ((kdnode+1)*natms)/mxnode
 
 c     systolic data pulse to transfer data
 
@@ -88,7 +85,7 @@ c     merge the incoming data into current arrays
 
          j=3*nsize
 
-         do i=katm1,katm2
+         do i=katm0,katm1
 
             xxx(i)=buffer(j+1)
             yyy(i)=buffer(j+2)
@@ -505,7 +502,7 @@ c***********************************************************************
       include "comms.inc"
 
       integer idnode, mxnode, natms,ierr,i,k,j0,k0,n,jdnode,j
-      integer lishap(mxlshp),lashap(mxproc)
+      integer lishap(mxlshp),lashap(mxnode)
 
       integer status(MPI_STATUS_SIZE), request
 

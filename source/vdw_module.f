@@ -29,29 +29,32 @@ c***********************************************************************
 
       contains
       
-      subroutine alloc_vdw_arrays(idnode)
-
+      subroutine alloc_vdw_arrays(idnode,mxnode)
+      
       implicit none
-
+      
       integer, parameter :: nnn=5
-
-      integer i,fail,idnode
+      
+      logical safe
+      integer i,fail,idnode,mxnode
       dimension fail(nnn)
-
-      do i=1,nnn
-        fail(i)=0
-      enddo
-
+      
+      safe=.true.
+      
+c     allocate arrays
+      
+      fail(:)=0
+      
       allocate (ltpvdw(mxvdw),stat=fail(1))
       allocate (lstvdw(mxvdw),stat=fail(2))
       allocate (prmvdw(mxvdw,mxpvdw),stat=fail(3))
       allocate (vvv(mxgrid,mxvdw),stat=fail(4))
       allocate (ggg(mxgrid,mxvdw),stat=fail(5))
-
-      do i=1,nnn
-        if(fail(i).gt.0)call error(idnode,1014)
-      enddo
-
+      
+      if(any(fail.gt.0))safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,1014)
+      
       end subroutine alloc_vdw_arrays
 
       subroutine define_van_der_waals

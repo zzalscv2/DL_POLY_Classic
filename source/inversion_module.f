@@ -30,16 +30,19 @@ c***********************************************************************
 
       contains
 
-      subroutine alloc_inv_arrays(idnode)
-
+      subroutine alloc_inv_arrays(idnode,mxnode)
+      
       implicit none
-
-      integer i,fail,idnode
+      
+      logical safe
+      integer i,fail,idnode,mxnode
       dimension fail(5)
 
-      do i=1,5
-        fail(i)=0
-      enddo
+      safe=.true.
+
+c     allocate arrays
+
+      fail(:)=0
 
       allocate (prminv(mxtinv,mxpinv),stat=fail(1))
       allocate (numinv(mxtmls),stat=fail(2))
@@ -47,10 +50,12 @@ c***********************************************************************
       allocate (lstinv(mxtinv,4),stat=fail(4))
       allocate (listinv(mxinv,5),stat=fail(5))
 
-      do i=1,5
-        if(fail(i).gt.0)call error(idnode,1120)
-      enddo
-
+      if(any(fail.gt.0))safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,1120)
+      
+c     initialise numin array
+      
       do i=1,mxtmls
          numinv(i)=0
       enddo
@@ -76,98 +81,103 @@ c***********************************************************************
       logical safe
       character*8 keyword
       character*1 message(80)
-      integer idnode,itmols,ninver,nsite,ntmp,inv,inv1,i
+      integer idnode,itmols,ninver,nsite,ntmp,inv,j,keytmp
       integer iatm1,iatm2,iatm3,iatm4,isite1,isite2,isite3,isite4
       integer ia,ja,idum
-      real(8) engunit
+      real(8) engunit,parpot(mxpinv)
 
       ntmp=intstr(record,lenrec,idum)
       numinv(itmols)=numinv(itmols)+ntmp
+
       if(idnode.eq.0)then
         write(nrite,"(/,1x,'number of inversion terms',
-     x    6x,i10)")ntmp
-        write(nrite,"(/,/,1x,'inversion potential details:',
-     x    /,/,21x,7x,'key',5x,'index',5x,'index',5x,
-     x    'index',5x,'index',5x,'f-const',7x,'angle',/)")
+     x    6x,i10)")numinv(itmols)
+        Write(nrite,"(/,1x,'inversion angle details:',
+     x       /,/,12x,'unit',5x,'key',5x,'index',5x,'index',5x,'index',
+     x       5x,'index',7x,'f-const',8x,'angle',8x,'factor',/)")
       endif
       
-      inv1=numinv(itmols)
-      do inv=1,inv1
-
+      do inv=1,ntmp
+        
+        ninver=ninver+1
+        if(ninver.gt.mxtinv)call error(idnode,73)
+        
 c     read inversion potential parameters
         
         call getrec(safe,idnode,nfield)
         if(.not.safe)return
-
+        
         call copystring(record,message,80)
         call lowcase(record,4)
         call getword(keyword,record,4,lenrec)
+        
+        if(keyword(1:4).eq.'harm')then
+          keytmp=1
+        elseif(keyword(1:4).eq.'hcos')then
+          keytmp=2
+        elseif(keyword(1:4).eq.'plan')then
+          keytmp=3
+        elseif(keyword(1:4).eq.'calc')then
+          keytmp=4
+        else
+          if(idnode.eq.0)write(nrite,*)record
+          call error(idnode,449)
+        endif
+        
         iatm1=intstr(record,lenrec,idum)
         iatm2=intstr(record,lenrec,idum)
         iatm3=intstr(record,lenrec,idum)
         iatm4=intstr(record,lenrec,idum)
-
-c     test for frozen atom pairs
-
+        parpot(1)=dblstr(record,lenrec,idum)
+        parpot(2)=dblstr(record,lenrec,idum)
+        
         isite1=nsite-numsit(itmols)+iatm1
         isite2=nsite-numsit(itmols)+iatm2
         isite3=nsite-numsit(itmols)+iatm3
         isite4=nsite-numsit(itmols)+iatm4
-
+        
+c     test for frozen atom pairs
+        
         if(lfzsit(isite1)*lfzsit(isite2)*
      x    lfzsit(isite3)*lfzsit(isite4).ne.0)then
           
           numinv(itmols)=numinv(itmols)-1
-          if(idnode.eq.0)write(nrite,'(14x,a16,40a1)')
-     x      '*** frozen *** ',(message(i),i=1,40)
-
-        else
-
-          ninver=ninver+1
+          if(idnode.eq.0)
+     x      write(nrite,"(4x,a8,i10,4x,a4,4i10,10f15.6)")
+     x      '*frozen*',inv,keyword(1:4),iatm1,iatm2,iatm3,iatm4,
+     x      (parpot(j),j=1,mxpinv)
           
-          if(ninver.gt.mxtinv)call error(idnode,73)
-
-          if(keyword(1:4).eq.'harm')then
-            keyinv(ninver)=1
-          elseif(keyword(1:4).eq.'hcos')then
-            keyinv(ninver)=2
-          elseif(keyword(1:4).eq.'plan')then
-            keyinv(ninver)=3
-          elseif(keyword(1:4).eq.'calc')then
-            keyinv(ninver)=4
-          else
-            if(idnode.eq.0)write(nrite,*)record
-            call error(idnode,449)
-          endif
-
-          lstinv(ninver,1)=iatm1
-          lstinv(ninver,2)=iatm2
-          lstinv(ninver,3)=iatm3
-          lstinv(ninver,4)=iatm4
-          prminv(ninver,1)=dblstr(record,lenrec,idum)
-          prminv(ninver,2)=dblstr(record,lenrec,idum)
+        else
           
           if(idnode.eq.0)
-     x      write(nrite,"(27x,a4,4i10,1p,e12.4,0p,9f12.6)")
-     x      keyword(1:4),(lstinv(ninver,ia),ia=1,4),
-     x      (prminv(ninver,ja),ja=1,mxpinv)
-
-c     convert energies to internal units and angles to radians
-          
-          prminv(ninver,1)=prminv(ninver,1)*engunit
-
-          if(keyinv(ninver).eq.2)then
-
-            prminv(ninver,2)=cos(prminv(ninver,2)*(pi/180.d0))
-
-          elseif(keyinv(ninver).eq.4)then
-            
-            prminv(ninver,2)=prminv(ninver,2)*engunit
-            
-          endif
+     x      write(nrite,"(12x,i10,4x,a4,4i10,10f15.6)")
+     x      inv,keyword(:4),iatm1,iatm2,iatm3,iatm4,
+     x      (parpot(j),j=1,mxpinv)
           
         endif
+        
+        keyinv(ninver)=keytmp
+        lstinv(ninver,1)=iatm1
+        lstinv(ninver,2)=iatm2
+        lstinv(ninver,3)=iatm3
+        lstinv(ninver,4)=iatm4
+        prminv(ninver,1)=parpot(1)
+        prminv(ninver,2)=parpot(2)
 
+c     convert energies to internal units and angles to radians
+        
+        prminv(ninver,1)=prminv(ninver,1)*engunit
+        
+        if(keytmp.eq.2)then
+          
+          prminv(ninver,2)=cos(prminv(ninver,2)*(pi/180.d0))
+          
+        elseif(keytmp.eq.4)then
+          
+          prminv(ninver,2)=prminv(ninver,2)*engunit
+          
+        endif
+        
       enddo
       
       return

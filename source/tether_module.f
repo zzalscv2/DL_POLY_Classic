@@ -27,19 +27,22 @@ c***********************************************************************
 
       contains
       
-      subroutine alloc_tet_arrays(idnode)
-
+      subroutine alloc_tet_arrays(idnode,mxnode)
+      
       implicit none
-
+      
       integer, parameter :: nnn=8
 
-      integer i,fail,idnode
+      logical safe
+      integer i,fail,idnode,mxnode
       dimension fail(nnn)
 
-      do i=1,nnn
-        fail(i)=0
-      enddo
+      safe=.true.
 
+c     allocate arrays
+
+      fail(:)=0
+      
       allocate (prmtet(mxteth,mxpbnd),stat=fail(1))
       allocate (numteth(mxtmls),stat=fail(2))
       allocate (keytet(mxteth),stat=fail(3))
@@ -48,15 +51,17 @@ c***********************************************************************
       allocate (xxs(mxatms),stat=fail(6))
       allocate (yys(mxatms),stat=fail(7))
       allocate (zzs(mxatms),stat=fail(8))
+      
+      if(any(fail.gt.0))safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,1260)
 
-      do i=1,nnn
-        if(fail(i).gt.0)call error(idnode,1260)
-      enddo
-
+c     initialise numteth array
+      
       do i=1,mxtmls
          numteth(i)=0
       enddo
-
+      
       end subroutine alloc_tet_arrays
 
       subroutine define_tethers
@@ -76,22 +81,25 @@ c***********************************************************************
       logical safe
       character*8 keyword
       character*1 message(80)
-      real(8) engunit
-      integer idnode,itmols,nteth,nsite,ntmp,iteth,iteth1,idum
-      integer iatm1,isite1,j,i
+      real(8) engunit, parpot(mxpbnd)
+      integer idnode,itmols,nteth,nsite,ntmp,iteth,idum
+      integer iatm1,isite1,j,keytmp
 
       ntmp=intstr(record,lenrec,idum)
       numteth(itmols)=numteth(itmols)+ntmp
+
       if(idnode.eq.0)then
         write(nrite,"(/,1x,'number of tethered atoms ',
-     x    6x,i10)")ntmp
+     x    6x,i10)")numteth(itmols)
         write(nrite,"(/,' tethered atom details:',/,/,
-     x    21x,7x,'key',6x,'atom',19x,'parameters',/) ")
+     x    12x,'unit',5x,'key',6x,'atom',19x,'parameters',/) ")
       endif
 
-      iteth1=numteth(itmols)
-      do iteth=1,iteth1
-        
+      do iteth=1,ntmp
+
+        nteth=nteth+1
+        if(nteth.gt.mxteth)call error(idnode,62)
+
         call getrec(safe,idnode,nfield)
         if(.not.safe)return
         call strip(record,lenrec)
@@ -99,60 +107,63 @@ c***********************************************************************
         call lowcase(record,4)
         call getword(keyword,record,4,lenrec)
 
+        if(keyword(1:4).eq.'harm')then
+          keytmp=1
+        elseif(keyword(1:4).eq.'rhrm')then
+          keytmp=2
+        elseif(keyword(1:4).eq.'quar')then
+          keytmp=3
+        else
+          if(idnode.eq.0)write(nrite,*)message
+          call error(idnode,450)
+        endif
+
         iatm1=intstr(record,lenrec,idum)
-
-c     test for frozen atom 
-
+        parpot(1)=dblstr(record,lenrec,idum)
+        parpot(2)=dblstr(record,lenrec,idum)
+        parpot(3)=dblstr(record,lenrec,idum)
+        
         isite1=nsite-numsit(itmols)+iatm1
         
+c     test for frozen atom 
+        
         if(lfzsit(isite1).ne.0)then
-
-          numteth(itmols)=numteth(itmols)-1
-          if(idnode.eq.0)write(nrite,'(14x,a16,40a1)')
-     x      '*** frozen *** ',(message(i),i=1,40)
-
-        else
-
-          nteth=nteth+1
-          if(nteth.gt.mxteth)call error(idnode,62)
           
-          if(keyword(1:4).eq.'harm')then
-            keytet(nteth)=1
-          elseif(keyword(1:4).eq.'rhrm')then
-            keytet(nteth)=2
-          elseif(keyword(1:4).eq.'quar')then
-            keytet(nteth)=3
-          else
-            if(idnode.eq.0)write(nrite,*)message
-            call error(idnode,450)
-          endif
-
-          lsttet(nteth)=iatm1
-          prmtet(nteth,1)=dblstr(record,lenrec,idum)
-          prmtet(nteth,2)=dblstr(record,lenrec,idum)
-          prmtet(nteth,3)=dblstr(record,lenrec,idum)
+          numteth(itmols)=numteth(itmols)-1
+          if(idnode.eq.0)
+     x      write(nrite,"(4x,a8,i10,4x,a4,i10,2x,10f15.6)")
+     x      '*frozen*',iteth,keyword(1:4),iatm1,(parpot(j),j=1,mxpbnd)
+          
+        else
           
           if(idnode.eq.0)
-     x      write(nrite,"(27x,a4,i10,1p,9e12.4)")
-     x      keyword(1:4),lsttet(nteth),
-     x      (prmtet(nteth,j),j=1,mxpbnd)
+     x      write(nrite,"(12x,i10,4x,a4,i10,2x,10f15.6)")
+     x      iteth,keyword(1:4),iatm1,(parpot(j),j=1,mxpbnd)
+          
+        endif           
+
+c     store parameters
+        
+        keytet(nteth)=keytmp
+        lsttet(nteth)=iatm1
+        prmtet(nteth,1)=parpot(1)
+        prmtet(nteth,2)=parpot(2)
+        prmtet(nteth,3)=parpot(3)
 
 c     convert energy units to internal units
-          
-          if(abs(keytet(nteth)).eq.1)then
-            prmtet(nteth,1)=prmtet(nteth,1)*engunit
-          elseif(abs(keytet(nteth)).eq.2)then
-            prmtet(nteth,1)=prmtet(nteth,1)*engunit
-          elseif(abs(keytet(nteth)).eq.3)then
-            prmtet(nteth,1)=prmtet(nteth,1)*engunit
-            prmtet(nteth,2)=prmtet(nteth,2)*engunit
-            prmtet(nteth,3)=prmtet(nteth,3)*engunit
-          endif
-
+        
+        if(abs(keytmp).eq.1)then
+          prmtet(nteth,1)=prmtet(nteth,1)*engunit
+        elseif(abs(keytmp).eq.2)then
+          prmtet(nteth,1)=prmtet(nteth,1)*engunit
+        elseif(abs(keytmp).eq.3)then
+          prmtet(nteth,1)=prmtet(nteth,1)*engunit
+          prmtet(nteth,2)=prmtet(nteth,2)*engunit
+          prmtet(nteth,3)=prmtet(nteth,3)*engunit
         endif
 
       enddo
-      
+
       return
       end subroutine define_tethers
 

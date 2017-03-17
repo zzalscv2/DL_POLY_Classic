@@ -27,18 +27,22 @@ c***********************************************************************
 
       contains
 
-      subroutine alloc_site_arrays(idnode)
-
+      subroutine alloc_site_arrays(idnode,mxnode)
+      
       implicit none
-
+      
       integer, parameter :: nnn=16
-
-      integer i,fail,idnode
+      
+      logical safe
+      integer i,fail,idnode,mxnode
       dimension fail(nnn)
+      
+      safe=.true.
 
-      do i=1,nnn
-         fail(i)=0
-      enddo
+c     allocate arrays
+
+      fail(:)=0
+      
       allocate (chgsit(mxsite),stat=fail(1))
       allocate (wgtsit(mxsite),stat=fail(2))
       allocate (nexsit(mxsite),stat=fail(3))
@@ -55,18 +59,21 @@ c***********************************************************************
       allocate (dens(mxatyp),stat=fail(14))
       allocate (nummols(mxtmls),stat=fail(15))
       allocate (molnam(40,mxtmls),stat=fail(16))
-      do i=1,nnn
-         if(fail(i).ne.0)call error(idnode,1090)
-      enddo
+      
+      if(any(fail.gt.0))safe=.false.      
+      if(mxnode.gt.1)call gstate(safe)    
+      if(.not.safe)call error(idnode,1090)
 
+c     initialise numsit array
+      
       do i=1,mxtmls
          numsit(i)=0
       enddo
-
+      
       end subroutine alloc_site_arrays
 
       subroutine define_atoms
-     x  (safe,lneut,idnode,itmols,nsite,ksite,ntpatm)
+     x  (safe,lneut,lfreeze,idnode,itmols,nsite,ksite,ntpatm)
 
 c***********************************************************************
 c     
@@ -81,12 +88,14 @@ c***********************************************************************
 
       character*8 atom1
       character*1 message(80)
-      logical lneut,safe,atmchk
+      logical lneut,safe,atmchk,lfreeze
       integer idnode,itmols,nsite,ksite,ntpatm,isite,nrept
-      integer ifrz,neugp,irept,jsite,idum
+      integer ifrz,neugp,irept,jsite,idum,ntmp
       real(8) weight,charge
 
-      numsit(itmols)=intstr(record,lenrec,idum)
+      ntmp=intstr(record,lenrec,idum)
+      numsit(itmols)=ntmp
+
       if(idnode.eq.0) then
         write(nrite,"(/,1x,'number of atoms/sites',
      x    10x,i10)") numsit(itmols)
@@ -98,11 +107,10 @@ c***********************************************************************
      x    write(nrite,"(/,/,1x,'atomic characteristics:',/
      x    /,21x,' site',5x,'name',10x,'mass',8x,'charge',
      x    4x,'repeat',4x,'freeze',3x,'chg grp')")
-        
       endif
       
-      do isite=1,numsit(itmols)
-        
+      do isite=1,ntmp
+
         if(ksite.lt.numsit(itmols))then
 
 c     read atom name, site number, mass, charge, freeze option
@@ -116,6 +124,7 @@ c     read atom name, site number, mass, charge, freeze option
           charge=dblstr(record,lenrec,idum)
           nrept=intstr(record,lenrec,idum)
           ifrz =intstr(record,lenrec,idum)
+          if(ifrz.gt.0)lfreeze=.true.
           neugp=intstr(record,lenrec,idum)
           if(nrept.eq.0)nrept=1
           ksite=ksite+nrept
