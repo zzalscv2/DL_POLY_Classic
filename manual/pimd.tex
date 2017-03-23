@@ -36,7 +36,7 @@ The central idea of both PIMD and PIMC is that the partition function
 of a system of {\em quantum} particles is isomorphic with that of a
 system of {\em classical} ring polymers. In this isomorphism each ring
 polymer corresponds to one quantum particle\footnote{As far as \DD{}
-  is concerned, the a `quantum particle' is a simple atom or
+  is concerned, a `quantum particle' is a simple atom or
   ion.}. The so-called `beads' of the polymer represent alternative
 locations for the quantum particle according to the probabilistic
 interpretation of the wave function and collectively describe the
@@ -356,7 +356,7 @@ In \DD{} these equations are integrated using the velocity Verlet
 algorithm and it is useful to note that the following quantity is
 formally conserved during the integration.
 \begin{equation}
-  E_{cons}=\sum_{J=1}^{N}\sum_{k=1}^{L} \left [ \frac{\pi_{j,k}^{2}}{2 m_{k}'}+
+  E_{cons}=\sum_{j=1}^{N}\sum_{k=1}^{L} \left [ \frac{\pi_{j,k}^{2}}{2 m_{k}'}+
     \mu_{k} \frac{\kappa}{2} (\vek{u}_{j,k} \cdot \vek{u}_{j,k})+
     \frac{1}{L}\Phi\left (\vek{r}_{jk}(\{\vek{u}_{j',k}^{\alpha}\}) \right )+ \newline
     \sum_{n=1}^{M} \sum_{\alpha} \left \{ \frac{1}{2}Q_{k}({\dot \zeta}_{j,k,n}^{\alpha})^{2}
