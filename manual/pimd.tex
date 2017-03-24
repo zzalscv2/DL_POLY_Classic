@@ -400,15 +400,15 @@ but that need not be a concern in PIMD simulations, which are
 concerned with structure only.
 
 In both approaches (\ref{pimd-nhc}) and (\ref{pimd-gt}), it is useful
-to have some means of monitoring the simulation to ensure that the
-system is properly ergodic. Ergodicity requires that the kinetic
-energy of every degree of freedom has an average value of
-$k_{B}T_{o}/2$ and that the instantaneous value is sampled from a
-Gaussian distribution. In \DD{} the quality of the obtained momentum
-distribution is assessed by comparing the even moments of the
-simulation distribution function with the ideal values for a true
-Gaussian (see \cite{smith-14} ch. 12).  The expected values for true
-Gaussian moments are
+to have some means of monitoring the simulation to ensure that it
+properly samples from the canonical ensemble. This requires that the
+kinetic energy of every degree of freedom has an average value of
+$k_{B}T_{o}/2$ and that the staged momenta of the beads are
+collectively represented by a Gaussian distribution. In \DD{} the
+quality of the obtained momentum distribution is assessed by comparing
+the even moments of the simulated distribution function with the ideal
+values for a true Gaussian (see \cite{smith-14} ch. 12).  The expected
+values for true Gaussian moments are
 \begin{eqnarray}
   \left \langle (\pi_{j,k}^{2}/m_{k}') \right \rangle &=& k_{B}T_{o} \nonumber \\
   \left \langle (\pi_{j,k}^{2}/m_{k}')^{2} \right \rangle &=& 3 (k_{B}T_{o})^{2} \nonumber \\
