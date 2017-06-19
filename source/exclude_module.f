@@ -527,7 +527,7 @@ c***********************************************************************
       endif
       
       return
-      end            
+      end subroutine check_exclude
 
       subroutine excludeneu(idnode,mxnode,nneut)
 
