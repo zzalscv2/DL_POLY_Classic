@@ -947,7 +947,7 @@ c**********************************************************************
       endif
 
       return
-      end
+      end function gssrnd
       
       subroutine thermo_chain_vv
      x  (idnode,mxnode,natms,tstep,taut,temp)
