@@ -198,8 +198,12 @@ c***********************************************************************
           
         endif
         
-        temp_sol(atmolt(i))=temp_sol(atmolt(i))+weight(i)*
-     x    (vvx*vvx+vvy*vvy+vvz*vvz)/(boltz*degfre_sol(atmolt(i)))
+        if(degfre_sol(atmolt(i)).ge.1.d0)then
+          
+          temp_sol(atmolt(i))=temp_sol(atmolt(i))+weight(i)*
+     x      (vvx*vvx+vvy*vvy+vvz*vvz)/(boltz*degfre_sol(atmolt(i)))
+          
+        endif
         
       enddo
       
@@ -898,6 +902,7 @@ c     mark start of time step data
 c     write intramolecular data
           
           write(nsolwr,'(1p,5e14.6)')temp_sol
+          
           if(lcomp(1))then
             if(lexcite)then
               write(nsolwr,'(1p,5e14.6)')bnd_sol(:)/engunit
