@@ -20,17 +20,15 @@ Classic Licence DO NOT extend to DL_POLY_3 or DL_POLY_4.
 
 ## quick install
 
-```
-
+```sh
 cd source
 ln -s ../build/MakePAR Makefile
 make dlpoly
-
 ```
 
 if you see the following issue
 
-```
+```sh
 mpif90 -c -O3 metafreeze_module.f
 metafreeze_module.f:297:49:
 
@@ -46,7 +44,7 @@ Error: Rank mismatch between actual argument at (1) and actual argument at (2) (
 
 change the make command to
 
-```
+``sh
 make dlpoly FFLAGS="-c -O3 -fallow-argument-mismatch"
 ```
 
