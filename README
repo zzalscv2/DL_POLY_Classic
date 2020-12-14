@@ -1,4 +1,4 @@
-The DL_POLY Classic README File
+# The DL_POLY Classic README File
 
 DL_POLY Classic is a general purpose (parallel and serial)
 molecular dynamics simulation package derived from the package
@@ -18,3 +18,37 @@ DL_POLY_4, which are available from Daresbury Laboratory under
 DIFFERENT licence terms. Permissions granted under the DL_POLY
 Classic Licence DO NOT extend to DL_POLY_3 or DL_POLY_4.
 
+## quick install
+
+```
+
+cd source
+ln -s ../build/MakePAR Makefile
+make dlpoly
+
+```
+
+if you see the following issue
+
+```
+mpif90 -c -O3 metafreeze_module.f
+metafreeze_module.f:297:49:
+
+  297 |         if ( commsize > 1 ) call gdsum(eng_loc,1,buff1)
+      |                                                 1
+......
+ 3075 |       call gdsum(zeta_global(1),ntet,buff1(1:ntet))
+      |                                     2            
+Error: Rank mismatch between actual argument at (1) and actual argument at (2) (rank-1 and scalar)
+
+```
+
+
+change the make command to
+
+```
+make dlpoly FFLAGS="-c -O3 -fallow-argument-mismatch"
+```
+
+
+ 

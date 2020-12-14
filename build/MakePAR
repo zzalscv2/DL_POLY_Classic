@@ -62,7 +62,7 @@ debug:
 #=================== Dlpoly ==========================================
 dlpoly:
 	$(MAKE) LD="mpif90 -o" LDFLAGS="" \
-	FC=mpif90 FFLAGS="-c -O3" \
+	FC=mpif90 FFLAGS?="-c -O3" \
 	EX=$(EX) BINROOT=$(BINROOT) $(TYPE)
 
 #=====================================================================
